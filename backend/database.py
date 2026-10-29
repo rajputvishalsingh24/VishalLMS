@@ -125,6 +125,7 @@ def _run_init_script(conn):
         subject_id TEXT,
         topic_id TEXT,
         document_id TEXT,
+        concept_name TEXT DEFAULT '',
         title TEXT NOT NULL,
         difficulty TEXT DEFAULT 'Medium',
         total_questions INTEGER DEFAULT 5,
@@ -134,14 +135,78 @@ def _run_init_script(conn):
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
+    CREATE TABLE IF NOT EXISTS quiz_questions (
+        id TEXT PRIMARY KEY,
+        quiz_id TEXT,
+        document_id TEXT NOT NULL,
+        concept_name TEXT NOT NULL,
+        question_index INTEGER NOT NULL,
+        question_text TEXT NOT NULL,
+        question_type TEXT NOT NULL DEFAULT 'single_choice',
+        difficulty TEXT NOT NULL DEFAULT 'Medium',
+        options_json TEXT NOT NULL,
+        correct_indices_json TEXT NOT NULL,
+        explanation TEXT NOT NULL,
+        distractor_explanations_json TEXT DEFAULT '{}',
+        source_slide_number INTEGER DEFAULT 1,
+        practical_example TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS quiz_attempts (
         id TEXT PRIMARY KEY,
         quiz_id TEXT NOT NULL,
+        document_id TEXT,
+        concept_name TEXT DEFAULT '',
         score INTEGER NOT NULL,
         total_questions INTEGER NOT NULL,
+        accuracy REAL NOT NULL,
+        time_taken_seconds INTEGER DEFAULT 0,
         answers_json TEXT NOT NULL,
+        results_json TEXT NOT NULL DEFAULT '[]',
+        strong_areas_json TEXT DEFAULT '[]',
+        needs_revision_json TEXT DEFAULT '[]',
+        recommended_activity TEXT DEFAULT '',
+        mode TEXT DEFAULT 'assessment',
         completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS study_sessions (
+        id TEXT PRIMARY KEY,
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT DEFAULT '',
+        start_time TIMESTAMP NOT NULL,
+        end_time TIMESTAMP,
+        duration_seconds INTEGER DEFAULT 0,
+        activity_type TEXT DEFAULT 'learning',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS concept_progress (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        concept_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'Not Started',
+        slide_numbers_json TEXT DEFAULT '[]',
+        times_studied INTEGER DEFAULT 0,
+        best_quiz_score REAL DEFAULT 0.0,
+        last_studied TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, concept_name) ON CONFLICT REPLACE
+    );
+
+    CREATE TABLE IF NOT EXISTS slide_assets (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        slide_number INTEGER NOT NULL,
+        title TEXT DEFAULT '',
+        layout_json TEXT DEFAULT '{}',
+        speaker_notes TEXT DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(document_id, slide_number) ON CONFLICT REPLACE
     );
 
     CREATE TABLE IF NOT EXISTS notes (
@@ -223,6 +288,23 @@ def _run_init_script(conn):
     except Exception as e:
         print(f"FTS5 setup notice: {e}")
 
+    # Run safe column migrations on existing tables
+    try:
+        q_cols = [r[1] for r in cursor.execute("PRAGMA table_info(quizzes)").fetchall()]
+        if "concept_name" not in q_cols:
+            cursor.execute("ALTER TABLE quizzes ADD COLUMN concept_name TEXT DEFAULT ''")
+    except Exception as e:
+        print(f"Migration notice quizzes: {e}")
+
+    try:
+        qa_cols = [r[1] for r in cursor.execute("PRAGMA table_info(quiz_attempts)").fetchall()]
+        if "document_id" not in qa_cols:
+            cursor.execute("ALTER TABLE quiz_attempts ADD COLUMN document_id TEXT")
+        if "concept_name" not in qa_cols:
+            cursor.execute("ALTER TABLE quiz_attempts ADD COLUMN concept_name TEXT DEFAULT ''")
+    except Exception as e:
+        print(f"Migration notice quiz_attempts: {e}")
+
     user_count = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if user_count == 0:
         default_pwd_hash = hash_password("vishal123")
@@ -231,6 +313,37 @@ def _run_init_script(conn):
         VALUES ('user_vishal', 'vishal', ?, 'Vishal Singh', 'Master of Business Administration (MBA)')
         """, (default_pwd_hash,))
 
+    conn.commit()
+
+def _run_safe_migrations(conn):
+    c = conn.cursor()
+    try:
+        q_cols = [r[1] for r in c.execute("PRAGMA table_info(quizzes)").fetchall()]
+        if "concept_name" not in q_cols:
+            c.execute("ALTER TABLE quizzes ADD COLUMN concept_name TEXT DEFAULT ''")
+        if "total_questions" not in q_cols:
+            c.execute("ALTER TABLE quizzes ADD COLUMN total_questions INTEGER DEFAULT 5")
+    except Exception:
+        pass
+    try:
+        qa_cols = [r[1] for r in c.execute("PRAGMA table_info(quiz_attempts)").fetchall()]
+        for col_name, col_type in [
+            ("document_id", "TEXT"),
+            ("concept_name", "TEXT DEFAULT ''"),
+            ("time_taken_seconds", "INTEGER DEFAULT 0"),
+            ("results_json", "TEXT DEFAULT '[]'"),
+            ("strong_areas_json", "TEXT DEFAULT '[]'"),
+            ("needs_revision_json", "TEXT DEFAULT '[]'"),
+            ("recommended_activity", "TEXT DEFAULT ''"),
+            ("mode", "TEXT DEFAULT 'assessment'")
+        ]:
+            if col_name not in qa_cols:
+                try:
+                    c.execute(f"ALTER TABLE quiz_attempts ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
+    except Exception:
+        pass
     conn.commit()
 
 def get_connection():
@@ -264,10 +377,12 @@ def get_connection():
         _db_is_ready = True
         try:
             c = conn.cursor()
-            c.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='presentation_summaries'")
+            c.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='quiz_questions'")
             exists = c.fetchone()[0]
             if exists == 0:
                 _run_init_script(conn)
+            else:
+                _run_safe_migrations(conn)
             
             c.execute("SELECT count(*) FROM user_settings WHERE key = 'seed_completed'")
             has_seeded = c.fetchone()[0]

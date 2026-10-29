@@ -15,10 +15,16 @@ from pydantic import BaseModel
 
 import secrets
 from .database import get_connection, init_db, verify_password, hash_password, is_cloud_env
-from .extractor import extract_document
+from .extractor import extract_document, extract_slide_layouts
 from .ai_tutor import answer_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
 from .seed_data import seed_all_data
 from .summarizer import analyze_presentation, get_concept_teaching_package, process_tutor_conversation
+from .quiz_engine import get_concept_quiz_prep, generate_or_get_concept_quiz, submit_quiz_evaluation, get_presentation_quiz_catalog
+from .tracker import (
+    record_study_session, update_concept_status, get_learning_analytics,
+    get_subject_progress_cards, get_presentation_progress_list,
+    get_study_recommendations, get_daily_study_time_chart
+)
 app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0")
 
 app.add_middleware(
@@ -246,9 +252,11 @@ def update_subject(id: str, subj: SubjectUpdate):
         conn.execute("UPDATE subjects SET name = ?, description = COALESCE(?, description) WHERE id = ?", (name, subj.description, id))
     elif subj.description is not None:
         conn.execute("UPDATE subjects SET description = ? WHERE id = ?", (subj.description.strip(), id))
+    
+    updated = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
     conn.commit()
     conn.close()
-    return {"success": True}
+    return {"success": True, "id": id, "name": updated["name"] if updated else "", "description": updated["description"] if updated else ""}
 
 @app.delete("/api/subjects/{id}")
 def delete_subject(id: str):
@@ -551,18 +559,27 @@ def get_quiz(id: str):
     return res
 
 class QuizSubmitRequest(BaseModel):
-    answers: List[Dict[str, Any]] # [{"question_id": 1, "selected_answer": "..."}]
+    answers: List[Any]
+    time_taken_seconds: Optional[int] = 0
+    mode: Optional[str] = "assessment"
 
 @app.post("/api/quizzes/{id}/submit")
 def submit_quiz_answers(id: str, sub: QuizSubmitRequest):
+    conn = get_connection()
+    q_count = conn.execute("SELECT count(*) FROM quiz_questions WHERE quiz_id = ?", (id,)).fetchone()[0]
+    conn.close()
+
+    if q_count > 0:
+        return submit_quiz_evaluation(id, sub.answers, sub.time_taken_seconds or 0, sub.mode or "assessment")
+
     conn = get_connection()
     row = conn.execute("SELECT * FROM quizzes WHERE id = ?", (id,)).fetchone()
     if not row:
         conn.close()
         raise HTTPException(status_code=404, detail="Quiz not found")
 
-    questions = json.loads(row["questions_json"])
-    q_map = {q["id"]: q for q in questions}
+    questions = json.loads(row["questions_json"]) if row["questions_json"] else []
+    q_map = {q.get("id"): q for q in questions if isinstance(q, dict)}
 
     total = len(questions)
     correct_count = 0
@@ -1048,6 +1065,153 @@ def api_export_presentation_printable(doc_id: str):
 </body>
 </html>"""
     return HTMLResponse(content=html)
+
+# ----------------- ORIGINAL PPT VIEWER & ASSETS ----------------- #
+@app.get("/api/presentations/{doc_id}/slides")
+def api_get_presentation_slides(doc_id: str):
+    conn = get_connection()
+    doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    if not doc:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = doc["file_path"]
+    doc_name = doc["name"]
+    conn.close()
+
+    if not os.path.exists(file_path):
+        conn = get_connection()
+        chunks = conn.execute("SELECT slide_number, title, content FROM document_chunks WHERE document_id = ? ORDER BY slide_number ASC", (doc_id,)).fetchall()
+        conn.close()
+        slides = []
+        for c in chunks:
+            s_num = c["slide_number"]
+            title = c["title"]
+            lines = [l.strip() for l in c["content"].split("\n") if l.strip()]
+            slides.append({
+                "slide_number": s_num,
+                "title": title,
+                "aspect_ratio": "16:9",
+                "shapes": [
+                    {"type": "text", "is_title": True, "left": 8.0, "top": 8.0, "width": 84.0, "height": 14.0, "paragraphs": [{"text": title, "is_title": True}]},
+                    {"type": "text", "is_title": False, "left": 8.0, "top": 26.0, "width": 84.0, "height": 65.0, "paragraphs": [{"text": l, "is_title": False} for l in lines[:8]]}
+                ],
+                "notes": ""
+            })
+        return {
+            "document_id": doc_id,
+            "document_name": doc_name,
+            "total_slides": len(slides),
+            "aspect_ratio": "16:9",
+            "slides": slides,
+            "download_url": f"/api/documents/{doc_id}/download"
+        }
+
+    slides = extract_slide_layouts(file_path, doc_id)
+    ratio = slides[0].get("aspect_ratio", "16:9") if slides else "16:9"
+    return {
+        "document_id": doc_id,
+        "document_name": doc_name,
+        "total_slides": len(slides),
+        "aspect_ratio": ratio,
+        "slides": slides,
+        "download_url": f"/api/documents/{doc_id}/download"
+    }
+
+@app.get("/api/documents/{doc_id}/download")
+def api_download_original_document(doc_id: str):
+    conn = get_connection()
+    doc = conn.execute("SELECT * FROM documents WHERE id = ?", (doc_id,)).fetchone()
+    conn.close()
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    file_path = doc["file_path"]
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=404, detail="File is not available on disk")
+
+    filename = doc["original_filename"] or doc["name"]
+    media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if filename.lower().endswith(".pptx") else "application/octet-stream"
+    return FileResponse(file_path, filename=filename, media_type=media_type)
+
+@app.get("/api/documents/{doc_id}/assets/{asset_name}")
+def api_get_document_asset(doc_id: str, asset_name: str):
+    assets_dir = tempfile.gettempdir() if is_cloud_env() else os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
+    safe_name = os.path.basename(asset_name)
+    path = os.path.join(assets_dir, safe_name)
+    if os.path.exists(path):
+        return FileResponse(path, media_type="image/png")
+    raise HTTPException(status_code=404, detail="Asset not found")
+
+# ----------------- CONCEPT-BY-CONCEPT 5-QUESTION QUIZZES ----------------- #
+@app.get("/api/presentations/{doc_id}/quiz-catalog")
+def api_get_quiz_catalog(doc_id: str):
+    cat = get_presentation_quiz_catalog(doc_id)
+    return {"catalog": cat, "total": len(cat)}
+
+@app.get("/api/presentations/{doc_id}/concepts/{concept_name}/quiz-prep")
+def api_get_quiz_prep(doc_id: str, concept_name: str):
+    return get_concept_quiz_prep(doc_id, concept_name)
+
+class QuizCreateReq(BaseModel):
+    difficulty: Optional[str] = "Medium"
+    force_regenerate: Optional[bool] = False
+
+@app.post("/api/presentations/{doc_id}/concepts/{concept_name}/quiz")
+def api_generate_concept_quiz(doc_id: str, concept_name: str, req: QuizCreateReq = QuizCreateReq()):
+    try:
+        return generate_or_get_concept_quiz(doc_id, concept_name, req.difficulty or "Medium", req.force_regenerate or False, count=5)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+
+@app.post("/api/quizzes/{quiz_id}/regenerate")
+def api_regenerate_quiz(quiz_id: str):
+    conn = get_connection()
+    quiz = conn.execute("SELECT * FROM quizzes WHERE id = ?", (quiz_id,)).fetchone()
+    conn.close()
+    if not quiz:
+        raise HTTPException(status_code=404, detail="Quiz not found")
+    return generate_or_get_concept_quiz(quiz["document_id"], quiz["concept_name"], quiz["difficulty"], force_regenerate=True, count=5)
+
+# ----------------- STUDY TRACKING & LEARNING PROGRESS ----------------- #
+class StudySessionReq(BaseModel):
+    subject_id: Optional[str] = None
+    document_id: Optional[str] = None
+    doc_id: Optional[str] = None
+    concept_name: Optional[str] = None
+    duration_seconds: int
+    activity_type: Optional[str] = "learning"
+
+@app.post("/api/study/session")
+def api_record_study_session(req: StudySessionReq):
+    target_doc_id = req.document_id or req.doc_id
+    return record_study_session(
+        req.subject_id, target_doc_id, req.concept_name,
+        req.duration_seconds, req.activity_type or "learning"
+    )
+
+class ConceptStatusReq(BaseModel):
+    status: str
+
+@app.post("/api/presentations/{doc_id}/concepts/{concept_name}/status")
+def api_update_concept_status(doc_id: str, concept_name: str, req: ConceptStatusReq):
+    return update_concept_status(doc_id, concept_name, req.status)
+
+@app.get("/api/progress/analytics")
+def api_get_learning_analytics():
+    stats = get_learning_analytics()
+    cards = get_subject_progress_cards()
+    return {
+        "global_stats": stats,
+        "metrics": stats,
+        "subject_cards": cards,
+        "subject_progress": cards,
+        "presentation_progress": get_presentation_progress_list(),
+        "recommendations": get_study_recommendations(),
+        "daily_chart": get_daily_study_time_chart()
+    }
 
 # ----------------- STATIC FRONTEND SERVING ----------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")

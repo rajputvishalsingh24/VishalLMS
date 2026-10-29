@@ -1,9 +1,10 @@
 import os
 import re
+import tempfile
 from typing import List, Dict, Any, Tuple
-import pypdf
 from pptx import Presentation
 import docx
+import pypdf
 
 def clean_text(text: str) -> str:
     """Normalize text whitespace and strip control characters."""
@@ -239,3 +240,158 @@ def extract_document(file_path: str, file_type: str) -> List[Dict[str, Any]]:
         return extract_text_file(file_path)
     else:
         raise ValueError(f"Unsupported file format: {file_type}. Supported: PPT, PPTX, PDF, DOCX, TXT, MD")
+
+def extract_slide_layouts(file_path: str, doc_id: str = "") -> List[Dict[str, Any]]:
+    """
+    High-fidelity slide layout extractor for the interactive presentation viewer.
+    Extracts slide coordinates, shapes, formatted texts, tables, embedded images,
+    and speaker notes.
+    """
+    ext = os.path.splitext(file_path)[1].lower().replace(".", "")
+    if ext in ["pptx", "ppt"]:
+        try:
+            prs = Presentation(file_path)
+            slide_w = float(prs.slide_width)
+            slide_h = float(prs.slide_height)
+            ratio = "16:9" if (slide_w / slide_h) > 1.5 else "4:3"
+
+            from .database import is_cloud_env
+            assets_dir = tempfile.gettempdir() if is_cloud_env() else os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
+            os.makedirs(assets_dir, exist_ok=True)
+
+            slides = []
+            for s_idx, slide in enumerate(prs.slides, start=1):
+                title = ""
+                if slide.shapes.title and slide.shapes.title.text:
+                    title = clean_text(slide.shapes.title.text)
+
+                shapes_data = []
+                for sh_idx, shape in enumerate(slide.shapes):
+                    try:
+                        left_pct = round((float(shape.left) / slide_w) * 100, 2)
+                        top_pct = round((float(shape.top) / slide_h) * 100, 2)
+                        width_pct = round((float(shape.width) / slide_w) * 100, 2)
+                        height_pct = round((float(shape.height) / slide_h) * 100, 2)
+                    except Exception:
+                        left_pct, top_pct, width_pct, height_pct = 5.0, 10.0 + (sh_idx * 15.0), 90.0, 20.0
+
+                    # 1. Image Shape
+                    if hasattr(shape, "image"):
+                        try:
+                            img_filename = f"img_{doc_id}_{s_idx}_{sh_idx}.png"
+                            img_path = os.path.join(assets_dir, img_filename)
+                            with open(img_path, "wb") as f_img:
+                                f_img.write(shape.image.blob)
+                            shapes_data.append({
+                                "type": "image",
+                                "left": left_pct,
+                                "top": top_pct,
+                                "width": width_pct,
+                                "height": height_pct,
+                                "url": f"/api/documents/{doc_id}/assets/{img_filename}"
+                            })
+                            continue
+                        except Exception as e_img:
+                            print(f"Notice extracting shape image: {e_img}")
+
+                    # 2. Table Shape
+                    if shape.has_table:
+                        rows_data = []
+                        for row in shape.table.rows:
+                            cells = [clean_text(c.text) for c in row.cells]
+                            rows_data.append(cells)
+                        shapes_data.append({
+                            "type": "table",
+                            "left": left_pct,
+                            "top": top_pct,
+                            "width": width_pct,
+                            "height": height_pct,
+                            "rows": rows_data
+                        })
+                        continue
+
+                    # 3. Text Shape
+                    if shape.has_text_frame:
+                        paras = []
+                        for p in shape.text_frame.paragraphs:
+                            t = clean_text(p.text)
+                            if t:
+                                is_title = (shape == slide.shapes.title)
+                                paras.append({
+                                    "text": t,
+                                    "is_title": is_title
+                                })
+                        if paras:
+                            shapes_data.append({
+                                "type": "text",
+                                "is_title": (shape == slide.shapes.title),
+                                "left": left_pct,
+                                "top": top_pct,
+                                "width": width_pct,
+                                "height": height_pct,
+                                "paragraphs": paras
+                            })
+
+                # Notes
+                notes = ""
+                if slide.has_notes_slide and slide.notes_slide.notes_text_frame:
+                    notes = clean_text(slide.notes_slide.notes_text_frame.text)
+
+                if not title and shapes_data:
+                    first_text = next((sh["paragraphs"][0]["text"] for sh in shapes_data if sh.get("paragraphs")), f"Slide {s_idx}")
+                    title = first_text[:60]
+                elif not title:
+                    title = f"Slide {s_idx}"
+
+                slides.append({
+                    "slide_number": s_idx,
+                    "title": title,
+                    "aspect_ratio": ratio,
+                    "shapes": shapes_data,
+                    "notes": notes,
+                    "speaker_notes": notes
+                })
+
+            if slides:
+                return slides
+        except Exception as e:
+            print(f"Error in extract_slide_layouts for PPTX: {e}")
+
+    # Fallback for PDF, DOCX, TXT or failed PPTX
+    chunks = extract_document(file_path, ext)
+    slides = []
+    for c in chunks:
+        s_num = c.get("slide_number", 1)
+        title = c.get("title", f"Slide {s_num}")
+        content = c.get("content", "")
+        lines = [l.strip() for l in content.split("\n") if l.strip()]
+
+        shapes = [
+            {
+                "type": "text",
+                "is_title": True,
+                "left": 8.0,
+                "top": 8.0,
+                "width": 84.0,
+                "height": 14.0,
+                "paragraphs": [{"text": title, "is_title": True}]
+            },
+            {
+                "type": "text",
+                "is_title": False,
+                "left": 8.0,
+                "top": 26.0,
+                "width": 84.0,
+                "height": 65.0,
+                "paragraphs": [{"text": l, "is_title": False} for l in lines[:8]]
+            }
+        ]
+        slides.append({
+            "slide_number": s_num,
+            "title": title,
+            "aspect_ratio": "16:9",
+            "shapes": shapes,
+            "notes": c.get("speaker_notes", ""),
+            "speaker_notes": c.get("speaker_notes", "")
+        })
+    return slides

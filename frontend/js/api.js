@@ -329,5 +329,84 @@ export const API = {
     const res = await fetch(`/api/presentations/${docId}/flashcards/${cardId}/master`, { method: 'POST' });
     if (!res.ok) throw new Error('Failed to master flashcard');
     return res.json();
+  },
+
+  // PPT Viewer & Slides
+  async getPresentationSlides(docId) {
+    const res = await fetch(`/api/presentations/${docId}/slides`);
+    if (!res.ok) throw new Error('Failed to fetch presentation slides');
+    return res.json();
+  },
+
+  // Concept Quizzes (5 Questions Per Concept)
+  async getQuizCatalog(docId) {
+    const res = await fetch(`/api/presentations/${docId}/quiz-catalog`);
+    if (!res.ok) throw new Error('Failed to fetch quiz catalog');
+    return res.json();
+  },
+
+  async getQuizPrep(docId, conceptName) {
+    const res = await fetch(`/api/presentations/${docId}/concepts/${encodeURIComponent(conceptName)}/quiz-prep`);
+    if (!res.ok) throw new Error('Failed to fetch quiz prep material');
+    return res.json();
+  },
+
+  async generateConceptQuiz(docId, conceptName, difficulty = 'Medium', forceRegenerate = false) {
+    const res = await fetch(`/api/presentations/${docId}/concepts/${encodeURIComponent(conceptName)}/quiz`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ difficulty, force_regenerate: forceRegenerate })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to generate concept quiz');
+    }
+    return res.json();
+  },
+
+  async submitQuiz(quizId, answers, timeTaken = 0, mode = 'assessment') {
+    const res = await fetch(`/api/quizzes/${quizId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers, time_taken_seconds: timeTaken, mode })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Quiz evaluation failed');
+    }
+    return res.json();
+  },
+
+  async regenerateQuiz(quizId) {
+    const res = await fetch(`/api/quizzes/${quizId}/regenerate`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to regenerate quiz');
+    return res.json();
+  },
+
+  // Study Tracking & Analytics
+  async recordStudySession(data) {
+    const res = await fetch('/api/study/session', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) return { success: false };
+    return res.json();
+  },
+
+  async updateConceptStatus(docId, conceptName, status) {
+    const res = await fetch(`/api/presentations/${docId}/concepts/${encodeURIComponent(conceptName)}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error('Failed to update concept status');
+    return res.json();
+  },
+
+  async getLearningAnalytics() {
+    const res = await fetch('/api/progress/analytics');
+    if (!res.ok) throw new Error('Failed to fetch learning analytics');
+    return res.json();
   }
 };
