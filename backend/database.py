@@ -33,11 +33,44 @@ def get_connection():
         pass
     return conn
 
+import hashlib
+import secrets
+
+def hash_password(password: str, salt: Optional[str] = None) -> str:
+    if not salt:
+        salt = secrets.token_hex(16)
+    hashed = hashlib.sha256((salt + password).encode('utf-8')).hexdigest()
+    return f"{salt}${hashed}"
+
+def verify_password(password: str, stored_hash: str) -> bool:
+    try:
+        salt, hashed = stored_hash.split("$", 1)
+        return hash_password(password, salt) == stored_hash
+    except Exception:
+        return False
+
 def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
     cursor.executescript("""
+    CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY,
+        username TEXT UNIQUE NOT NULL,
+        password_hash TEXT NOT NULL,
+        full_name TEXT NOT NULL,
+        program TEXT DEFAULT 'Master of Business Administration (MBA)',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_sessions (
+        token TEXT PRIMARY KEY,
+        user_id TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expires_at TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+
     CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
@@ -166,6 +199,15 @@ def init_db():
         """)
     except Exception as e:
         print(f"FTS5 setup notice: {e}")
+
+    # Ensure default user exists
+    user_count = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if user_count == 0:
+        default_pwd_hash = hash_password("vishal123")
+        cursor.execute("""
+        INSERT INTO users (id, username, password_hash, full_name, program)
+        VALUES ('user_vishal', 'vishal', ?, 'Vishal Singh', 'Master of Business Administration (MBA)')
+        """, (default_pwd_hash,))
 
     conn.commit()
     conn.close()

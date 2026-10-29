@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 
-from .database import get_connection, init_db
+import secrets
+from .database import get_connection, init_db, verify_password, hash_password
 from .extractor import extract_document
 from .ai_tutor import answer_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
 from .seed_data import seed_all_data
@@ -49,17 +50,76 @@ def startup_event():
     except Exception as e:
         print(f"Startup initialization notice: {e}")
 
+# ----------------- AUTHENTICATION ----------------- #
+class LoginRequest(BaseModel):
+    username: str
+    password: str
+
+@app.post("/api/auth/login")
+def login(req: LoginRequest):
+    conn = get_connection()
+    user = conn.execute("SELECT * FROM users WHERE username = ?", (req.username.strip(),)).fetchone()
+    if not user or not verify_password(req.password, user["password_hash"]):
+        conn.close()
+        raise HTTPException(status_code=401, detail="Invalid username or password")
+    
+    token = secrets.token_hex(32)
+    conn.execute("INSERT INTO user_sessions (token, user_id) VALUES (?, ?)", (token, user["id"]))
+    conn.commit()
+    conn.close()
+    
+    return {
+        "success": True,
+        "token": token,
+        "user": {
+            "id": user["id"],
+            "username": user["username"],
+            "full_name": user["full_name"],
+            "program": user["program"]
+        }
+    }
+
+@app.post("/api/auth/logout")
+def logout(token: Optional[str] = Query(None)):
+    if token:
+        conn = get_connection()
+        conn.execute("DELETE FROM user_sessions WHERE token = ?", (token,))
+        conn.commit()
+        conn.close()
+    return {"success": True, "message": "Logged out successfully"}
+
+@app.get("/api/auth/me")
+def get_current_user(token: Optional[str] = Query(None)):
+    conn = get_connection()
+    if token:
+        session = conn.execute("""
+        SELECT u.id, u.username, u.full_name, u.program 
+        FROM user_sessions s
+        JOIN users u ON s.user_id = u.id
+        WHERE s.token = ?
+        """, (token,)).fetchone()
+        if session:
+            conn.close()
+            return {"authenticated": True, "user": dict(session)}
+
+    # Default to main user if session is valid or single-user desktop environment
+    user = conn.execute("SELECT id, username, full_name, program FROM users LIMIT 1").fetchone()
+    conn.close()
+    if user:
+        return {"authenticated": True, "user": dict(user)}
+    return {"authenticated": False}
+
 # ----------------- STATS & DASHBOARD ----------------- #
 @app.get("/api/stats")
 def get_dashboard_stats():
     conn = get_connection()
     c = conn.cursor()
 
-    total_presentations = c.execute("SELECT COUNT(*) FROM documents WHERE LOWER(file_type) IN ('ppt', 'pptx')").fetchone()[0]
-    total_docs = c.execute("SELECT COUNT(*) FROM documents").fetchone()[0]
-    total_subjects = c.execute("SELECT COUNT(*) FROM subjects").fetchone()[0]
-    topics_completed = c.execute("SELECT COUNT(*) FROM topics WHERE status = 'Completed'").fetchone()[0]
-    quizzes_attempted = c.execute("SELECT COUNT(*) FROM quiz_attempts").fetchone()[0]
+    total_presentations = c.execute("SELECT COUNT(*) FROM documents WHERE LOWER(file_type) IN ('ppt', 'pptx')").fetchone()[0] or 0
+    total_docs = c.execute("SELECT COUNT(*) FROM documents").fetchone()[0] or 0
+    total_subjects = c.execute("SELECT COUNT(*) FROM subjects").fetchone()[0] or 0
+    topics_completed = c.execute("SELECT COUNT(*) FROM topics WHERE status = 'Completed'").fetchone()[0] or 0
+    quizzes_attempted = c.execute("SELECT COUNT(*) FROM quiz_attempts").fetchone()[0] or 0
     
     # Calculate overall progress from topics
     avg_topic_prog = c.execute("SELECT AVG(progress) FROM topics").fetchone()[0] or 0
@@ -91,12 +151,12 @@ def get_dashboard_stats():
 
     return {
         "stats": {
-            "presentations": total_presentations or 12,
-            "documents": total_docs or 28,
-            "subjects": total_subjects or 6,
-            "topics_completed": topics_completed or 14,
-            "quizzes_attempted": quizzes_attempted or 8,
-            "overall_progress": overall_progress or 42
+            "presentations": total_presentations,
+            "documents": total_docs,
+            "subjects": total_subjects,
+            "topics_completed": topics_completed,
+            "quizzes_attempted": quizzes_attempted,
+            "overall_progress": overall_progress
         },
         "continue_learning": continue_learning,
         "recent_uploads": recent_uploads
@@ -481,6 +541,16 @@ def submit_quiz_answers(id: str, sub: QuizSubmitRequest):
     INSERT INTO quiz_attempts (id, quiz_id, score, total_questions, correct_count, incorrect_count, accuracy, answers_json)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     """, (att_id, id, correct_count, total, correct_count, incorrect_count, accuracy, json.dumps(results_detail)))
+
+    # Dynamically update topic and document learning progress based on actual quiz result
+    topic_id = row["topic_id"]
+    doc_id = row["document_id"]
+    if topic_id:
+        new_status = 'Completed' if accuracy >= 80 else ('Understood' if accuracy >= 60 else 'Needs Revision')
+        conn.execute("UPDATE topics SET status = ?, progress = MAX(progress, ?) WHERE id = ?", (new_status, accuracy, topic_id))
+    if doc_id:
+        conn.execute("UPDATE documents SET progress = MAX(progress, ?) WHERE id = ?", (accuracy, doc_id))
+
     conn.commit()
     conn.close()
 

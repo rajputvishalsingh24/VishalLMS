@@ -32,6 +32,25 @@ export const App = {
   async init() {
     console.log('Initializing VISHAL SINGH LMS...');
     this.initLucide();
+    
+    // Check authentication session
+    const token = localStorage.getItem('vishal_lms_token');
+    const isLoggedOut = localStorage.getItem('vishal_lms_logged_out') === 'true';
+    if (isLoggedOut) {
+      document.getElementById('modal-login')?.classList.remove('hidden');
+    } else {
+      try {
+        const auth = await API.getCurrentUser(token);
+        if (auth && auth.authenticated) {
+          this.state.user = auth.user;
+          const nameEl = document.getElementById('header-user-name');
+          if (nameEl) nameEl.innerText = auth.user.full_name || 'Vishal Singh';
+        }
+      } catch (e) {
+        console.warn('Auth check notice:', e);
+      }
+    }
+
     await this.loadSubjects();
     await this.loadDashboard();
     
@@ -1043,6 +1062,189 @@ export const App = {
     } finally {
       btn.disabled = false;
       btn.innerText = 'Upload';
+    }
+  },
+
+  // ==================== AUTHENTICATION ====================
+  async submitLogin() {
+    const u = document.getElementById('login-username').value.trim();
+    const p = document.getElementById('login-password').value.trim();
+    if (!u || !p) return alert('Please enter username and password');
+    const btn = document.getElementById('login-submit-btn');
+    btn.disabled = true;
+    btn.innerText = 'Signing In...';
+    try {
+      const res = await API.login(u, p);
+      localStorage.setItem('vishal_lms_token', res.token);
+      localStorage.removeItem('vishal_lms_logged_out');
+      this.state.user = res.user;
+      document.getElementById('modal-login')?.classList.add('hidden');
+      const nameEl = document.getElementById('header-user-name');
+      if (nameEl) nameEl.innerText = res.user.full_name;
+      await this.loadSubjects();
+      await this.loadDashboard();
+    } catch (err) {
+      alert('Login error: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = 'Sign In';
+    }
+  },
+
+  async handleLogout() {
+    if (!confirm('Log out from your personal workspace?')) return;
+    const token = localStorage.getItem('vishal_lms_token');
+    await API.logout(token);
+    localStorage.removeItem('vishal_lms_token');
+    localStorage.setItem('vishal_lms_logged_out', 'true');
+    document.getElementById('modal-login')?.classList.remove('hidden');
+  },
+
+  // ==================== QUIZ GENERATION MODAL ====================
+  async openQuizGeneratorModal() {
+    const sel = document.getElementById('quiz-gen-doc-select');
+    if (sel) {
+      if (this.state.documents.length === 0) {
+        this.state.documents = await API.getDocuments();
+      }
+      sel.innerHTML = this.state.documents.map(d => `<option value="${d.id}">${d.name} (${d.subject_name || 'General'})</option>`).join('');
+    }
+    document.getElementById('modal-quiz-generator')?.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  async submitQuizGeneration() {
+    const docId = document.getElementById('quiz-gen-doc-select').value;
+    const diff = document.getElementById('quiz-gen-difficulty-select').value;
+    const count = parseInt(document.getElementById('quiz-gen-count-select').value);
+    const btn = document.getElementById('quiz-gen-submit-btn');
+    btn.disabled = true;
+    btn.innerText = 'Generating Quiz...';
+    try {
+      const quiz = await API.generateQuiz({ document_id: docId, difficulty: diff, num_questions: count });
+      this.state.activeQuiz = quiz;
+      this.state.quizQuestionIdx = 0;
+      this.state.quizUserAnswers = {};
+      document.getElementById('modal-quiz-generator')?.classList.add('hidden');
+      await this.navigate('quizzes');
+      this.renderQuizQuestion();
+    } catch (err) {
+      alert('Quiz generation error: ' + err.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = 'Generate Quiz';
+    }
+  },
+
+  // ==================== NOTES MODAL ====================
+  openNewNoteModal() {
+    const sel = document.getElementById('new-note-subject-select');
+    if (sel && this.state.subjects.length > 0) {
+      sel.innerHTML = this.state.subjects.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    }
+    document.getElementById('new-note-title').value = '';
+    document.getElementById('new-note-content').value = '';
+    document.getElementById('modal-new-note')?.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  async submitCreateNote() {
+    const title = document.getElementById('new-note-title').value.trim();
+    const subjId = document.getElementById('new-note-subject-select').value;
+    const noteType = document.getElementById('new-note-type-select').value;
+    const content = document.getElementById('new-note-content').value.trim();
+    if (!title || !content) return alert('Please enter both title and content for your note');
+    try {
+      await API.createNote({ title, subject_id: subjId, note_type: noteType, content });
+      document.getElementById('modal-new-note')?.classList.add('hidden');
+      await this.loadNotes();
+    } catch (err) {
+      alert('Failed to save note: ' + err.message);
+    }
+  },
+
+  // ==================== SUBJECTS MODAL ====================
+  openAddSubjectModal() {
+    document.getElementById('add-subject-name').value = '';
+    document.getElementById('add-subject-description').value = '';
+    document.getElementById('modal-add-subject')?.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  async submitAddSubject() {
+    const name = document.getElementById('add-subject-name').value.trim();
+    const semester = document.getElementById('add-subject-semester').value;
+    const description = document.getElementById('add-subject-description').value.trim();
+    if (!name) return alert('Please enter subject name');
+    try {
+      await API.createSubject({ name, semester, description, color: '#2563EB' });
+      document.getElementById('modal-add-subject')?.classList.add('hidden');
+      await this.loadSubjects();
+      await this.loadSubjectsPage();
+    } catch (err) {
+      alert('Failed to create subject: ' + err.message);
+    }
+  },
+
+  // ==================== DOC PICKER FOR TUTOR ====================
+  async openDocPickerForTutor() {
+    if (this.state.documents.length === 0) {
+      this.state.documents = await API.getDocuments();
+    }
+    const list = document.getElementById('tutor-doc-picker-list');
+    if (list) {
+      list.innerHTML = this.state.documents.map(d => `
+        <div onclick="App.attachDocToTutor('${d.id}', '${d.name.replace(/'/g, "\\'")}')" class="p-2.5 rounded-lg border border-slate-200 hover:bg-blue-50 hover:border-blue-300 cursor-pointer flex items-center justify-between">
+          <div>
+            <p class="font-bold text-slate-900">${d.name}</p>
+            <p class="text-[10px] text-slate-500">${d.subject_name || 'General'} &bull; ${d.slide_count || 1} slides/pages</p>
+          </div>
+          <span class="text-[10px] font-semibold text-blue-600">Select &rarr;</span>
+        </div>
+      `).join('');
+    }
+    document.getElementById('modal-doc-picker')?.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  attachDocToTutor(docId, docName) {
+    document.getElementById('modal-doc-picker')?.classList.add('hidden');
+    const input = document.getElementById('tutor-input-field');
+    input.value = `Explain the key concepts in ${docName}: `;
+    input.focus();
+    this.state.attachedTutorDocId = docId;
+  },
+
+  // ==================== SLIDE VIEWER CHAT & FULLSCREEN ====================
+  async sendSlideChatQuery() {
+    const input = document.getElementById('viewer-slide-chat-input');
+    const query = input.value.trim();
+    if (!query || !this.state.currentDoc) return;
+    input.value = '';
+    const hist = document.getElementById('viewer-slide-chat-history');
+    hist.innerHTML += `<div class="p-2 bg-blue-50 text-blue-900 rounded-lg text-xs font-medium"><strong>You:</strong> ${query}</div>`;
+    const chunk = this.state.currentDoc.chunks[this.state.currentSlideIndex];
+    const slideNum = chunk ? chunk.slide_number : (this.state.currentSlideIndex + 1);
+    hist.innerHTML += `<div id="slide-chat-loading" class="text-slate-400 italic text-[11px] p-1">Consulting slide ${slideNum}...</div>`;
+    hist.scrollTop = hist.scrollHeight;
+    try {
+      const res = await API.tutorChat(`Slide ${slideNum} ("${chunk ? chunk.title : ''}"): ${query}`, 'presentation_explainer', this.state.currentDoc.subject_id, this.state.currentDoc.id);
+      document.getElementById('slide-chat-loading')?.remove();
+      hist.innerHTML += `<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-lg text-xs text-slate-800 leading-relaxed">${res.response.replace(/\n/g, '<br>')}</div>`;
+      hist.scrollTop = hist.scrollHeight;
+    } catch (err) {
+      document.getElementById('slide-chat-loading')?.remove();
+      hist.innerHTML += `<div class="text-red-500 text-xs p-1">Error: ${err.message}</div>`;
+    }
+  },
+
+  toggleViewerFullscreen() {
+    const v = document.getElementById('page-viewer');
+    if (!document.fullscreenElement) {
+      if (v.requestFullscreen) v.requestFullscreen();
+      else if (v.webkitRequestFullscreen) v.webkitRequestFullscreen();
+    } else {
+      if (document.exitFullscreen) document.exitFullscreen();
     }
   },
 

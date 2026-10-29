@@ -226,203 +226,276 @@ If information is missing, state it clearly.
 
 def generate_offline_mba_tutor_response(query: str, mode: str, chunks: List[Dict[str, Any]], citations: List[Dict[str, Any]]) -> str:
     """
-    Intelligent built-in pedagogical MBA tutor response when API key is not yet set.
+    Intelligent built-in pedagogical MBA tutor response dynamically constructed
+    from the actual uploaded document slides and chunks.
     """
     topic_name = query.title()
     citation_text = ""
     if citations:
-        citation_text = f"\n\n> 📚 **Cited Sources from Your Library:**\n" + "\n".join([f"> - **{c['document']}**, Slide {c['slide']} (`{c['title']}`)" for c in citations[:3]])
+        citation_text = f"\n\n> 📚 **Cited Sources from Your Library:**\n" + "\n".join([f"> - **{c['document']}**, Slide/Page {c['slide']} (`{c['title']}`)" for c in citations[:4]])
     
+    # Use content from top matching chunk if available
+    top_chunk = chunks[0] if chunks else None
+    slide_title = top_chunk["title"] if top_chunk else topic_name
+    slide_num = top_chunk["slide_number"] if top_chunk else 1
+    doc_name = top_chunk["doc_name"] if top_chunk else "Study Material"
+    raw_content = top_chunk["content"] if top_chunk else f"Discussion and strategic principles of {topic_name}."
+    
+    # Parse bullet points and takeaways from the actual slide
+    content_lines = [l.strip().lstrip("•-* ") for l in raw_content.split("\n") if len(l.strip()) > 5]
+    if not content_lines:
+        content_lines = [f"Foundational concepts and execution framework for {slide_title}"]
+
+    takeaways_list = []
+    if top_chunk and top_chunk.get("takeaways"):
+        try:
+            t_raw = top_chunk["takeaways"]
+            takeaways_list = json.loads(t_raw) if isinstance(t_raw, str) else t_raw
+        except Exception:
+            takeaways_list = content_lines[:3]
+    if not takeaways_list:
+        takeaways_list = content_lines[:3]
+
     if mode == "simple_explanation":
-        return f"""## 📘 Simple Explanation: {topic_name}
+        key_points_str = "\n".join([f"- **{l}**" for l in content_lines[:4]])
+        return f"""## 📘 Simple Explanation: {slide_title}
+**Source Document:** `{doc_name}` (Slide/Page {slide_num})
 
 ### 1. What is it?
-**{topic_name}** is a foundational strategic management framework and methodology designed to align business objectives, customer value creation, and competitive differentiation into actionable decisions.
+**{slide_title}** is a core operational and strategic concept in management. Based on your uploaded materials, it focuses on:
+> *"{content_lines[0] if content_lines else slide_title}"*
 
 ### 2. Why is it important?
-In fast-moving business environments, organizations frequently suffer from operational misalignment. Understanding **{topic_name}** prevents resource wastage, sharpens market positioning, and ensures sustained profitability and customer retention.
+In managerial decision-making, mastering **{slide_title}** provides strategic leverage, eliminates operational friction, and ensures that cross-functional teams execute towards quantified business outcomes.
 
 ### 3. How does it work?
-1. **Diagnosis:** Analyze current internal capabilities, market dynamics, and competitive headwinds.
-2. **Guiding Policy:** Establish strategic focus areas and clear trade-offs (deciding what *not* to do).
-3. **Coherent Action:** Execute coordinated initiatives across product development, marketing, and operations.
-4. **Feedback Loop:** Measure key performance indicators (KPIs) and iterate based on empirical market data.
+Your presentation outlines the following structural mechanism:
+{chr(10).join([f"{i+1}. **{line}**" for i, line in enumerate(content_lines[:4])])}
 
 ### 4. Practical Business Example
-- **Netflix:** Pivoted from DVD rentals to streaming and later original content creation by applying {topic_name} principles to anticipate customer behavioral shifts and cloud infrastructure maturity.
+- **Real-World Application:** Leading firms apply this exact framework to mitigate risk, benchmark competitors, and ensure continuous customer value delivery during growth phases.
 
 ### 5. Product Management Application
-Product Managers use {topic_name} during quarterly OKR planning and feature prioritization (e.g., RICE or Kano models) to justify roadmap investments to executive leadership and engineering teams.
+In modern product management, PMs leverage this concept during sprint roadmapping and discovery interviews to prioritize high-leverage initiatives over non-essential features.
 
-### 6. Key Points to Remember
-- Strategy is about making deliberate trade-offs, not trying to be everything to everyone.
-- Execution without clear strategic intent is merely operational noise.
-- Continually validate hypotheses against real customer feedback and unit economics.
+### 6. Key Points to Remember (From Your Slide)
+{key_points_str}
 
 ### 7. Common Mistakes & Misunderstandings
-- Confusing operational effectiveness (doing things better) with strategy (doing different things).
-- Setting vague aspirational goals ("be #1 in the market") without specifying the structural mechanism to win.
+- Treating this concept as a one-time static document rather than an iterative managerial tool.
+- Confusing high-level strategic outcomes with day-to-day tactical outputs.
 
 ### 8. Check Your Understanding
-1. *Conceptual:* How does {topic_name} distinguish between short-term tactics and long-term sustainable advantage?
-2. *Scenario:* If a competitor slashes prices by 30%, how should a brand leveraging {topic_name} respond?
-3. *Application:* Identify one key metric you would track on your dashboard to evaluate this framework.{citation_text}
+1. *Conceptual:* How does **{slide_title}** directly support the primary business goals stated in your materials?
+2. *Scenario:* If your team encounters unexpected market headwinds, how should this framework be adapted?
+3. *Application:* Based on Slide {slide_num}, what is the first operational step you would execute?{citation_text}
 """
     elif mode == "teach_step_by_step":
-        return f"""## 🎓 Step-by-Step Lesson: {topic_name}
-
-### Lesson 1: The Core Intuition
-Imagine you are the captain of a ship navigating through unpredictable waters. You have a compass, a map, and limited fuel. You cannot steer in five directions at once. 
-
-**{topic_name}** is your navigation compass—it defines the exact heading your ship must take to reach port safely while avoiding underwater reefs.
-
-### Key Terminology
-- **Value Proposition:** The explicit promise of value to be delivered and acknowledged by the customer.
-- **Moat (Competitive Advantage):** The structural barrier that protects a company's market share and margins against rivals.
-- **Unit Economics:** The direct revenues and costs associated with an individual customer or product unit.
-
-### The First Fundamental Concept
-Before launching any product or initiative, great MBA leaders formulate a testable hypothesis:
-> *"If we solve problem X for customer segment Y using method Z, we can capture sustainable margin M."*
-
----
-### ❓ Question for Vishal:
-Suppose you are launching a new B2B SaaS tool. Which should you establish **first**?
-- [A] The marketing ad campaign budget
-- [B] The quantified customer problem and value proposition
-- [C] The 5-year financial projections
-
-*Reply with your answer or click **Explain Again** / **Next Lesson**.*{citation_text}
-"""
-    elif mode == "presentation_explainer":
-        slide_title = citations[0]["title"] if citations else topic_name
-        slide_num = citations[0]["slide"] if citations else 1
-        doc_name = citations[0]["document"] if citations else "Class Presentation"
-        return f"""## 📊 Slide Explainer: {slide_title}
+        first_concept = content_lines[0] if content_lines else slide_title
+        second_concept = content_lines[1] if len(content_lines) > 1 else "Strategic Alignment"
+        return f"""## 🎓 Step-by-Step Lesson: {slide_title}
 **Document:** `{doc_name}` | **Slide:** #{slide_num}
 
+### Lesson 1: The Core Intuition
+Think of **{slide_title}** as a navigation compass in business. Just as an architect needs blueprints before constructing a building, business leaders use this concept to ensure all team efforts build toward the same vision.
+
+### Key Terminology from Your Materials
+- **{first_concept.split(':')[0] if ':' in first_concept else 'Primary Objective'}:** The baseline requirement for achieving measurable business outcomes.
+- **{second_concept.split(':')[0] if ':' in second_concept else 'Execution Focus'}:** The disciplined alignment of resources and priorities.
+
+### Fundamental Principle (Slide {slide_num})
+Your uploaded notes highlight:
+> *"{first_concept}"*
+
+---
+### ❓ Interactive Check Question for Vishal:
+Based on your study materials on **{slide_title}**, which action represents the most effective starting point?
+- [A] Diving directly into task execution without strategic alignment
+- [B] Establishing clear problem validation and outcome metrics ({first_concept[:45]}...)
+- [C] Delaying all decisions until complete annual forecasts are finalized
+
+*Reply with your answer or click **Next Lesson Step** / **Explain Again** below.*{citation_text}
+"""
+    elif mode == "presentation_explainer":
+        return f"""## 📊 Slide Explainer: Slide {slide_num} - {slide_title}
+**Document:** `{doc_name}` | **Slide/Page:** #{slide_num}
+
 ### Main Idea (Simple English)
-This slide establishes the critical link between customer problem discovery and sustainable business value delivery. It illustrates that building product features without validated user demand is the leading cause of business failure.
+This slide focuses on establishing clarity around **{slide_title}**. It emphasizes that structured decision-making and cross-functional alignment are prerequisites for operational success.
 
-### Detailed Explanation
-The slide breaks down how high-performing teams transition from idea conception to measurable impact:
-1. **Problem Space Exploration:** Identifying unmet user needs through user interviews and usage analytics.
-2. **Solution Space Iteration:** Prototyping lightweight solutions and testing minimum viable products (MVPs).
-3. **Market Alignment:** Calibrating pricing, positioning, and distribution channels to maximize market adoption.
+### Detailed Breakdown of Slide Content
+{chr(10).join([f"- **Key Element {i+1}:** {line}" for i, line in enumerate(content_lines[:5])])}
 
-### Important Terms
-- **Product-Market Fit (PMF):** Being in a good market with a product that can satisfy that market.
-- **Discovery vs Delivery:** Separating the work of figuring out what to build from the engineering process of building it.
+### Important Terms on This Slide
+- **{slide_title}:** The overarching theme of this presentation section.
+- **{content_lines[0][:30] if content_lines else 'Strategic Metric'}:** Key driver of performance.
 
 ### Practical Business Example
-- **Slack:** Began as an internal communications tool for an online gaming startup (*Glitch*). When the game failed, the founders recognized that the messaging architecture was the true high-value asset, pivoting completely to create Slack.
+- High-performing technology and MBA benchmark companies use this principle to align product development, financial planning, and go-to-market strategies.
 
 ### Key Takeaway
-Features are outputs; customer outcomes and business value are the only true metrics of product success.
+Features and tasks are outputs; verified customer problem resolution and sustainable business margins are the true measures of success.
 
 ### Possible MBA Examination Question
-*Discuss how agile product discovery mitigates market risk compared to traditional waterfall stage-gate models.*{citation_text}
+*Critically evaluate how the principles in Slide {slide_num} ('{slide_title}') mitigate business execution risk compared to unstructured approaches.*{citation_text}
 """
     else: # ask_materials
+        bullets_summary = "\n".join([f"- {l}" for l in content_lines[:4]])
         return f"""## 🎯 Analysis of "{query}"
 
 Based on the study materials in your personal MBA library:
 
-### Summary of Findings
-{f"In your presentation **{citations[0]['document']}** (Slide {citations[0]['slide']}), this concept is highlighted as a primary driver of organizational performance." if citations else "This topic represents a central framework in modern MBA strategy and managerial decision-making."}
+### Primary Grounded Findings
+In your document **{doc_name}** (Slide/Page {slide_num}, *{slide_title}*), this topic is addressed with the following core points:
 
-### Detailed Breakdown
-1. **Core Mechanism:** The fundamental principle involves structuring quantitative and qualitative metrics to evaluate operational trade-offs and drive higher customer lifetime value (LTV).
-2. **Framework Alignment:** This aligns closely with standard business school frameworks such as Porter's Value Chain, SWOT Matrix, and Agile Sprint Retrospectives.
-3. **Execution Steps:** Successful implementation requires cross-functional collaboration between Product, Marketing, and Financial Operations.
+{bullets_summary}
 
-> 💡 **Tutor Note:** To enable live Gemini AI synthesis with your custom cloud model, simply enter your free Gemini API key in **Settings**.{citation_text}
+### Strategic Synthesis
+1. **Core Insight:** The materials emphasize disciplined validation, clear prioritization frameworks, and continuous feedback loops.
+2. **Framework Alignment:** This connects directly with MBA core concepts in strategic management, customer discovery, and financial feasibility.
+
+> 💡 **Tutor Note:** To enable live Gemini AI synthesis with your custom cloud model, enter your free Gemini API key in **Settings** anytime.{citation_text}
 """
 
 def generate_quiz_for_topic(subject_id: Optional[str], topic_id: Optional[str], document_id: Optional[str], difficulty: str = "MBA Examination Level", format_type: str = "Multiple Choice", num_questions: int = 5) -> Dict[str, Any]:
     """
-    Generate questions grounded in the user's materials with explanations and mistake analyses.
+    Generate questions dynamically grounded in the user's actual uploaded materials.
     """
-    chunks = search_chunks(query="framework strategy model analysis", subject_id=subject_id, document_id=document_id, limit=6)
-    
-    questions = [
-        {
+    conn = get_connection()
+    c = conn.cursor()
+
+    # Retrieve chunks for the specified document or subject
+    chunks = []
+    doc_name = "Study Material"
+    if document_id:
+        doc_row = c.execute("SELECT name FROM documents WHERE id = ?", (document_id,)).fetchone()
+        if doc_row:
+            doc_name = doc_row["name"]
+        rows = c.execute("""
+        SELECT chunk_index, slide_number, page_number, title, content, takeaways
+        FROM document_chunks
+        WHERE document_id = ?
+        ORDER BY slide_number ASC
+        LIMIT 15
+        """, (document_id,)).fetchall()
+        chunks = [dict(r) for r in rows]
+    elif subject_id:
+        rows = c.execute("""
+        SELECT dc.chunk_index, dc.slide_number, dc.page_number, dc.title, dc.content, dc.takeaways, d.name as doc_name
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        WHERE d.subject_id = ?
+        ORDER BY dc.created_at DESC
+        LIMIT 15
+        """, (subject_id,)).fetchall()
+        chunks = [dict(r) for r in rows]
+        if chunks and chunks[0].get("doc_name"):
+            doc_name = chunks[0]["doc_name"]
+    else:
+        rows = c.execute("""
+        SELECT dc.chunk_index, dc.slide_number, dc.page_number, dc.title, dc.content, dc.takeaways, d.name as doc_name
+        FROM document_chunks dc
+        JOIN documents d ON dc.document_id = d.id
+        ORDER BY dc.created_at DESC
+        LIMIT 15
+        """, ()).fetchall()
+        chunks = [dict(r) for r in rows]
+        if chunks and chunks[0].get("doc_name"):
+            doc_name = chunks[0]["doc_name"]
+
+    conn.close()
+
+    # Try Gemini generation if API key is present
+    api_key = get_configured_api_key()
+    if api_key and chunks:
+        context_text = "\n".join([f"Slide {ch.get('slide_number', i+1)}: {ch.get('title')} - {ch.get('content')[:200]}" for i, ch in enumerate(chunks[:6])])
+        prompt = f"""Generate {num_questions} high-quality {difficulty} quiz questions based strictly on these slides from {doc_name}:
+{context_text}
+
+Return ONLY a valid JSON array with this structure:
+[
+  {{
+    "id": 1,
+    "question": "question text",
+    "options": ["Option A", "Option B", "Option C", "Option D"],
+    "correct_answer": "Option A",
+    "explanation": "detailed explanation citing the slide",
+    "mistake_analysis": "why other choices are incorrect",
+    "source_citation": "{doc_name}, Slide X"
+  }}
+]
+"""
+        try:
+            gemini_out = call_gemini(prompt)
+            if gemini_out:
+                clean_json = re.sub(r'^```json\s*', '', gemini_out.strip(), flags=re.MULTILINE)
+                clean_json = re.sub(r'```$', '', clean_json.strip())
+                parsed_questions = json.loads(clean_json)
+                if isinstance(parsed_questions, list) and len(parsed_questions) > 0:
+                    return {
+                        "title": f"Practice Quiz: {doc_name} ({difficulty})",
+                        "difficulty": difficulty,
+                        "format": format_type,
+                        "questions": parsed_questions[:num_questions]
+                    }
+        except Exception as e:
+            print(f"Gemini quiz generation fallback: {e}")
+
+    # Grounded Dynamic Offline Quiz Generator from Slide Chunks
+    questions = []
+    if chunks:
+        for idx, ch in enumerate(chunks[:num_questions], start=1):
+            s_num = ch.get("slide_number", idx)
+            s_title = ch.get("title", f"Slide {s_num}")
+            s_content = ch.get("content", "")
+            lines = [l.strip().lstrip("•-* ") for l in s_content.split("\n") if len(l.strip()) > 10]
+            
+            correct_fact = lines[0] if lines else f"Covers strategic principles of {s_title}"
+            second_fact = lines[1] if len(lines) > 1 else "Disciplined execution and team alignment"
+
+            # Create plausible distractors
+            distractor_1 = f"Confining {s_title} solely to short-term micro-tasks without strategic direction"
+            distractor_2 = "Ignoring customer validation and assuming market demand without empirical data"
+            distractor_3 = "Allocating capital exclusively to unvalidated high-cost marketing campaigns"
+
+            options = [correct_fact, distractor_1, distractor_2, distractor_3]
+            # Shuffle options deterministically
+            import random
+            rnd = random.Random(s_num * 17)
+            rnd.shuffle(options)
+
+            questions.append({
+                "id": idx,
+                "question": f"According to Slide {s_num} ('{s_title}'), what is the primary strategic principle emphasized?",
+                "options": options,
+                "correct_answer": correct_fact,
+                "explanation": f"Slide {s_num} ('{s_title}') highlights: '{correct_fact}'. In strategic management, this ensures resources directly create differentiated customer value.",
+                "mistake_analysis": "Distractors represent common managerial traps, such as prematurely scaling or focusing on outputs rather than outcomes.",
+                "source_citation": f"{doc_name}, Slide {s_num}"
+            })
+
+    if not questions:
+        # Fallback question if no chunks exist
+        questions = [{
             "id": 1,
-            "question": "What is the primary purpose of a product roadmap in strategic product management?",
+            "question": f"What is the primary objective of studying {doc_name}?",
             "options": [
-                "To define the product vision, strategic themes, and long-term business goals",
-                "To manage daily micro-tasks and hour-by-hour engineering activities",
-                "To allocate the annual corporate marketing budget and television ads",
-                "To track individual employee performance reviews and appraisals"
+                "To establish structured strategic frameworks and customer-centric value delivery",
+                "To eliminate all documentation and planning",
+                "To bypass product discovery and customer interviews",
+                "To focus only on short-term vanity metrics"
             ],
-            "correct_answer": "To define the product vision, strategic themes, and long-term business goals",
-            "explanation": "A product roadmap is a strategic communication tool that articulates the vision, direction, and progress of a product over time. It aligns internal and external stakeholders on the high-level 'why' and 'what' rather than daily tactical task lists.",
-            "mistake_analysis": "Confusing a roadmap with a release backlog or sprint task board is a common mistake. Roadmaps are outcome-focused, while backlogs are output-focused.",
-            "source_citation": "Product_Strategy.pptx, Slide 3"
-        },
-        {
-            "id": 2,
-            "question": "In the Customer Discovery phase, what is the primary objective of conducting user interviews?",
-            "options": [
-                "To pitch features and persuade users to buy immediately",
-                "To understand customer pain points, behaviors, and unmet needs without leading questions",
-                "To collect legal sign-offs for product terms and conditions",
-                "To negotiate pricing contracts with procurement officers"
-            ],
-            "correct_answer": "To understand customer pain points, behaviors, and unmet needs without leading questions",
-            "explanation": "Customer discovery is grounded in listening rather than selling. Asking open-ended questions about past behaviors uncovers true user problems rather than hypothetical opinions.",
-            "mistake_analysis": "Pitching solutions during discovery biases the research and leads to false positive validation.",
-            "source_citation": "Product_Discovery.pptx, Slide 5"
-        },
-        {
-            "id": 3,
-            "question": "Which metric best reflects the economic sustainability of customer acquisition?",
-            "options": [
-                "Total number of social media followers",
-                "Ratio of Customer Lifetime Value (LTV) to Customer Acquisition Cost (CAC)",
-                "Gross website visitor count per month",
-                "Number of features shipped in the latest sprint"
-            ],
-            "correct_answer": "Ratio of Customer Lifetime Value (LTV) to Customer Acquisition Cost (CAC)",
-            "explanation": "A healthy SaaS and MBA benchmark is an LTV:CAC ratio of 3:1 or higher. It proves that the revenue generated from a customer significantly exceeds the marketing and sales cost required to acquire them.",
-            "mistake_analysis": "Vanity metrics like followers or raw page views do not reflect financial health or unit economics.",
-            "source_citation": "Financial_Analysis.pdf, Page 4"
-        },
-        {
-            "id": 4,
-            "question": "How does Agile Scrum differ fundamentally from traditional Waterfall project management?",
-            "options": [
-                "Scrum does not allow any documentation or code testing",
-                "Scrum delivers value in iterative, cross-functional sprints with continuous inspection and adaptation",
-                "Waterfall does not have defined deadlines or phases",
-                "Scrum eliminates the need for product managers or engineers"
-            ],
-            "correct_answer": "Scrum delivers value in iterative, cross-functional sprints with continuous inspection and adaptation",
-            "explanation": "Agile Scrum organizes work into short, time-boxed sprints (typically 2 weeks), allowing teams to inspect increments of working software and adapt to changing market requirements rapidly.",
-            "mistake_analysis": "Thinking agile means 'no documentation' is a dangerous misconception; agile values working software over comprehensive documentation, not zero documentation.",
-            "source_citation": "Agile_and_Scrum.pptx, Slide 2"
-        },
-        {
-            "id": 5,
-            "question": "When performing market segmentation using the STP framework, what is the 'Positioning' step?",
-            "options": [
-                "Determining the physical office coordinates of regional sales reps",
-                "Designing the company's offering and image to occupy a distinctive place in the mind of the target segment",
-                "Setting the legal salary brackets for marketing executives",
-                "Filing patents for manufacturing equipment"
-            ],
-            "correct_answer": "Designing the company's offering and image to occupy a distinctive place in the mind of the target segment",
-            "explanation": "Positioning is the act of designing the brand's perception so that target consumers understand exactly how it uniquely solves their problem compared to competitors.",
-            "mistake_analysis": "Confusing brand positioning with physical supply chain location.",
-            "source_citation": "Marketing_Segmentation.pdf, Page 2"
-        }
-    ]
-    
+            "correct_answer": "To establish structured strategic frameworks and customer-centric value delivery",
+            "explanation": "Foundational management requires systematic validation and sustainable unit economics.",
+            "mistake_analysis": "Ignoring customer discovery leads to high product failure rates.",
+            "source_citation": f"{doc_name}, Slide 1"
+        }]
+
     return {
-        "title": f"MBA Practice Quiz: {difficulty}",
+        "title": f"Practice Quiz: {doc_name} ({difficulty})",
         "difficulty": difficulty,
         "format": format_type,
-        "questions": questions[:num_questions]
+        "questions": questions
     }
 
 def generate_notes_for_topic(subject_id: Optional[str], topic_id: Optional[str], note_type: str = "quick_revision", title: str = "Study Notes") -> Dict[str, Any]:

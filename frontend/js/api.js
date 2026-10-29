@@ -4,6 +4,31 @@ const API_BASE = window.location.origin.includes('localhost') || window.location
   : '';
 
 export const API = {
+  // Auth
+  async login(username, password) {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Login failed');
+    }
+    return res.json();
+  },
+
+  async logout(token) {
+    const res = await fetch(`/api/auth/logout?token=${token || ''}`, { method: 'POST' });
+    return res.json();
+  },
+
+  async getCurrentUser(token) {
+    const res = await fetch(`/api/auth/me?token=${token || ''}`);
+    if (!res.ok) return { authenticated: false };
+    return res.json();
+  },
+
   // Stats
   async getStats() {
     const res = await fetch('/api/stats');
