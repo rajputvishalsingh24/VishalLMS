@@ -1,0 +1,6 @@
+# Strategic Product Roadmaps
+
+Strategic roadmaps align cross-functional teams around desired customer outcomes rather than rigid feature outputs.
+
+## Outcome Driven Roadmaps
+Focus on metrics like customer activation and retention rate.

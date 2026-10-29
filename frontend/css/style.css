@@ -1,0 +1,131 @@
+/* VISHAL SINGH - AI Learning Platform Stylesheet */
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+:root {
+  --font-sans: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --bg-sidebar: #0B132B;
+  --bg-sidebar-active: #1C2541;
+  --sidebar-border: #1E293B;
+  --primary-blue: #2563EB;
+  --primary-blue-hover: #1D4ED8;
+  --accent-blue-light: #EFF6FF;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: #F8FAFC;
+  color: #0F172A;
+  margin: 0;
+  padding: 0;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #CBD5E1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94A3B8;
+}
+
+/* Mountain banner illustration */
+.mountain-banner {
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 40%, #E0E7FF 100%);
+  position: relative;
+  overflow: hidden;
+}
+.mountain-banner::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 380px;
+  height: 100%;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1440 320'%3E%3Cpath fill='%2393c5fd' fill-opacity='0.35' d='M0,192L48,208C96,224,192,256,288,245.3C384,235,480,181,576,170.7C672,160,768,192,864,208C960,224,1056,224,1152,197.3C1248,171,1344,117,1392,90.7L1440,64L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z'%3E%3C/path%3E%3Cpath fill='%2360a5fa' fill-opacity='0.25' d='M0,288L60,261.3C120,235,240,181,360,170.7C480,160,600,192,720,197.3C840,203,960,181,1080,181.3C1200,181,1320,203,1380,213.3L1440,224L1440,320L1380,320C1320,320,1200,320,1080,320C960,320,840,320,720,320C600,320,480,320,360,320C240,320,120,320,60,320L0,320Z'%3E%3C/path%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: bottom right;
+  background-size: cover;
+  pointer-events: none;
+}
+
+/* 3D Flashcard Flip */
+.perspective-1000 {
+  perspective: 1000px;
+}
+.transform-style-3d {
+  transform-style: preserve-3d;
+}
+.backface-hidden {
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+.rotate-y-180 {
+  transform: rotateY(180deg);
+}
+
+/* Slide Canvas */
+.slide-canvas {
+  aspect-ratio: 16 / 9;
+  background: white;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  position: relative;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Radial Progress Ring */
+.progress-ring-circle {
+  transition: stroke-dashoffset 0.5s ease-in-out;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.25s ease-out forwards;
+}
+
+/* Dark Mode Overrides */
+body.dark-mode {
+  background-color: #090D16;
+  color: #F1F5F9;
+}
+body.dark-mode .bg-white {
+  background-color: #111827;
+  color: #F1F5F9;
+  border-color: #1F2937;
+}
+body.dark-mode .text-slate-800,
+body.dark-mode .text-slate-900 {
+  color: #F8FAFC !important;
+}
+body.dark-mode .text-slate-600,
+body.dark-mode .text-slate-700 {
+  color: #94A3B8 !important;
+}
+body.dark-mode .border-slate-200,
+body.dark-mode .border-slate-100 {
+  border-color: #1F2937 !important;
+}
+body.dark-mode .mountain-banner {
+  background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+}
+body.dark-mode .slide-canvas {
+  background: #1E293B;
+  color: #F8FAFC;
+}
