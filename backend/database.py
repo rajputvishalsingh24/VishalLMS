@@ -30,18 +30,7 @@ if is_cloud_env():
 else:
     DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
 
-def get_connection():
-    try:
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    except Exception:
-        pass
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
-    conn.row_factory = sqlite3.Row
-    try:
-        conn.execute("PRAGMA foreign_keys = ON")
-    except Exception:
-        pass
-    return conn
+_db_is_ready = False
 
 def hash_password(password: str, salt: Optional[str] = None) -> str:
     if not salt:
@@ -56,10 +45,8 @@ def verify_password(password: str, stored_hash: str) -> bool:
     except Exception:
         return False
 
-def init_db():
-    conn = get_connection()
+def _run_init_script(conn):
     cursor = conn.cursor()
-
     cursor.executescript("""
     CREATE TABLE IF NOT EXISTS users (
         id TEXT PRIMARY KEY,
@@ -112,13 +99,11 @@ def init_db():
         file_path TEXT NOT NULL,
         semester TEXT DEFAULT 'Semester 1',
         faculty TEXT DEFAULT '',
-        description TEXT DEFAULT '',
         tags TEXT DEFAULT '[]',
-        status TEXT NOT NULL DEFAULT 'processed',
         slide_count INTEGER DEFAULT 0,
         page_count INTEGER DEFAULT 0,
-        progress INTEGER DEFAULT 0,
-        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        is_processed BOOLEAN DEFAULT 0,
+        processing_status TEXT DEFAULT 'pending',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL,
         FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
@@ -128,25 +113,26 @@ def init_db():
         id TEXT PRIMARY KEY,
         document_id TEXT NOT NULL,
         chunk_index INTEGER NOT NULL,
-        slide_number INTEGER DEFAULT 0,
-        page_number INTEGER DEFAULT 0,
+        slide_number INTEGER,
+        page_number INTEGER,
         title TEXT DEFAULT '',
         content TEXT NOT NULL,
-        takeaways TEXT DEFAULT '[]',
+        speaker_notes TEXT DEFAULT '',
+        has_visuals BOOLEAN DEFAULT 0,
+        visual_description TEXT DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS ai_chats (
         id TEXT PRIMARY KEY,
-        session_id TEXT NOT NULL,
-        mode TEXT NOT NULL DEFAULT 'ask_materials',
-        subject_id TEXT,
         document_id TEXT,
-        query TEXT NOT NULL,
-        response TEXT NOT NULL,
+        slide_number INTEGER,
+        role TEXT NOT NULL,
+        content TEXT NOT NULL,
         citations TEXT DEFAULT '[]',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS quizzes (
@@ -155,21 +141,20 @@ def init_db():
         topic_id TEXT,
         document_id TEXT,
         title TEXT NOT NULL,
-        difficulty TEXT NOT NULL DEFAULT 'Intermediate',
-        format TEXT NOT NULL DEFAULT 'Multiple Choice',
-        questions_json TEXT NOT NULL,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        difficulty TEXT DEFAULT 'Medium',
+        total_questions INTEGER DEFAULT 5,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS quiz_attempts (
         id TEXT PRIMARY KEY,
         quiz_id TEXT NOT NULL,
-        score INTEGER NOT NULL DEFAULT 0,
-        total_questions INTEGER NOT NULL DEFAULT 0,
-        correct_count INTEGER NOT NULL DEFAULT 0,
-        incorrect_count INTEGER NOT NULL DEFAULT 0,
-        accuracy INTEGER NOT NULL DEFAULT 0,
-        answers_json TEXT NOT NULL DEFAULT '[]',
+        score INTEGER NOT NULL,
+        total_questions INTEGER NOT NULL,
+        answers_json TEXT NOT NULL,
         completed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
     );
@@ -180,11 +165,13 @@ def init_db():
         topic_id TEXT,
         document_id TEXT,
         title TEXT NOT NULL,
-        note_type TEXT NOT NULL DEFAULT 'quick_revision',
         content TEXT NOT NULL,
         tags TEXT DEFAULT '[]',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS user_settings (
@@ -192,20 +179,20 @@ def init_db():
         value TEXT NOT NULL
     );
 
-    -- AI-Powered PPT Summarization & Interactive Learning Tables
     CREATE TABLE IF NOT EXISTS presentation_summaries (
         id TEXT PRIMARY KEY,
         document_id TEXT UNIQUE NOT NULL,
-        title TEXT NOT NULL,
         overview_json TEXT NOT NULL,
         concepts_json TEXT NOT NULL,
         frameworks_json TEXT NOT NULL,
         glossary_json TEXT NOT NULL,
         formulas_json TEXT NOT NULL,
         connections_json TEXT NOT NULL,
-        slide_summaries_json TEXT NOT NULL,
-        revision_json TEXT NOT NULL,
+        slide_breakdown_json TEXT NOT NULL,
+        revision_sheet_json TEXT NOT NULL,
         learning_path_json TEXT NOT NULL,
+        total_slides INTEGER DEFAULT 0,
+        concepts_count INTEGER DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
@@ -214,14 +201,13 @@ def init_db():
     CREATE TABLE IF NOT EXISTS presentation_learning_sessions (
         id TEXT PRIMARY KEY,
         document_id TEXT UNIQUE NOT NULL,
-        current_module_id TEXT DEFAULT '',
-        current_concept_name TEXT DEFAULT '',
-        current_slide_number INTEGER DEFAULT 1,
-        understood_concepts TEXT DEFAULT '[]',
-        revision_needed_concepts TEXT DEFAULT '[]',
-        messages_json TEXT DEFAULT '[]',
-        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        active_module_index INTEGER DEFAULT 0,
+        active_concept_id TEXT DEFAULT '',
+        completed_concept_ids TEXT DEFAULT '[]',
+        teaching_state_json TEXT DEFAULT '{}',
+        chat_history_json TEXT DEFAULT '[]',
+        progress_percentage REAL DEFAULT 0.0,
+        last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
@@ -232,27 +218,25 @@ def init_db():
         front TEXT NOT NULL,
         back TEXT NOT NULL,
         slide_number INTEGER DEFAULT 1,
-        mastered INTEGER DEFAULT 0,
+        is_mastered BOOLEAN DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
     """)
 
-    # Setup FTS5 for document chunk retrieval
     try:
         cursor.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS document_chunks_fts USING fts5(
-            chunk_id UNINDEXED,
-            document_id UNINDEXED,
-            title,
             content,
-            tokenize='porter unicode61'
+            title,
+            speaker_notes,
+            content='document_chunks',
+            content_rowid='rowid'
         );
         """)
     except Exception as e:
         print(f"FTS5 setup notice: {e}")
 
-    # Ensure default user exists
     user_count = cursor.execute("SELECT COUNT(*) FROM users").fetchone()[0]
     if user_count == 0:
         default_pwd_hash = hash_password("vishal123")
@@ -262,6 +246,43 @@ def init_db():
         """, (default_pwd_hash,))
 
     conn.commit()
+
+def get_connection():
+    global _db_is_ready
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    except Exception:
+        pass
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = DELETE")
+    except Exception:
+        pass
+
+    if not _db_is_ready:
+        _db_is_ready = True
+        try:
+            c = conn.cursor()
+            c.execute("SELECT count(*) FROM sqlite_master WHERE type='table' AND name='presentation_summaries'")
+            exists = c.fetchone()[0]
+            if exists == 0:
+                _run_init_script(conn)
+            
+            c.execute("SELECT count(*) FROM subjects")
+            sub_count = c.fetchone()[0]
+            if sub_count == 0:
+                from .seed_data import seed_all_data
+                seed_all_data()
+        except Exception as e:
+            print(f"Auto-init DB notice: {e}")
+
+    return conn
+
+def init_db():
+    conn = get_connection()
+    _run_init_script(conn)
     conn.close()
 
 if __name__ == "__main__":

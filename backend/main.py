@@ -19,8 +19,23 @@ from .extractor import extract_document
 from .ai_tutor import answer_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
 from .seed_data import seed_all_data
 from .summarizer import analyze_presentation, get_concept_teaching_package, process_tutor_conversation
+from contextlib import asynccontextmanager
 
-app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0")
+@asynccontextmanager
+async def lifespan(app_instance: FastAPI):
+    try:
+        init_db()
+        conn = get_connection()
+        c = conn.cursor()
+        count = c.execute("SELECT count(*) FROM subjects").fetchone()[0]
+        conn.close()
+        if count == 0:
+            seed_all_data()
+    except Exception as e:
+        print(f"Lifespan startup notice: {e}", file=sys.stderr)
+    yield
+
+app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,19 +63,6 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"error": str(exc), "traceback": tb}
     )
-
-@app.on_event("startup")
-def startup_event():
-    try:
-        init_db()
-        conn = get_connection()
-        c = conn.cursor()
-        count = c.execute("SELECT count(*) FROM subjects").fetchone()[0]
-        conn.close()
-        if count == 0:
-            seed_all_data()
-    except Exception as e:
-        print(f"Startup initialization notice: {e}", file=sys.stderr)
 
 # ----------------- AUTHENTICATION ----------------- #
 class LoginRequest(BaseModel):
@@ -992,6 +994,8 @@ if os.path.exists(FRONTEND_DIR):
     app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 @app.get("/")
+@app.get("/api/index.py")
+@app.get("/api/index")
 def serve_index():
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_file):
@@ -1001,20 +1005,27 @@ def serve_index():
 
 @app.get("/{full_path:path}")
 def serve_spa_paths(full_path: str):
+    if full_path in ("api/index.py", "api/index", "index.py", "index.html", ""):
+        return serve_index()
     if full_path.startswith("api/"):
         raise HTTPException(status_code=404, detail="API route not found")
-    potential_file = os.path.join(FRONTEND_DIR, full_path)
+        
+    rel_path = full_path
+    if rel_path.startswith("static/"):
+        rel_path = rel_path[7:]
+
+    potential_file = os.path.join(FRONTEND_DIR, rel_path)
     if os.path.isfile(potential_file):
         media_type = "text/plain"
-        if full_path.endswith(".js"):
+        if rel_path.endswith(".js"):
             media_type = "application/javascript"
-        elif full_path.endswith(".css"):
+        elif rel_path.endswith(".css"):
             media_type = "text/css"
-        elif full_path.endswith(".html"):
+        elif rel_path.endswith(".html"):
             media_type = "text/html"
-        elif full_path.endswith(".png"):
+        elif rel_path.endswith(".png"):
             media_type = "image/png"
-        elif full_path.endswith(".svg"):
+        elif rel_path.endswith(".svg"):
             media_type = "image/svg+xml"
         try:
             with open(potential_file, "rb") as f:

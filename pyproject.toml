@@ -11,4 +11,5 @@ dependencies = [
     "aiofiles>=23.0.0",
     "requests>=2.31.0",
     "pydantic>=2.5.0",
+    "python-multipart>=0.0.9",
 ]

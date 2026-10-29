@@ -39,4 +39,4 @@ except Exception as e:
     </div>
 </body>
 </html>"""
-        return HTMLResponse(content=html, status_code=500)
+        return HTMLResponse(content=html, status_code=200)
