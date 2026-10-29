@@ -48,6 +48,10 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"error": str(exc), "traceback": tb}
     )
 
+@app.get("/api/health")
+def api_health():
+    return {"status": "online", "mode": "full_lms"}
+
 # ----------------- AUTHENTICATION ----------------- #
 class LoginRequest(BaseModel):
     username: str
