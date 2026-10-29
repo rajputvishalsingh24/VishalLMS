@@ -25,8 +25,29 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
-os.makedirs(UPLOAD_DIR, exist_ok=True)
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+if IS_VERCEL:
+    UPLOAD_DIR = "/tmp/uploads"
+else:
+    UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
+
+try:
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+except Exception:
+    pass
+
+@app.on_event("startup")
+def startup_event():
+    try:
+        init_db()
+        conn = get_connection()
+        c = conn.cursor()
+        count = c.execute("SELECT count(*) FROM subjects").fetchone()[0]
+        conn.close()
+        if count == 0:
+            seed_all_data()
+    except Exception as e:
+        print(f"Startup initialization notice: {e}")
 
 # ----------------- STATS & DASHBOARD ----------------- #
 @app.get("/api/stats")
@@ -656,4 +677,14 @@ def serve_index():
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_file):
         return FileResponse(index_file)
-    return {"message": "VISHAL SINGH API is running. Place index.html in frontend directory."}
+    return {"message": "VISHAL SINGH API is running."}
+
+@app.get("/{full_path:path}")
+def serve_spa_paths(full_path: str):
+    potential_file = os.path.join(FRONTEND_DIR, full_path)
+    if os.path.isfile(potential_file):
+        return FileResponse(potential_file)
+    index_file = os.path.join(FRONTEND_DIR, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    raise HTTPException(status_code=404, detail="Page not found")

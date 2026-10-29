@@ -4,14 +4,33 @@ import os
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
+import shutil
+
+IS_VERCEL = bool(os.environ.get("VERCEL"))
+
+if IS_VERCEL:
+    DB_PATH = "/tmp/lms.db"
+    ORIGINAL_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
+    if not os.path.exists(DB_PATH) and os.path.exists(ORIGINAL_DB):
+        try:
+            shutil.copy2(ORIGINAL_DB, DB_PATH)
+        except Exception as e:
+            print(f"Notice copying DB on Vercel: {e}")
+else:
+    DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
 
 def get_connection():
-    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    try:
+        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    except Exception:
+        pass
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA foreign_keys = ON")
-    conn.execute("PRAGMA journal_mode = WAL")
+    try:
+        conn.execute("PRAGMA foreign_keys = ON")
+        conn.execute("PRAGMA journal_mode = WAL")
+    except Exception:
+        pass
     return conn
 
 def init_db():
