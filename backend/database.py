@@ -186,13 +186,14 @@ def _run_init_script(conn):
     CREATE TABLE IF NOT EXISTS presentation_learning_sessions (
         id TEXT PRIMARY KEY,
         document_id TEXT UNIQUE NOT NULL,
-        active_module_index INTEGER DEFAULT 0,
-        active_concept_id TEXT DEFAULT '',
-        completed_concept_ids TEXT DEFAULT '[]',
-        teaching_state_json TEXT DEFAULT '{}',
-        chat_history_json TEXT DEFAULT '[]',
-        progress_percentage REAL DEFAULT 0.0,
-        last_accessed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        current_module_id TEXT DEFAULT 'mod_1',
+        current_concept_name TEXT DEFAULT '',
+        current_slide_number INTEGER DEFAULT 1,
+        understood_concepts TEXT DEFAULT '[]',
+        revision_needed_concepts TEXT DEFAULT '[]',
+        messages_json TEXT DEFAULT '[]',
+        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
 
@@ -268,11 +269,15 @@ def get_connection():
             if exists == 0:
                 _run_init_script(conn)
             
-            c.execute("SELECT count(*) FROM subjects")
-            sub_count = c.fetchone()[0]
-            if sub_count == 0:
-                from .seed_data import seed_all_data
-                seed_all_data()
+            c.execute("SELECT count(*) FROM user_settings WHERE key = 'seed_completed'")
+            has_seeded = c.fetchone()[0]
+            if has_seeded == 0:
+                c.execute("INSERT OR REPLACE INTO user_settings (key, value) VALUES ('seed_completed', 'true')")
+                conn.commit()
+                c.execute("SELECT count(*) FROM subjects")
+                if c.fetchone()[0] == 0:
+                    from .seed_data import seed_all_data
+                    seed_all_data()
         except Exception as e:
             print(f"Auto-init DB notice: {e}")
 

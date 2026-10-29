@@ -43,13 +43,35 @@ export const API = {
     return res.json();
   },
 
+  async getSubjectDetail(id) {
+    const res = await fetch(`/api/subjects/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch subject details');
+    return res.json();
+  },
+
   async createSubject(data) {
     const res = await fetch('/api/subjects', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error('Failed to create subject');
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to create subject');
+    }
+    return res.json();
+  },
+
+  async updateSubject(id, data) {
+    const res = await fetch(`/api/subjects/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update subject');
+    }
     return res.json();
   },
 
@@ -91,6 +113,19 @@ export const API = {
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Upload failed');
+    }
+    return res.json();
+  },
+
+  async updateDocument(id, data) {
+    const res = await fetch(`/api/documents/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to update document');
     }
     return res.json();
   },
@@ -269,6 +304,18 @@ export const API = {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Tutor response failed');
     }
+    return res.json();
+  },
+
+  async getPresentationChat(docId) {
+    const res = await fetch(`/api/presentations/${docId}/chat`);
+    if (!res.ok) throw new Error('Failed to fetch chat history');
+    return res.json();
+  },
+
+  async clearPresentationChat(docId) {
+    const res = await fetch(`/api/presentations/${docId}/chat`, { method: 'DELETE' });
+    if (!res.ok) throw new Error('Failed to clear chat history');
     return res.json();
   },
 

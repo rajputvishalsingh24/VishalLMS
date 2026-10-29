@@ -201,19 +201,60 @@ class SubjectCreate(BaseModel):
     description: str = ""
     color: str = "#3B82F6"
 
+@app.get("/api/subjects/{id}")
+def get_subject_detail(id: str):
+    conn = get_connection()
+    subj = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
+    if not subj:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Subject not found")
+    docs = conn.execute("SELECT * FROM documents WHERE subject_id = ? ORDER BY created_at DESC", (id,)).fetchall()
+    conn.close()
+    res = dict(subj)
+    res["documents"] = [dict(d) for d in docs]
+    return res
+
 @app.post("/api/subjects")
 def create_subject(subj: SubjectCreate):
+    name = subj.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Subject name cannot be empty")
     conn = get_connection()
+    existing = conn.execute("SELECT id FROM subjects WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
+    if existing:
+        conn.close()
+        raise HTTPException(status_code=400, detail=f"A subject named '{name}' already exists.")
     s_id = f"sub_{uuid.uuid4().hex[:8]}"
     conn.execute("INSERT INTO subjects (id, name, semester, description, color) VALUES (?, ?, ?, ?, ?)",
-                 (s_id, subj.name, subj.semester, subj.description, subj.color))
+                 (s_id, name, subj.semester, subj.description.strip(), subj.color))
     conn.commit()
     conn.close()
-    return {"id": s_id, "name": subj.name}
+    return {"id": s_id, "name": name, "description": subj.description.strip()}
+
+class SubjectUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+@app.put("/api/subjects/{id}")
+def update_subject(id: str, subj: SubjectUpdate):
+    conn = get_connection()
+    if subj.name:
+        name = subj.name.strip()
+        if not name:
+            conn.close()
+            raise HTTPException(status_code=400, detail="Subject name cannot be empty")
+        conn.execute("UPDATE subjects SET name = ?, description = COALESCE(?, description) WHERE id = ?", (name, subj.description, id))
+    elif subj.description is not None:
+        conn.execute("UPDATE subjects SET description = ? WHERE id = ?", (subj.description.strip(), id))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @app.delete("/api/subjects/{id}")
 def delete_subject(id: str):
     conn = get_connection()
+    # Cascade delete documents and chunks
+    conn.execute("DELETE FROM documents WHERE subject_id = ?", (id,))
     conn.execute("DELETE FROM subjects WHERE id = ?", (id,))
     conn.commit()
     conn.close()
@@ -406,6 +447,20 @@ def delete_document(id: str):
     conn.commit()
     conn.close()
     return {"success": True}
+
+class DocumentUpdate(BaseModel):
+    name: str
+
+@app.put("/api/documents/{id}")
+def update_document(id: str, doc_update: DocumentUpdate):
+    name = doc_update.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Document name cannot be empty")
+    conn = get_connection()
+    conn.execute("UPDATE documents SET name = ? WHERE id = ?", (name, id))
+    conn.commit()
+    conn.close()
+    return {"success": True, "name": name}
 
 # ----------------- AI TUTOR ----------------- #
 class TutorChatRequest(BaseModel):
@@ -883,6 +938,23 @@ def api_presentation_tutor_chat(doc_id: str, req: TutorChatRequest):
         return resp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/presentations/{doc_id}/chat")
+def api_get_presentation_chat_history(doc_id: str):
+    conn = get_connection()
+    sess = conn.execute("SELECT messages_json FROM presentation_learning_sessions WHERE document_id = ?", (doc_id,)).fetchone()
+    conn.close()
+    if not sess or not sess["messages_json"]:
+        return {"messages": []}
+    return {"messages": json.loads(sess["messages_json"])}
+
+@app.delete("/api/presentations/{doc_id}/chat")
+def api_clear_presentation_chat(doc_id: str):
+    conn = get_connection()
+    conn.execute("UPDATE presentation_learning_sessions SET messages_json = '[]' WHERE document_id = ?", (doc_id,))
+    conn.commit()
+    conn.close()
+    return {"success": True}
 
 @app.get("/api/presentations/{doc_id}/flashcards")
 def api_get_presentation_flashcards(doc_id: str):

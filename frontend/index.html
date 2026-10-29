@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>VISHAL SINGH - Personal AI Learning Space</title>
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22%20width=%22100%22%20height=%22100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%232563EB%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2240%22 dy=%22.35em%22>VS</text></svg>">
+  <title>VISHAL SINGH — Learn Anything. Understand Everything.</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%200%20100%20100%22><circle cx=%2250%22 cy=%2250%22 r=%2250%22 fill=%22%232563EB%22/><text x=%2250%%22 y=%2250%%22 text-anchor=%22middle%22 fill=%22white%22 font-family=%22sans-serif%22 font-weight=%22bold%22 font-size=%2240%22 dy=%22.35em%22>VS</text></svg>">
   
   <!-- Local Vendor Scripts -->
   <script src="/static/js/vendor/tailwind.js"></script>
@@ -15,13 +15,12 @@
         extend: {
           colors: {
             brand: {
-              sidebar: '#0B132B',
-              sidebarActive: '#1C2541',
-              primary: '#2563EB',
-              primaryHover: '#1D4ED8',
-              cardBg: '#FFFFFF',
-              darkCard: '#111827',
-              accentLight: '#EFF6FF'
+              bg: '#070B19',
+              surface: '#0E1626',
+              elevated: '#162035',
+              primary: '#3B82F6',
+              primaryHover: '#2563EB',
+              accent: '#06B6D4'
             }
           }
         }
@@ -32,1339 +31,828 @@
   <script src="/static/js/vendor/marked.min.js"></script>
   <link rel="stylesheet" href="/static/css/style.css">
 </head>
-<body class="bg-slate-50 text-slate-900 flex h-screen overflow-hidden antialiased">
+<body class="dark-mode bg-[#070B19] text-slate-100 min-h-screen flex flex-col font-sans antialiased selection:bg-blue-600 selection:text-white">
 
-  <!-- ==================== LEFT SIDEBAR ==================== -->
-  <aside id="main-sidebar" class="w-64 bg-[#0B132B] text-slate-300 flex flex-col flex-shrink-0 z-30 transition-all duration-300 select-none">
-    <!-- Brand Header -->
-    <div class="px-6 py-6 border-b border-slate-800/80">
-      <div class="flex items-center space-x-3 cursor-pointer" onclick="App.navigate('dashboard')">
-        <div class="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white shadow-md text-sm">
-          VS
+  <!-- Ambient Animated Glowing Mesh -->
+  <div class="ambient-mesh">
+    <div class="ambient-orb ambient-orb-1"></div>
+    <div class="ambient-orb ambient-orb-2"></div>
+    <div class="ambient-orb ambient-orb-3"></div>
+  </div>
+
+  <!-- ==================== MINIMAL TOP HEADER ==================== -->
+  <header class="sticky top-0 z-40 w-full border-b border-white/10 bg-[#070B19]/80 backdrop-blur-xl px-4 sm:px-8 py-3.5 transition-colors">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      
+      <!-- Logo & Tagline -->
+      <div class="flex items-center space-x-3 cursor-pointer group flex-shrink-0" onclick="App.navigate('dashboard')">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 via-indigo-600 to-cyan-500 p-[2px] shadow-lg shadow-blue-500/20 group-hover:scale-105 transition-transform">
+          <div class="w-full h-full bg-[#070B19] rounded-[10px] flex items-center justify-center font-extrabold text-white text-sm">
+            VS
+          </div>
         </div>
         <div>
-          <h1 class="text-white font-extrabold text-base tracking-wider leading-tight">VISHAL SINGH</h1>
-          <p class="text-[11px] text-slate-400 font-medium">Your Personal AI Learning Space</p>
+          <div class="flex items-center space-x-2">
+            <span class="font-extrabold text-base tracking-wider text-white">VISHAL SINGH</span>
+            <span class="text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-400 font-semibold border border-blue-500/20">AI Tutor</span>
+          </div>
+          <p class="text-[11px] text-slate-400 font-medium hidden sm:block">Learn Anything. Understand Everything.</p>
         </div>
       </div>
-    </div>
 
-    <!-- Navigation Items -->
-    <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-      <button onclick="App.navigate('dashboard')" data-nav="dashboard" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-white bg-[#1C2541] hover:bg-[#1C2541]">
-        <i data-lucide="home" class="w-4 h-4 mr-3 text-blue-400"></i>
-        <span>Home</span>
-      </button>
+      <!-- Center Minimal Navigation -->
+      <nav class="hidden md:flex items-center space-x-1 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 backdrop-blur-md">
+        <button onclick="App.navigate('dashboard')" data-nav-pill="dashboard" class="nav-pill px-4 py-1.5 rounded-full text-xs font-semibold transition text-white bg-blue-600 shadow-sm flex items-center space-x-1.5">
+          <i data-lucide="home" class="w-3.5 h-3.5"></i>
+          <span>Home</span>
+        </button>
+        <button onclick="App.navigate('dashboard')" data-nav-pill="subjects" class="nav-pill px-4 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
+          <i data-lucide="layers" class="w-3.5 h-3.5"></i>
+          <span>My Subjects</span>
+        </button>
+      </nav>
 
-      <button onclick="App.navigate('library')" data-nav="library" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="folder-kanban" class="w-4 h-4 mr-3 text-slate-400"></i>
-        <span>Study Library</span>
-      </button>
-
-      <button onclick="App.navigate('workspace')" data-nav="workspace" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="presentation" class="w-4 h-4 mr-3 text-indigo-400"></i>
-        <span>PPT Workspace</span>
-      </button>
-
-      <button onclick="App.navigate('tutor')" data-nav="tutor" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="bot" class="w-4 h-4 mr-3 text-emerald-400"></i>
-        <span>AI Tutor</span>
-      </button>
-
-      <button onclick="App.navigate('quizzes')" data-nav="quizzes" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="help-circle" class="w-4 h-4 mr-3 text-violet-400"></i>
-        <span>Quizzes</span>
-      </button>
-
-      <button onclick="App.navigate('notes')" data-nav="notes" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="file-text" class="w-4 h-4 mr-3 text-amber-400"></i>
-        <span>My Notes</span>
-      </button>
-
-      <button onclick="App.navigate('progress')" data-nav="progress" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="trending-up" class="w-4 h-4 mr-3 text-pink-400"></i>
-        <span>Learning Progress</span>
-      </button>
-
-      <button onclick="App.navigate('subjects')" data-nav="subjects" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="layout-grid" class="w-4 h-4 mr-3 text-cyan-400"></i>
-        <span>Subjects</span>
-      </button>
-    </nav>
-
-    <!-- Bottom Settings -->
-    <div class="p-3 border-t border-slate-800/80">
-      <button onclick="App.navigate('settings')" data-nav="settings" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
-        <i data-lucide="settings" class="w-4 h-4 mr-3 text-slate-400"></i>
-        <span>Settings</span>
-      </button>
-    </div>
-  </aside>
-
-  <!-- ==================== MAIN CONTENT WRAPPER ==================== -->
-  <div class="flex-1 flex flex-col h-screen overflow-hidden">
-    
-    <!-- Top Global Header -->
-    <header class="h-16 bg-white border-b border-slate-200/80 px-6 flex items-center justify-between flex-shrink-0 z-20">
-      <!-- Search Input -->
-      <div class="relative w-full max-w-xl">
+      <!-- Search Bar -->
+      <div class="relative flex-1 max-w-md hidden sm:block">
         <i data-lucide="search" class="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"></i>
         <input 
           id="global-search-input" 
           type="text" 
-          placeholder="Search subjects, presentations, concepts, or ask AI..."
-          class="w-full pl-10 pr-4 py-2 text-sm bg-slate-100/70 border border-transparent rounded-lg focus:bg-white focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 transition-all text-slate-800 placeholder-slate-400"
-          onkeydown="if(event.key === 'Enter') App.handleGlobalSearch(this.value)"
+          placeholder="Search subjects, presentations, or concepts..."
+          class="w-full pl-10 pr-4 py-2 text-xs sm:text-sm bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition text-slate-100 placeholder-slate-400"
+          oninput="App.handleSearch(this.value)"
         >
-        <div id="search-dropdown" class="hidden absolute left-0 right-0 top-full mt-1.5 bg-white border border-slate-200 rounded-xl shadow-xl p-2 z-50"></div>
+        <div id="search-dropdown" class="hidden absolute left-0 right-0 top-full mt-2 bg-[#0E1626] border border-white/10 rounded-xl shadow-2xl p-2 z-50 max-h-72 overflow-y-auto"></div>
       </div>
 
-      <!-- Right Header Actions -->
-      <div class="flex items-center space-x-4">
-        <!-- AI Tutor Quick Pill -->
-        <button onclick="App.navigate('tutor')" class="hidden sm:flex items-center text-xs font-semibold px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors">
-          <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1.5 text-blue-600"></i>
-          Ask AI
+      <!-- Right Header Actions (Theme Toggle & Profile) -->
+      <div class="flex items-center space-x-3 flex-shrink-0">
+        <!-- Theme Toggle (Light / Dark Mode) -->
+        <button 
+          id="theme-toggle-btn"
+          onclick="App.toggleTheme()" 
+          class="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition-all shadow-sm"
+          title="Toggle Light/Dark Theme"
+        >
+          <i id="theme-toggle-icon" data-lucide="sun" class="w-4 h-4 text-amber-400"></i>
         </button>
 
-        <!-- Notification Bell -->
-        <button class="relative p-2 text-slate-500 hover:text-slate-700 rounded-lg hover:bg-slate-100 transition-colors" title="Notifications">
-          <i data-lucide="bell" class="w-5 h-5"></i>
-          <span class="absolute top-1.5 right-1.5 w-2 h-2 bg-blue-600 rounded-full"></span>
-        </button>
-
-        <!-- User Profile Avatar & Logout -->
-        <div class="flex items-center space-x-3 pl-2 border-l border-slate-200">
-          <div class="flex items-center space-x-2 cursor-pointer" onclick="App.navigate('settings')">
-            <div class="w-9 h-9 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold text-xs shadow-sm ring-2 ring-blue-100">
-              VS
-            </div>
-            <div class="hidden md:block text-left">
-              <p id="header-user-name" class="text-xs font-semibold text-slate-800 leading-tight">Vishal Singh</p>
-              <p class="text-[10px] text-slate-500">MBA Scholar</p>
-            </div>
+        <!-- User Profile Avatar -->
+        <div class="flex items-center space-x-2 pl-2 border-l border-white/10">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-md border border-white/20">
+            VS
           </div>
-          <button onclick="App.handleLogout()" class="p-2 text-slate-400 hover:text-rose-600 rounded-lg hover:bg-slate-100 transition" title="Log Out">
-            <i data-lucide="log-out" class="w-4 h-4"></i>
+          <div class="hidden lg:block text-left">
+            <p id="header-user-name" class="text-xs font-semibold text-slate-200 leading-tight">Vishal Singh</p>
+            <p class="text-[10px] text-slate-400">MBA Scholar</p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN APPLICATION VIEWPORT ==================== -->
+  <main class="relative z-10 flex-1 max-w-7xl w-full mx-auto p-4 sm:p-8 overflow-y-auto">
+    
+    <!-- ==================== PAGE 1: MAIN DASHBOARD ==================== -->
+    <div id="page-dashboard" class="page-view animate-fade-in space-y-8">
+      
+      <!-- Welcome Hero Section -->
+      <div class="relative overflow-hidden rounded-3xl bg-gradient-to-r from-blue-900/40 via-indigo-900/30 to-purple-900/20 border border-blue-500/20 p-6 sm:p-10 shadow-2xl backdrop-blur-md">
+        <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div class="space-y-2 max-w-2xl">
+            <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold">
+              <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+              <span>AI-Powered Personal Classroom</span>
+            </div>
+            <h1 class="text-3xl sm:text-4xl font-extrabold tracking-tight text-white">
+              Welcome back, Vishal 👋
+            </h1>
+            <p class="text-slate-300 text-sm sm:text-base font-normal leading-relaxed">
+              Your classroom is ready. What do you want to learn today?
+            </p>
+          </div>
+
+          <!-- Primary Action Buttons -->
+          <div class="flex flex-wrap items-center gap-3">
+            <button 
+              onclick="App.openCreateSubjectModal()" 
+              class="px-5 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.02] active:scale-[0.98] transition flex items-center space-x-2"
+            >
+              <i data-lucide="folder-plus" class="w-4 h-4"></i>
+              <span>+ Create Subject</span>
+            </button>
+
+            <button 
+              onclick="App.openUploadPptModal()" 
+              class="px-5 py-3 rounded-xl bg-white/10 hover:bg-white/15 text-white font-semibold text-xs sm:text-sm border border-white/15 hover:border-white/25 hover:scale-[1.02] active:scale-[0.98] transition flex items-center space-x-2 backdrop-blur-md"
+            >
+              <i data-lucide="upload" class="w-4 h-4 text-cyan-400"></i>
+              <span>↑ Upload PPT</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- My Subjects Section -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center space-x-2">
+              <span>My Subjects</span>
+              <span id="subject-count-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-semibold border border-white/10">0</span>
+            </h2>
+            <p class="text-xs text-slate-400 mt-0.5">Explore study materials and learn presentation concepts with your AI tutor.</p>
+          </div>
+
+          <button 
+            onclick="App.openCreateSubjectModal()"
+            class="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1 transition"
+          >
+            <span>+ New Subject</span>
+          </button>
+        </div>
+
+        <!-- Subjects Grid -->
+        <div id="subjects-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Dynamically populated or empty state -->
+        </div>
+
+        <!-- Empty Dashboard State -->
+        <div id="dashboard-empty-state" class="hidden text-center py-16 px-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.02]">
+          <div class="w-20 h-20 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-5 empty-state-floating-icon shadow-inner">
+            <i data-lucide="layers" class="w-10 h-10"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white mb-2">No subjects yet</h3>
+          <p class="text-sm text-slate-400 max-w-md mx-auto mb-6">Create your first subject to start uploading class presentations and learning with your AI tutor.</p>
+          <button 
+            onclick="App.openCreateSubjectModal()" 
+            class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-500/25 transition inline-flex items-center space-x-2"
+          >
+            <i data-lucide="plus" class="w-4 h-4"></i>
+            <span>+ Create Subject</span>
           </button>
         </div>
       </div>
-    </header>
 
-    <!-- Main View Scrollable Container -->
-    <main id="app-viewport" class="flex-1 overflow-y-auto bg-slate-50 relative p-6">
+    </div>
+
+    <!-- ==================== PAGE 2: SUBJECT WORKSPACE ==================== -->
+    <div id="page-subject" class="page-view hidden animate-fade-in space-y-6">
       
-      <!-- ==================== 1. DASHBOARD PAGE ==================== -->
-      <div id="page-dashboard" class="page-view animate-fade-in space-y-6">
-        <!-- Resume Learning Hero Card (Persistent Learning Anchor) -->
-        <div id="dashboard-resume-card" class="hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 text-white rounded-2xl p-5 shadow-lg border border-blue-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center space-x-4">
-            <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-bold flex-shrink-0 shadow-inner">
-              <i data-lucide="play-circle" class="w-6 h-6"></i>
+      <!-- Back to Dashboard & Header Bar -->
+      <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/10 pb-5">
+        <div class="flex items-center space-x-3">
+          <button 
+            onclick="App.navigate('dashboard')"
+            class="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition flex items-center space-x-1.5 text-xs font-semibold"
+          >
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            <span>Back to Dashboard</span>
+          </button>
+          
+          <div class="h-6 w-[1px] bg-white/10"></div>
+
+          <div>
+            <div class="flex items-center space-x-3">
+              <h1 id="subject-view-title" class="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">Product Management</h1>
+              <span id="subject-view-count" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 font-semibold border border-blue-500/20">3 PPTs</span>
             </div>
-            <div>
-              <div class="flex items-center space-x-2">
-                <span class="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-blue-100">Resume Learning</span>
-                <span id="resume-card-time" class="text-xs text-blue-200">Active Session</span>
-              </div>
-              <h3 id="resume-card-title" class="text-base font-extrabold text-white mt-0.5">Resume Learning: Product Strategy</h3>
-              <p id="resume-card-subtitle" class="text-xs text-blue-100/90">Module 1: Strategic Foundations &bull; Current Concept: Product-Market Fit</p>
-            </div>
+            <p id="subject-view-desc" class="text-xs sm:text-sm text-slate-400 mt-1 max-w-2xl">Core MBA framework analysis, roadmap strategy, and customer discovery.</p>
           </div>
-          <button id="resume-card-btn" onclick="App.resumeCurrentPresentation()" class="px-5 py-2.5 bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2 flex-shrink-0">
-            <span>Continue Learning</span>
+        </div>
+
+        <button 
+          onclick="App.openUploadPptForCurrentSubject()" 
+          class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
+        >
+          <i data-lucide="upload" class="w-4 h-4"></i>
+          <span>+ Upload PPT</span>
+        </button>
+      </div>
+
+      <!-- Subject Presentations List -->
+      <div class="space-y-4">
+        <h2 class="text-lg font-bold text-white tracking-tight">Uploaded Presentations</h2>
+        
+        <div id="subject-presentations-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <!-- Dynamically populated presentation cards -->
+        </div>
+
+        <!-- Empty Subject Presentations State -->
+        <div id="subject-empty-state" class="hidden text-center py-16 px-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.02]">
+          <div class="w-16 h-16 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4 empty-state-floating-icon">
+            <i data-lucide="presentation" class="w-8 h-8"></i>
+          </div>
+          <h3 class="text-base font-bold text-white mb-1">No presentations in this subject yet</h3>
+          <p class="text-xs text-slate-400 max-w-sm mx-auto mb-5">Upload your first class PPT to start analyzing slides and learning concepts.</p>
+          <button 
+            onclick="App.openUploadPptForCurrentSubject()" 
+            class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition inline-flex items-center space-x-1.5"
+          >
+            <i data-lucide="upload" class="w-3.5 h-3.5"></i>
+            <span>+ Upload PPT</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== PAGE 3: PRESENTATION LEARNING WORKSPACE (4 TABS ONLY) ==================== -->
+    <div id="page-presentation-learn" class="page-view hidden animate-fade-in space-y-6">
+      
+      <!-- Top Bar: Presentation Title, Subject Badge, Slide Count, Back Button -->
+      <div class="flex items-center justify-between flex-wrap gap-4 border-b border-white/10 pb-5">
+        <div class="flex items-center space-x-3">
+          <button 
+            onclick="App.backToCurrentSubject()"
+            class="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition flex items-center space-x-1.5 text-xs font-semibold"
+          >
+            <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            <span>Back to Subject</span>
+          </button>
+
+          <div class="h-6 w-[1px] bg-white/10"></div>
+
+          <div>
+            <div class="flex items-center space-x-2 flex-wrap">
+              <span id="learn-subject-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-400 border border-blue-500/20">Product Management</span>
+              <span id="learn-slide-count-badge" class="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 border border-white/10 flex items-center space-x-1">
+                <i data-lucide="presentation" class="w-3 h-3 text-cyan-400"></i>
+                <span id="learn-slide-count-text">24 Slides</span>
+              </span>
+            </div>
+            <h1 id="learn-presentation-title" class="text-xl sm:text-2xl font-extrabold text-white tracking-tight mt-1">Product Strategy & Roadmaps</h1>
+          </div>
+        </div>
+
+        <!-- Export Summary Button -->
+        <button 
+          onclick="App.exportPrintableSummary()" 
+          class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white font-semibold text-xs border border-white/10 transition flex items-center space-x-1.5"
+          title="Print or Export Summary as PDF"
+        >
+          <i data-lucide="printer" class="w-4 h-4 text-purple-400"></i>
+          <span>Export Summary</span>
+        </button>
+      </div>
+
+      <!-- Navigation Tabs: Strictly 4 Tabs -->
+      <div class="flex items-center space-x-2 border-b border-white/10 overflow-x-auto pb-1">
+        <button 
+          onclick="App.switchLearnTab('overview')" 
+          id="tab-btn-overview" 
+          class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition flex items-center space-x-2 text-white bg-blue-600 shadow-sm"
+        >
+          <i data-lucide="compass" class="w-4 h-4"></i>
+          <span>1. Overview</span>
+        </button>
+
+        <button 
+          onclick="App.switchLearnTab('summary')" 
+          id="tab-btn-summary" 
+          class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5"
+        >
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          <span>2. Detailed Summary</span>
+        </button>
+
+        <button 
+          onclick="App.switchLearnTab('tutor-teaching')" 
+          id="tab-btn-tutor-teaching" 
+          class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5"
+        >
+          <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+          <span>3. Learn with AI</span>
+        </button>
+
+        <button 
+          onclick="App.switchLearnTab('ask-ai')" 
+          id="tab-btn-ask-ai" 
+          class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5"
+        >
+          <i data-lucide="bot" class="w-4 h-4 text-emerald-400"></i>
+          <span>4. Ask AI (Q&A)</span>
+        </button>
+      </div>
+
+      <!-- TAB 1 CONTENT: OVERVIEW -->
+      <div id="learn-tab-overview" class="learn-tab-content space-y-6 animate-fade-in">
+        <!-- Central Objective Box -->
+        <div class="p-6 rounded-2xl bg-gradient-to-r from-blue-900/30 to-indigo-900/20 border border-blue-500/20">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-md border border-blue-500/20">Central Objective</span>
+          <h3 id="overview-objective" class="text-base sm:text-lg font-semibold text-white mt-2 leading-relaxed">
+            Equip MBA scholars with executive frameworks, operational mechanics, and strategic prioritization models.
+          </h3>
+          <p id="overview-structure" class="text-xs sm:text-sm text-slate-300 mt-2"></p>
+        </div>
+
+        <!-- What You Will Learn -->
+        <div class="glass-panel p-6 rounded-2xl space-y-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span>What You Will Master</span>
+          </h3>
+          <div id="overview-learn-outcomes" class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs sm:text-sm text-slate-300">
+            <!-- Out comes populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Detected Concepts Grid -->
+        <div class="glass-panel p-6 rounded-2xl space-y-4">
+          <div class="flex items-center justify-between">
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+              <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
+              <span>Detected Key Concepts</span>
+            </h3>
+            <span id="overview-concepts-count" class="text-xs text-slate-400">6 Concepts Identified</span>
+          </div>
+          
+          <div id="overview-concepts-badges" class="flex flex-wrap gap-2">
+            <!-- Badges populated dynamically -->
+          </div>
+        </div>
+
+        <!-- Start Learning Action Card -->
+        <div class="p-6 rounded-2xl bg-blue-600/20 border border-blue-500/40 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h4 class="text-base font-bold text-white">Ready to begin concept-by-concept learning?</h4>
+            <p class="text-xs text-slate-300 mt-0.5">Your AI tutor is prepared to guide you through each concept with examples, frameworks, and checks.</p>
+          </div>
+          <button 
+            onclick="App.switchLearnTab('tutor-teaching')" 
+            class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs sm:text-sm shadow-lg shadow-blue-500/30 transition flex items-center justify-center space-x-2 flex-shrink-0"
+          >
+            <span>Start Learning with AI</span>
             <i data-lucide="arrow-right" class="w-4 h-4"></i>
           </button>
         </div>
-
-        <!-- Mountain Banner -->
-        <div class="mountain-banner rounded-2xl p-7 border border-blue-100 shadow-sm flex flex-col justify-center min-h-[125px]">
-          <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Welcome back, Vishal.</h2>
-          <p class="text-sm sm:text-base text-slate-600 font-medium mt-1">Your classroom, your materials, your learning journey.</p>
-        </div>
-
-        <!-- 6 Learning Statistics Cards -->
-        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <!-- Presentations -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div class="flex items-center space-x-2 text-rose-500 mb-2">
-              <i data-lucide="presentation" class="w-4 h-4"></i>
-              <span class="text-xs font-medium text-slate-500">Presentations</span>
-            </div>
-            <div id="stat-presentations" class="text-2xl font-extrabold text-slate-900">12</div>
-          </div>
-
-          <!-- Study Documents -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div class="flex items-center space-x-2 text-blue-500 mb-2">
-              <i data-lucide="file-text" class="w-4 h-4"></i>
-              <span class="text-xs font-medium text-slate-500">Study Documents</span>
-            </div>
-            <div id="stat-documents" class="text-2xl font-extrabold text-slate-900">28</div>
-          </div>
-
-          <!-- Subjects -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div class="flex items-center space-x-2 text-emerald-500 mb-2">
-              <i data-lucide="folder" class="w-4 h-4"></i>
-              <span class="text-xs font-medium text-slate-500">Subjects</span>
-            </div>
-            <div id="stat-subjects" class="text-2xl font-extrabold text-slate-900">6</div>
-          </div>
-
-          <!-- Topics Completed -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div class="flex items-center space-x-2 text-purple-500 mb-2">
-              <i data-lucide="check-circle-2" class="w-4 h-4"></i>
-              <span class="text-xs font-medium text-slate-500">Topics Completed</span>
-            </div>
-            <div id="stat-topics" class="text-2xl font-extrabold text-slate-900">14</div>
-          </div>
-
-          <!-- Quizzes Attempted -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-col justify-between">
-            <div class="flex items-center space-x-2 text-amber-500 mb-2">
-              <i data-lucide="award" class="w-4 h-4"></i>
-              <span class="text-xs font-medium text-slate-500">Quizzes Attempted</span>
-            </div>
-            <div id="stat-quizzes" class="text-2xl font-extrabold text-slate-900">8</div>
-          </div>
-
-          <!-- Overall Progress Ring -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center justify-between">
-            <div>
-              <span class="text-xs font-medium text-slate-500 block mb-1">Overall Progress</span>
-              <div id="stat-progress-text" class="text-2xl font-extrabold text-slate-900">42%</div>
-            </div>
-            <div class="relative w-12 h-12 flex items-center justify-center">
-              <svg class="w-12 h-12" viewBox="0 0 36 36">
-                <path class="text-slate-100" stroke-width="3.5" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-                <path id="stat-progress-ring" class="text-blue-600 progress-ring-circle" stroke-dasharray="42, 100" stroke-width="3.5" stroke-linecap="round" stroke="currentColor" fill="none" d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831" />
-              </svg>
-            </div>
-          </div>
-        </div>
-
-        <!-- Continue Learning & Quick Actions Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <!-- Left 3 Cols: Continue Learning & Recent Uploads -->
-          <div class="lg:col-span-3 space-y-6">
-            <!-- Continue Learning Header -->
-            <div class="flex items-center justify-between">
-              <h3 class="text-lg font-bold text-slate-900">Continue Learning</h3>
-              <button onclick="App.navigate('library')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
-                View all <i data-lucide="arrow-right" class="w-3.5 h-3.5 ml-1"></i>
-              </button>
-            </div>
-
-            <!-- Continue Learning Cards Grid -->
-            <div id="continue-learning-cards" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <!-- Rendered dynamically -->
-            </div>
-
-            <!-- Recent Uploads Table -->
-            <div class="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-              <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-                <h3 class="text-base font-bold text-slate-900">Recent Uploads</h3>
-                <button onclick="App.navigate('library')" class="text-xs font-semibold text-blue-600 hover:text-blue-700 flex items-center">
-                  View all <i data-lucide="arrow-right" class="w-3.5 h-3.5 ml-1"></i>
-                </button>
-              </div>
-              <div class="overflow-x-auto">
-                <table class="w-full text-left text-sm text-slate-600">
-                  <thead class="bg-slate-50/80 text-xs font-semibold uppercase text-slate-400 border-b border-slate-100">
-                    <tr>
-                      <th class="px-5 py-3">Name</th>
-                      <th class="px-4 py-3">Subject</th>
-                      <th class="px-4 py-3">Uploaded</th>
-                      <th class="px-4 py-3">Type</th>
-                      <th class="px-4 py-3 text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody id="recent-uploads-tbody" class="divide-y divide-slate-100">
-                    <!-- Rendered dynamically -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right 1 Col: Quick Actions -->
-          <div class="space-y-4">
-            <h3 class="text-lg font-bold text-slate-900">Quick Actions</h3>
-            <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs space-y-2.5">
-              
-              <button onclick="App.openUploadModal()" class="w-full flex items-center p-3 rounded-xl bg-purple-50/80 hover:bg-purple-100 text-purple-900 transition text-left group">
-                <div class="w-9 h-9 rounded-lg bg-purple-600 text-white flex items-center justify-center mr-3 flex-shrink-0 shadow-sm group-hover:scale-105 transition">
-                  <i data-lucide="upload-cloud" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-900">Upload Study Material</p>
-                  <p class="text-xs text-slate-500">PPT, PDF, DOCX, TXT</p>
-                </div>
-              </button>
-
-              <button onclick="App.navigate('subjects')" class="w-full flex items-center p-3 rounded-xl bg-indigo-50/80 hover:bg-indigo-100 text-indigo-900 transition text-left group">
-                <div class="w-9 h-9 rounded-lg bg-indigo-600 text-white flex items-center justify-center mr-3 flex-shrink-0 shadow-sm group-hover:scale-105 transition">
-                  <i data-lucide="book-open" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-900">Learn a Topic</p>
-                  <p class="text-xs text-slate-500">Curriculum syllabus</p>
-                </div>
-              </button>
-
-              <button onclick="App.navigate('tutor')" class="w-full flex items-center p-3 rounded-xl bg-emerald-50/80 hover:bg-emerald-100 text-emerald-900 transition text-left group">
-                <div class="w-9 h-9 rounded-lg bg-emerald-600 text-white flex items-center justify-center mr-3 flex-shrink-0 shadow-sm group-hover:scale-105 transition">
-                  <i data-lucide="bot" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-900">Ask AI Tutor</p>
-                  <p class="text-xs text-slate-500">Instant explanations & RAG</p>
-                </div>
-              </button>
-
-              <button onclick="App.navigate('quizzes')" class="w-full flex items-center p-3 rounded-xl bg-amber-50/80 hover:bg-amber-100 text-amber-900 transition text-left group">
-                <div class="w-9 h-9 rounded-lg bg-amber-600 text-white flex items-center justify-center mr-3 flex-shrink-0 shadow-sm group-hover:scale-105 transition">
-                  <i data-lucide="check-square" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-900">Take a Quiz</p>
-                  <p class="text-xs text-slate-500">MBA exam practice questions</p>
-                </div>
-              </button>
-
-              <button onclick="App.navigate('notes')" class="w-full flex items-center p-3 rounded-xl bg-rose-50/80 hover:bg-rose-100 text-rose-900 transition text-left group">
-                <div class="w-9 h-9 rounded-lg bg-rose-600 text-white flex items-center justify-center mr-3 flex-shrink-0 shadow-sm group-hover:scale-105 transition">
-                  <i data-lucide="edit-3" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-900">Revise My Notes</p>
-                  <p class="text-xs text-slate-500">Summaries & flashcards</p>
-                </div>
-              </button>
-
-              <button onclick="App.navigate('subjects')" class="w-full flex items-center p-3 rounded-xl bg-blue-50/80 hover:bg-blue-100 text-blue-900 transition text-left group">
-                <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center mr-3 flex-shrink-0 shadow-sm group-hover:scale-105 transition">
-                  <i data-lucide="grid" class="w-5 h-5"></i>
-                </div>
-                <div>
-                  <p class="text-sm font-bold text-slate-900">Browse All Subjects</p>
-                  <p class="text-xs text-slate-500">6 Core MBA Subjects</p>
-                </div>
-              </button>
-
-            </div>
-          </div>
-        </div>
       </div>
 
-      <!-- ==================== 2. STUDY LIBRARY PAGE ==================== -->
-      <div id="page-library" class="page-view hidden space-y-6">
-        <!-- Header -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <!-- TAB 2 CONTENT: DETAILED SUMMARY -->
+      <div id="learn-tab-summary" class="learn-tab-content hidden space-y-6 animate-fade-in">
+        <div class="flex items-center justify-between">
           <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Study Material Library</h2>
-            <p class="text-sm text-slate-500">Manage and organize all your study materials in one place.</p>
+            <h3 class="text-lg font-bold text-white">Comprehensive 8-Part Presentation Breakdown</h3>
+            <p class="text-xs text-slate-400">Structured MBA summary citing slide numbers and verified frameworks.</p>
           </div>
-          <button onclick="App.openUploadModal()" class="inline-flex items-center justify-center px-4 py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold shadow-sm transition">
-            <i data-lucide="upload" class="w-4 h-4 mr-2"></i>
-            Upload Material
+          <button 
+            onclick="App.exportPrintableSummary()" 
+            class="px-3.5 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-xs text-slate-200 border border-white/10 flex items-center space-x-1.5"
+          >
+            <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+            <span>Print / PDF</span>
           </button>
         </div>
 
-        <!-- Filter bar -->
-        <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex flex-wrap items-center justify-between gap-4">
-          <!-- Type Pills -->
-          <div class="flex items-center space-x-1.5 overflow-x-auto pb-1 sm:pb-0" id="library-type-filters">
-            <button onclick="App.filterLibraryType('all')" class="type-filter-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 text-white">All Files</button>
-            <button onclick="App.filterLibraryType('pptx')" class="type-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100">PPT</button>
-            <button onclick="App.filterLibraryType('pdf')" class="type-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100">PDF</button>
-            <button onclick="App.filterLibraryType('docx')" class="type-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100">DOCX</button>
-            <button onclick="App.filterLibraryType('txt')" class="type-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100">TXT</button>
-            <button onclick="App.filterLibraryType('md')" class="type-filter-btn px-3 py-1.5 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100">MD</button>
-          </div>
-
-          <!-- Dropdowns & Search -->
-          <div class="flex items-center space-x-3 w-full sm:w-auto">
-            <div class="relative flex-1 sm:w-64">
-              <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-              <input id="library-search-input" type="text" placeholder="Search files, subjects, topics..." oninput="App.handleLibrarySearch(this.value)" class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-            </div>
-
-            <select id="library-semester-filter" onchange="App.handleLibraryFilterChange()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none">
-              <option value="all">Semester: All</option>
-              <option value="Semester 1">Semester 1</option>
-              <option value="Semester 2">Semester 2</option>
-              <option value="Semester 3">Semester 3</option>
-              <option value="Semester 4">Semester 4</option>
-            </select>
-
-            <select id="library-sort-filter" onchange="App.handleLibraryFilterChange()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-2.5 py-1.5 text-slate-700 focus:outline-none">
-              <option value="newest">Sort by: Newest</option>
-              <option value="name">Sort by: Name</option>
-              <option value="oldest">Sort by: Oldest</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 2-Pane Study Library Content -->
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <!-- Left Pane: Semesters & Subjects Tree -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs space-y-5">
-            <div>
-              <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Semesters</p>
-              <div class="space-y-1 text-sm font-medium text-slate-700">
-                <div class="flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-blue-50/70 text-blue-700 font-semibold cursor-pointer">
-                  <div class="flex items-center"><i data-lucide="chevron-down" class="w-3.5 h-3.5 mr-1.5"></i> MBA</div>
-                  <span class="text-xs bg-blue-200 text-blue-800 px-1.5 py-0.5 rounded">All</span>
-                </div>
-                <div class="pl-6 space-y-1 text-xs">
-                  <div onclick="App.filterSemester('Semester 1')" class="p-1.5 rounded hover:bg-slate-100 flex justify-between cursor-pointer"><span>Semester 1</span><span class="text-slate-400">12</span></div>
-                  <div onclick="App.filterSemester('Semester 2')" class="p-1.5 rounded hover:bg-slate-100 flex justify-between cursor-pointer"><span>Semester 2</span><span class="text-slate-400">8</span></div>
-                  <div onclick="App.filterSemester('Semester 3')" class="p-1.5 rounded hover:bg-slate-100 flex justify-between cursor-pointer"><span>Semester 3</span><span class="text-slate-400">6</span></div>
-                  <div onclick="App.filterSemester('Semester 4')" class="p-1.5 rounded hover:bg-slate-100 flex justify-between cursor-pointer"><span>Semester 4</span><span class="text-slate-400">4</span></div>
-                </div>
-              </div>
-            </div>
-
-            <div class="pt-3 border-t border-slate-100">
-              <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Subjects</p>
-              <div id="library-subjects-sidebar-list" class="space-y-1 text-xs text-slate-700">
-                <!-- Rendered dynamically -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Right Pane: Files Table -->
-          <div class="lg:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
-              <div>
-                <h3 id="library-current-category-title" class="text-base font-bold text-slate-900">All Materials</h3>
-                <p id="library-file-count-label" class="text-xs text-slate-500">7 files indexed</p>
-              </div>
-            </div>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-sm text-slate-600">
-                <thead class="bg-slate-50/80 text-xs font-semibold uppercase text-slate-400 border-b border-slate-100">
-                  <tr>
-                    <th class="px-5 py-3">Name</th>
-                    <th class="px-4 py-3">Subject</th>
-                    <th class="px-4 py-3">Type</th>
-                    <th class="px-4 py-3">Size</th>
-                    <th class="px-4 py-3">Uploaded</th>
-                    <th class="px-4 py-3 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody id="library-files-tbody" class="divide-y divide-slate-100">
-                  <!-- Rendered dynamically -->
-                </tbody>
-              </table>
-            </div>
-          </div>
+        <div id="detailed-summary-container" class="space-y-6">
+          <!-- Populated dynamically with concepts, frameworks, formulas, glossary, revision -->
         </div>
       </div>
 
-      <!-- ==================== 3. PRESENTATION VIEWER PAGE ==================== -->
-      <div id="page-viewer" class="page-view hidden space-y-4">
-        <!-- Top Bar with Breadcrumbs & Actions -->
-        <div class="flex items-center justify-between bg-white px-5 py-3 rounded-xl border border-slate-200/80 shadow-xs">
-          <div class="flex items-center space-x-2 text-xs text-slate-500">
-            <button onclick="App.navigate('library')" class="hover:text-blue-600 flex items-center">
-              <i data-lucide="arrow-left" class="w-3.5 h-3.5 mr-1"></i> Library
-            </button>
-            <span>/</span>
-            <span id="viewer-breadcrumb-subject" class="text-slate-700 font-medium">Product Management</span>
-            <span>/</span>
-            <span id="viewer-breadcrumb-doc" class="text-blue-600 font-semibold truncate max-w-xs">Product_Strategy.pptx</span>
-          </div>
-
-          <div class="flex items-center space-x-2">
-            <button onclick="App.downloadCurrentDoc()" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 flex items-center">
-              <i data-lucide="download" class="w-3.5 h-3.5 mr-1.5"></i> Download
-            </button>
-            <button onclick="App.toggleViewerFullscreen()" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600" title="Fullscreen">
-              <i data-lucide="maximize" class="w-4 h-4"></i>
-            </button>
-          </div>
-        </div>
-
-        <!-- 3-Column Viewer Workspace -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-175px)]">
-          <!-- Left 2 Cols: Slide Thumbnails Panel -->
-          <div class="lg:col-span-2 bg-white rounded-xl border border-slate-200/80 p-3 overflow-y-auto space-y-3">
-            <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Slides</p>
-            <div id="viewer-thumbnails-list" class="space-y-2">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
-
-          <!-- Center 7 Cols: Slide Stage -->
-          <div class="lg:col-span-7 flex flex-col justify-between bg-slate-900/5 rounded-xl border border-slate-200/80 p-4">
-            <!-- Slide Canvas Viewport -->
-            <div class="flex-1 flex items-center justify-center p-2">
-              <div id="slide-canvas-card" class="slide-canvas w-full max-w-3xl p-8 flex flex-col justify-between">
-                <!-- Slide Header -->
-                <div>
-                  <div class="flex justify-between items-start mb-2">
-                    <span id="slide-badge-number" class="text-[11px] font-bold text-blue-600 bg-blue-50 px-2.5 py-1 rounded-full uppercase tracking-wider">Slide 1 of 12</span>
-                    <span id="slide-badge-topic" class="text-xs text-slate-400 font-medium">Product Strategy</span>
-                  </div>
-                  <h3 id="slide-canvas-title" class="text-2xl font-extrabold text-slate-900 tracking-tight leading-snug">Product Strategy: From Idea to Impact</h3>
-                  <p id="slide-canvas-subtitle" class="text-sm text-blue-600 font-semibold mt-1">Build the right product, for the right users, at the right time.</p>
-                </div>
-
-                <!-- Slide Body / Bullet Points -->
-                <div id="slide-canvas-body" class="my-6 space-y-3 text-slate-700 text-sm leading-relaxed">
-                  <!-- Bullets injected dynamically -->
-                </div>
-
-                <!-- Slide Footer -->
-                <div class="pt-4 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-                  <span>MBA Masterclass Series</span>
-                  <span>VISHAL SINGH Digital Classroom</span>
-                </div>
-              </div>
-            </div>
-
-            <!-- Slide Navigation Controls -->
-            <div class="flex items-center justify-between bg-white px-5 py-2.5 rounded-xl border border-slate-200/80 mt-2 shadow-xs">
-              <div class="flex items-center space-x-2">
-                <button onclick="App.prevSlide()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-700" title="Previous Slide">
-                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                </button>
-                <span id="viewer-slide-counter" class="text-xs font-semibold text-slate-800">1 / 12</span>
-                <button onclick="App.nextSlide()" class="p-1.5 rounded-lg hover:bg-slate-100 text-slate-700" title="Next Slide">
-                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-              </div>
-
-              <div class="flex items-center space-x-3 text-xs text-slate-500">
-                <button onclick="App.askAIAboutThisSlide()" class="font-semibold text-blue-600 hover:text-blue-700 flex items-center">
-                  <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1"></i> Ask AI About This Slide
-                </button>
-              </div>
-            </div>
-          </div>
-
-          <!-- Right 3 Cols: AI Summary & Notes Sidebar -->
-          <div class="lg:col-span-3 bg-white rounded-xl border border-slate-200/80 shadow-xs flex flex-col overflow-hidden">
-            <!-- Tabs -->
-            <div class="flex border-b border-slate-200 text-xs font-semibold">
-              <button onclick="App.switchViewerTab('summary')" id="tab-btn-summary" class="flex-1 py-3 text-blue-600 border-b-2 border-blue-600 text-center">AI Summary</button>
-              <button onclick="App.switchViewerTab('notes')" id="tab-btn-notes" class="flex-1 py-3 text-slate-500 hover:text-slate-800 text-center">Notes</button>
-              <button onclick="App.switchViewerTab('ask_ai')" id="tab-btn-ask_ai" class="flex-1 py-3 text-slate-500 hover:text-slate-800 text-center">Ask AI</button>
-            </div>
-
-            <!-- Tab Content: AI Summary -->
-            <div id="viewer-tab-summary" class="flex-1 p-4 overflow-y-auto space-y-4">
-              <div>
-                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Key Takeaways</h4>
-                <ul id="viewer-takeaways-list" class="space-y-2 text-xs text-slate-700 leading-relaxed">
-                  <!-- Takeaways injected dynamically -->
-                </ul>
-              </div>
-
-              <div class="p-3.5 bg-blue-50/80 rounded-xl border border-blue-100 space-y-2">
-                <p class="text-xs font-bold text-blue-900">Want to know more?</p>
-                <p class="text-[11px] text-blue-700 leading-relaxed">Let AI explain this slide using simple analogies and MBA exam insights.</p>
-                <button onclick="App.askAIAboutThisSlide()" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold transition">
-                  Ask AI about this slide
-                </button>
-              </div>
-            </div>
-
-            <!-- Tab Content: Notes -->
-            <div id="viewer-tab-notes" class="flex-1 p-4 hidden flex-col">
-              <textarea id="viewer-slide-personal-notes" placeholder="Write personal revision notes for this slide (auto-saves)..." class="w-full flex-1 p-3 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none"></textarea>
-              <button onclick="App.saveSlideNotes()" class="mt-2 w-full py-1.5 bg-slate-900 text-white rounded-lg text-xs font-semibold hover:bg-slate-800 transition">Save Note</button>
-            </div>
-
-            <!-- Tab Content: Ask AI -->
-            <div id="viewer-tab-ask_ai" class="flex-1 p-4 hidden flex-col">
-              <div id="viewer-slide-chat-history" class="flex-1 overflow-y-auto space-y-3 text-xs">
-                <!-- Chat history injected -->
-              </div>
-              <div class="pt-3 border-t border-slate-100 flex items-center space-x-2">
-                <input id="viewer-slide-chat-input" type="text" placeholder="Ask about this slide..." onkeydown="if(event.key === 'Enter') App.sendSlideChatQuery()" class="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-                <button onclick="App.sendSlideChatQuery()" class="p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"><i data-lucide="send" class="w-3 h-3"></i></button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ==================== 3B. PRESENTATION LEARNING WORKSPACE ==================== -->
-      <div id="page-workspace" class="page-view hidden space-y-4">
-        <!-- Top Workspace Bar -->
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs gap-3">
+      <!-- TAB 3 CONTENT: LEARN WITH AI (INTERACTIVE STEP-BY-STEP TEACHING) -->
+      <div id="learn-tab-tutor-teaching" class="learn-tab-content hidden space-y-6 animate-fade-in">
+        
+        <!-- Concept Carousel & Progress Navigation Bar -->
+        <div class="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div class="flex items-center space-x-3">
-            <button onclick="App.navigate('library')" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition" title="Back to Library">
-              <i data-lucide="arrow-left" class="w-4 h-4"></i>
-            </button>
-            <div>
-              <div class="flex items-center space-x-2">
-                <span id="workspace-subject-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">MBA Core</span>
-                <span id="workspace-slide-badge" class="text-xs text-slate-400">12 Slides</span>
-                <span id="workspace-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Analyzed</span>
-              </div>
-              <h2 id="workspace-doc-title" class="text-base font-extrabold text-slate-900 tracking-tight mt-0.5">Product Strategy: From Idea to Impact</h2>
-            </div>
+            <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Concept:</span>
+            <select 
+              id="concept-selector-dropdown" 
+              onchange="App.selectConceptByName(this.value)"
+              class="bg-white/5 border border-white/15 rounded-xl px-3 py-1.5 text-xs sm:text-sm text-white font-semibold focus:outline-none focus:border-blue-500"
+            >
+              <!-- Populated dynamically -->
+            </select>
+            <span id="concept-slide-citation-tag" class="text-[11px] px-2 py-0.5 rounded-full bg-white/10 text-slate-300 font-medium">Source: Slide 1</span>
           </div>
 
-          <!-- Center Workspace Mode Switcher -->
-          <div class="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
-            <button onclick="App.switchWorkspaceTab('summary')" id="ws-tab-btn-summary" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-900 bg-white shadow-xs">
-              Detailed Summary
-            </button>
-            <button onclick="App.switchWorkspaceTab('learn')" id="ws-tab-btn-learn" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
-              Learn with AI
-            </button>
-            <button onclick="App.switchWorkspaceTab('slides')" id="ws-tab-btn-slides" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
-              Slide View
-            </button>
-            <button onclick="App.switchWorkspaceTab('practice')" id="ws-tab-btn-practice" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
-              Practice & Flashcards
-            </button>
-          </div>
-
-          <!-- Right Action Controls -->
+          <!-- Prev / Next Concept Controls -->
           <div class="flex items-center space-x-2">
-            <button onclick="App.exportWorkspaceMarkdown()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 flex items-center transition" title="Export Markdown">
-              <i data-lucide="file-down" class="w-3.5 h-3.5 mr-1.5 text-slate-500"></i> Markdown
+            <button 
+              onclick="App.triggerTeachingControl('prev_concept')" 
+              class="px-3.5 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-semibold text-slate-300 hover:text-white transition flex items-center space-x-1"
+            >
+              <i data-lucide="chevron-left" class="w-3.5 h-3.5"></i>
+              <span>Prev</span>
             </button>
-            <button onclick="App.exportWorkspacePrintable()" class="text-xs font-semibold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-xs transition" title="Printable PDF Summary">
-              <i data-lucide="printer" class="w-3.5 h-3.5 mr-1.5"></i> Export PDF
+            <span id="concept-counter-indicator" class="text-xs text-slate-400 px-2 font-medium">1 of 5</span>
+            <button 
+              onclick="App.triggerTeachingControl('next_concept')" 
+              class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white transition flex items-center space-x-1 shadow-sm"
+            >
+              <span>Next</span>
+              <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
             </button>
           </div>
         </div>
 
-        <!-- 3-Column Presentation Workspace Layout -->
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-185px)]">
+        <!-- Concept Teaching Display Card -->
+        <div id="concept-card-main" class="glass-panel-elevated p-6 sm:p-8 rounded-3xl border border-blue-500/30 space-y-6 shadow-2xl relative overflow-hidden">
           
-          <!-- LEFT COLUMN (3 Cols): Navigation & Structured Learning Path -->
-          <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col h-full overflow-hidden shadow-xs">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
-              <span class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
-                <i data-lucide="map" class="w-3.5 h-3.5 mr-1.5 text-blue-600"></i> Learning Path
+          <!-- Mode Title & Citation -->
+          <div class="flex items-center justify-between border-b border-white/10 pb-4">
+            <div>
+              <span id="concept-control-badge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                Standard Explanation
               </span>
-              <span id="workspace-progress-pct" class="text-xs font-extrabold text-blue-600">0%</span>
+              <h2 id="concept-title-display" class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Product-Market Fit</h2>
             </div>
+            <span id="concept-slide-badge" class="text-xs text-cyan-300 font-semibold bg-cyan-950/40 border border-cyan-800/40 px-3 py-1 rounded-full">
+              Slide 1
+            </span>
+          </div>
 
-            <!-- Progress Bar -->
-            <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2.5 mb-3 flex-shrink-0 overflow-hidden">
-              <div id="workspace-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+          <!-- 8 Step Pedagogical Explanation Area -->
+          <div id="concept-steps-container" class="space-y-5 text-sm sm:text-base leading-relaxed text-slate-200">
+            <!-- Dynamic steps -->
+          </div>
+
+          <!-- Interactive Comprehension Check -->
+          <div id="concept-comprehension-box" class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
+            <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+              <i data-lucide="help-circle" class="w-4 h-4"></i>
+              <span>Comprehension Check</span>
             </div>
-
-            <!-- Scrollable Modules & Concepts List -->
-            <div id="workspace-modules-tree" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
-              <!-- Dynamically rendered modules and concepts -->
+            <p id="comprehension-question-text" class="text-sm font-semibold text-white">When applying this concept, what is the primary indicator of success?</p>
+            <div id="comprehension-options-container" class="space-y-2">
+              <!-- Options populated dynamically -->
             </div>
+            <div id="comprehension-feedback" class="hidden text-xs p-3 rounded-xl"></div>
+          </div>
 
-            <!-- Bottom Slide Quick Jump -->
-            <div class="pt-3 border-t border-slate-100 flex-shrink-0">
-              <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-2">
-                <span>SLIDE QUICK JUMP</span>
-                <span id="workspace-slide-counter">Slide 1 of 12</span>
-              </div>
-              <div id="workspace-slide-thumbnails" class="flex space-x-1.5 overflow-x-auto pb-1">
-                <!-- Mini slide numbers -->
-              </div>
+          <!-- Authoritative External Sources (Dual Knowledge) -->
+          <div id="concept-external-sources-box" class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/20 space-y-2">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
+              <i data-lucide="globe" class="w-3.5 h-3.5"></i>
+              <span>Authoritative External References (Clickable)</span>
+            </span>
+            <div id="concept-sources-list" class="flex flex-wrap gap-2 text-xs">
+              <!-- Links populated dynamically -->
             </div>
           </div>
 
-          <!-- CENTER COLUMN (6 Cols): Canvas (Summary / Learn / Slides / Practice) -->
-          <div class="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-5 flex flex-col h-full overflow-hidden shadow-xs relative">
+          <!-- 10 Teaching Controls (Always Available On-Screen) -->
+          <div class="border-t border-white/10 pt-5 space-y-3">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
+              <i data-lucide="sliders" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Teaching Controls (Click to Adapt Instantly)</span>
+            </span>
             
-            <!-- TAB 1: DETAILED SUMMARY -->
-            <div id="workspace-canvas-summary" class="flex-1 overflow-y-auto space-y-5 pr-2">
-              <!-- Search & Filter Controls -->
-              <div class="sticky top-0 bg-white/95 backdrop-blur-xs pb-3 pt-1 z-10 border-b border-slate-100 flex flex-col sm:flex-row gap-2.5 items-center justify-between">
-                <div class="relative w-full sm:w-64">
-                  <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
-                  <input id="summary-search-input" oninput="App.filterSummaryContent()" type="text" placeholder="Search concepts, frameworks..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-                </div>
-                <div class="flex items-center space-x-1.5 text-[11px] font-semibold overflow-x-auto w-full sm:w-auto">
-                  <button onclick="App.filterSummarySection('all')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200">All</button>
-                  <button onclick="App.filterSummarySection('concepts')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Concepts</button>
-                  <button onclick="App.filterSummarySection('frameworks')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Frameworks</button>
-                  <button onclick="App.filterSummarySection('glossary')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Glossary</button>
-                  <button onclick="App.filterSummarySection('revision')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Revision</button>
-                </div>
-              </div>
+            <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
+              <button onclick="App.triggerTeachingControl('simpler_english')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-400"></i>
+                <span>Simpler English</span>
+              </button>
 
-              <!-- Detailed Summary Dynamic Content (8 Sections) -->
-              <div id="summary-rendered-sections" class="space-y-6">
-                <!-- Rendered by App.renderDetailedSummary() -->
-              </div>
-            </div>
+              <button onclick="App.triggerTeachingControl('more_detail')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="file-text" class="w-3.5 h-3.5 text-indigo-400"></i>
+                <span>In Detail</span>
+              </button>
 
-            <!-- TAB 2: LEARN WITH AI (8 PEDAGOGICAL STEPS) -->
-            <div id="workspace-canvas-learn" class="flex-1 overflow-y-auto space-y-4 pr-2 hidden">
-              <!-- Active Concept Top Banner -->
-              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 rounded-xl flex items-center justify-between">
-                <div>
-                  <div class="flex items-center space-x-2">
-                    <span id="learn-module-badge" class="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">Module 1</span>
-                    <span id="learn-slide-citation" class="text-xs text-blue-600 font-semibold">Source: Slide 1</span>
-                    <span id="learn-control-indicator" class="text-xs text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 hidden"></span>
-                  </div>
-                  <h3 id="learn-active-concept-title" class="text-lg font-extrabold text-slate-900 mt-1">Product Strategy: From Idea to Impact</h3>
-                </div>
-                <div class="flex items-center space-x-2">
-                  <button onclick="App.markActiveConceptStatus('understood')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 shadow-xs transition">
-                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
-                    <span>Understood</span>
-                  </button>
-                  <button onclick="App.markActiveConceptStatus('revision')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 shadow-xs transition">
-                    <i data-lucide="bookmark" class="w-3.5 h-3.5"></i>
-                    <span>Needs Revision</span>
-                  </button>
-                </div>
-              </div>
+              <button onclick="App.triggerTeachingControl('another_example')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="briefcase" class="w-3.5 h-3.5 text-emerald-400"></i>
+                <span>Real Example</span>
+              </button>
 
-              <!-- 8 Pedagogical Teaching Cards Container -->
-              <div id="learn-steps-container" class="space-y-3.5">
-                <!-- Dynamically generated 8 steps -->
-              </div>
-            </div>
+              <button onclick="App.triggerTeachingControl('step_by_step')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="list-ordered" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>Step by Step</span>
+              </button>
 
-            <!-- TAB 3: SLIDE VIEW (16:9 CANVAS) -->
-            <div id="workspace-canvas-slides" class="flex-1 flex flex-col justify-between hidden">
-              <div class="flex-1 flex items-center justify-center p-2">
-                <div id="ws-slide-card" class="slide-canvas w-full max-w-2xl p-7 flex flex-col justify-between bg-white border border-slate-200 rounded-2xl shadow-sm min-h-[340px]">
-                  <div>
-                    <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
-                      <span id="ws-slide-num-label" class="font-bold text-blue-600">Slide 1 of 12</span>
-                      <span id="ws-slide-doc-label">Product_Strategy.pptx</span>
-                    </div>
-                    <h2 id="ws-slide-title" class="text-xl font-extrabold text-slate-900 leading-snug">Product Strategy: From Idea to Impact</h2>
-                    <div id="ws-slide-content" class="mt-4 text-xs text-slate-700 space-y-2 leading-relaxed">
-                      <!-- Bullets / text -->
-                    </div>
-                  </div>
-                  <div id="ws-slide-notes-container" class="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 italic hidden">
-                    <!-- Speaker notes -->
-                  </div>
-                </div>
-              </div>
+              <button onclick="App.triggerTeachingControl('compare')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="git-compare" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>Compare</span>
+              </button>
 
-              <!-- Slide Prev / Next Footer -->
-              <div class="flex items-center justify-between pt-3 border-t border-slate-100">
-                <button onclick="App.prevWorkspaceSlide()" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center space-x-1">
-                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
-                  <span>Previous Slide</span>
-                </button>
-                <span id="ws-slide-page-indicator" class="text-xs font-semibold text-slate-500">1 / 12</span>
-                <button onclick="App.nextWorkspaceSlide()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center space-x-1 shadow-xs">
-                  <span>Next Slide</span>
-                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
-                </button>
-              </div>
-            </div>
+              <button onclick="App.triggerTeachingControl('framework')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="grid" class="w-3.5 h-3.5 text-purple-400"></i>
+                <span>As Framework</span>
+              </button>
 
-            <!-- TAB 4: PRACTICE & FLASHCARDS -->
-            <div id="workspace-canvas-practice" class="flex-1 overflow-y-auto space-y-6 pr-2 hidden">
-              <div>
-                <h4 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-3 flex items-center">
-                  <i data-lucide="layers" class="w-4 h-4 mr-1.5 text-blue-600"></i> Flashcards for Revision
-                </h4>
-                <div id="ws-flashcard-stage" class="max-w-md mx-auto">
-                  <!-- Rendered Flashcard -->
-                </div>
-              </div>
+              <button onclick="App.triggerTeachingControl('analogy')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-yellow-400"></i>
+                <span>Use Analogy</span>
+              </button>
 
-              <div class="pt-4 border-t border-slate-100">
-                <h4 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-3 flex items-center">
-                  <i data-lucide="graduation-cap" class="w-4 h-4 mr-1.5 text-indigo-600"></i> MBA Exam Preparation Questions
-                </h4>
-                <div id="ws-exam-questions-list" class="space-y-3">
-                  <!-- Exam questions with revealable model answers -->
-                </div>
-              </div>
-            </div>
+              <button onclick="App.triggerTeachingControl('test_me')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-rose-400"></i>
+                <span>Test Me</span>
+              </button>
 
-          </div>
+              <button onclick="App.triggerTeachingControl('differently')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-teal-400"></i>
+                <span>Differently</span>
+              </button>
 
-          <!-- RIGHT COLUMN (3 Cols): Interactive AI Tutor & 12 Teaching Controls -->
-          <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col h-full overflow-hidden shadow-xs">
-            <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
-              <div class="flex items-center space-x-2">
-                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
-                <h4 class="text-xs font-bold text-slate-900">MBA AI Tutor</h4>
-              </div>
-              <span id="tutor-active-slide-ref" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Slide 1</span>
-            </div>
-
-            <!-- 12 Quick Teaching Action Controls -->
-            <div class="py-2.5 border-b border-slate-100 flex-shrink-0">
-              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Teaching Controls</p>
-              <div class="flex flex-wrap gap-1 text-[11px]">
-                <button onclick="App.triggerTeachingControl('simpler_english')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Explain in simpler English">Simple English</button>
-                <button onclick="App.triggerTeachingControl('more_detail')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Give more detail">More Detail</button>
-                <button onclick="App.triggerTeachingControl('another_example')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Show another practical example">Example</button>
-                <button onclick="App.triggerTeachingControl('analogy')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Explain with an analogy">Analogy</button>
-                <button onclick="App.triggerTeachingControl('step_by_step')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Break it down step-by-step">Step-by-Step</button>
-                <button onclick="App.triggerTeachingControl('real_business')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="How is this used in real business?">Real Business</button>
-                <button onclick="App.triggerTeachingControl('compare')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Compare this with related concept">Compare</button>
-                <button onclick="App.triggerTeachingControl('test_me')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Test me on this concept">Test Me</button>
-                <button onclick="App.triggerTeachingControl('repeat')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Repeat this explanation">Repeat</button>
-                <button onclick="App.triggerTeachingControl('next_concept')" class="px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold transition" title="I understand, move to next concept">Next Concept &rarr;</button>
-              </div>
-            </div>
-
-            <!-- Chat Messages Stream -->
-            <div id="workspace-tutor-messages" class="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
-              <!-- Rendered messages with citations -->
-            </div>
-
-            <!-- Chat Input Form -->
-            <div class="pt-2.5 border-t border-slate-100 flex-shrink-0 flex items-center space-x-1.5">
-              <input id="workspace-chat-input" type="text" placeholder="Ask a question about this slide or concept..." onkeydown="if(event.key === 'Enter') App.sendWorkspaceTutorQuery()" class="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-              <button onclick="App.sendWorkspaceTutorQuery()" class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition">
-                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              <button onclick="App.triggerTeachingControl('in_hinglish')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-500/10 border-amber-500/30 flex items-center space-x-1.5">
+                <i data-lucide="message-circle" class="w-3.5 h-3.5 text-amber-400"></i>
+                <span>In Hinglish</span>
               </button>
             </div>
           </div>
 
         </div>
+
       </div>
 
-      <!-- ==================== 4. AI TUTOR PAGE ==================== -->
-      <div id="page-tutor" class="page-view hidden space-y-5 h-[calc(100vh-120px)] flex flex-col">
-        <!-- Header -->
-        <div class="flex items-center justify-between flex-shrink-0">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">AI Tutor</h2>
-            <p class="text-sm text-slate-500">Ask questions, get clear explanations, and learn from your materials.</p>
+      <!-- TAB 4 CONTENT: ASK AI (DUAL KNOWLEDGE CHAT & CONVERSATION HISTORY) -->
+      <div id="learn-tab-ask-ai" class="learn-tab-content hidden space-y-4 animate-fade-in">
+        <div class="glass-panel p-4 rounded-2xl flex items-center justify-between">
+          <div class="flex items-center space-x-2">
+            <div class="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold">
+              <i data-lucide="bot" class="w-4 h-4"></i>
+            </div>
+            <div>
+              <h3 class="text-sm font-bold text-white">AI Executive Tutor (Dual Knowledge Engine)</h3>
+              <p class="text-[11px] text-slate-400">Grounded in your PPT slides and verified external academic sources (HBR, Investopedia, Wikipedia).</p>
+            </div>
           </div>
-          <!-- Mode Selector Tabs -->
-          <div class="flex bg-slate-200/80 p-1 rounded-xl text-xs font-semibold">
-            <button onclick="App.setTutorMode('simple_explanation')" data-tutor-mode="simple_explanation" class="tutor-mode-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">Mode 1: Simple</button>
-            <button onclick="App.setTutorMode('teach_step_by_step')" data-tutor-mode="teach_step_by_step" class="tutor-mode-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">Mode 2: Step-by-Step</button>
-            <button onclick="App.setTutorMode('presentation_explainer')" data-tutor-mode="presentation_explainer" class="tutor-mode-btn px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900">Mode 3: Slide Explainer</button>
-            <button onclick="App.setTutorMode('ask_materials')" data-tutor-mode="ask_materials" class="tutor-mode-btn px-3 py-1.5 rounded-lg bg-white text-blue-700 shadow-xs">Mode 4: Ask Materials</button>
-          </div>
+          <button 
+            onclick="App.clearPresentationChatHistory()" 
+            class="text-xs text-slate-400 hover:text-rose-400 transition flex items-center space-x-1"
+            title="Clear Chat History"
+          >
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span>Clear Chat</span>
+          </button>
         </div>
 
-        <!-- Chat Stream Area -->
-        <div id="tutor-chat-container" class="flex-1 bg-white rounded-2xl border border-slate-200/80 shadow-xs p-6 overflow-y-auto space-y-6">
-          <!-- Initial Welcome Card -->
-          <div class="flex items-start space-x-4 max-w-3xl">
-            <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-sm">
-              <i data-lucide="bot" class="w-5 h-5"></i>
-            </div>
-            <div class="space-y-3">
-              <div class="p-4 bg-slate-50 rounded-2xl border border-slate-200/80 text-sm text-slate-800 leading-relaxed">
-                <p class="font-bold text-slate-900 mb-1">Hi Vishal! 👋</p>
-                <p>I'm your AI tutor. I can help you understand concepts, explain topics, summarize documents, and answer your questions based on your study materials.</p>
-              </div>
+        <!-- Chat Messages Container -->
+        <div id="presentation-chat-history" class="glass-panel-elevated p-6 rounded-3xl min-h-[380px] max-h-[520px] overflow-y-auto space-y-4">
+          <!-- Populated dynamically -->
+        </div>
 
-              <!-- Suggested prompt pills -->
-              <div>
-                <p class="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Try asking:</p>
-                <div class="flex flex-wrap gap-2">
-                  <button onclick="App.sendTutorPrompt('Explain product lifecycle in simple terms.')" class="text-xs font-medium px-3.5 py-2 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 transition">
-                    Explain product lifecycle in simple terms.
-                  </button>
-                  <button onclick="App.sendTutorPrompt('Summarize the key points from PPT.')" class="text-xs font-medium px-3.5 py-2 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 transition">
-                    Summarize the key points from PPT.
-                  </button>
-                  <button onclick="App.sendTutorPrompt('Give me 5 practice questions on marketing mix.')" class="text-xs font-medium px-3.5 py-2 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 transition">
-                    Give me 5 practice questions on marketing mix.
-                  </button>
-                  <button onclick="App.sendTutorPrompt('Compare Agile vs Waterfall.')" class="text-xs font-medium px-3.5 py-2 rounded-full bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-100 transition">
-                    Compare Agile vs Waterfall.
-                  </button>
-                </div>
-              </div>
-            </div>
+        <!-- AI Thinking Indicator -->
+        <div id="chat-thinking-indicator" class="hidden flex items-center space-x-3 text-xs text-blue-400 px-4 py-2 rounded-xl bg-blue-500/10 border border-blue-500/20">
+          <div class="thinking-wave">
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
+            <span class="thinking-dot"></span>
           </div>
+          <span class="font-medium">Analyzing presentation slides and searching reliable external sources...</span>
         </div>
 
         <!-- Chat Input Bar -->
-        <div class="bg-white p-3 rounded-2xl border border-slate-200/80 shadow-xs flex-shrink-0">
-          <div class="flex items-center space-x-3">
-            <button onclick="App.openDocPickerForTutor()" class="p-2 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100 transition" title="Attach Document Reference">
-              <i data-lucide="paperclip" class="w-5 h-5"></i>
-            </button>
-            <input 
-              id="tutor-input-field" 
-              type="text" 
-              placeholder="Ask a question about your study materials..." 
-              class="flex-1 text-sm bg-transparent border-0 focus:outline-none text-slate-900 placeholder-slate-400"
-              onkeydown="if(event.key === 'Enter') App.sendTutorMessage()"
-            >
-            <button onclick="App.sendTutorMessage()" class="p-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm transition">
-              <i data-lucide="send" class="w-4 h-4"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- ==================== 5. QUIZZES PAGE ==================== -->
-      <div id="page-quizzes" class="page-view hidden space-y-6">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Quiz</h2>
-            <p class="text-sm text-slate-500">Test your knowledge and track your progress.</p>
-          </div>
-          <button onclick="App.openQuizGeneratorModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg shadow-sm transition">
-            + Generate New Quiz
+        <form onsubmit="App.handlePresentationChatSubmit(event)" class="relative flex items-center gap-2">
+          <input 
+            id="presentation-chat-input" 
+            type="text" 
+            placeholder="Ask a question about this presentation (e.g. 'Explain this in Hinglish', 'Give me an HBR case study')..." 
+            class="flex-1 px-4 py-3 text-xs sm:text-sm bg-white/5 border border-white/10 rounded-2xl focus:bg-white/10 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-100 placeholder-slate-400 transition"
+          >
+          <button 
+            type="submit" 
+            class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-blue-500/30 transition flex items-center space-x-1.5 flex-shrink-0"
+          >
+            <span>Ask</span>
+            <i data-lucide="send" class="w-4 h-4"></i>
           </button>
-        </div>
-
-        <!-- Quiz Container (Active Quiz or History) -->
-        <div id="quiz-active-viewport" class="max-w-3xl mx-auto space-y-6">
-          <!-- Rendered dynamically: Question Card OR Results Screen -->
-        </div>
+        </form>
       </div>
 
-      <!-- ==================== 6. MY NOTES PAGE ==================== -->
-      <div id="page-notes" class="page-view hidden space-y-6">
-        <!-- Header -->
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">My Notes</h2>
-            <p class="text-sm text-slate-500">Save, organize and review important concepts.</p>
-          </div>
-          <div class="flex items-center space-x-3">
-            <button onclick="App.openGenerateNotesModal()" class="px-3.5 py-2 bg-purple-50 text-purple-700 hover:bg-purple-100 rounded-lg text-sm font-semibold border border-purple-100 transition">
-              <i data-lucide="sparkles" class="w-4 h-4 inline mr-1"></i> AI Note Generator
-            </button>
-            <button onclick="App.openNewNoteModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm transition">
-              + New Note
-            </button>
-          </div>
-        </div>
-
-        <!-- Notes 2-Pane Content -->
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <!-- Left Categories -->
-          <div class="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs space-y-3">
-            <p class="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Categories</p>
-            <div id="notes-category-list" class="space-y-1 text-sm">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
-
-          <!-- Right Notes List / Viewer -->
-          <div class="lg:col-span-3 space-y-4">
-            <div id="notes-content-container" class="space-y-4">
-              <!-- Rendered dynamically -->
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- ==================== 7. LEARNING PROGRESS PAGE ==================== -->
-      <div id="page-progress" class="page-view hidden space-y-6">
-        <div>
-          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Learning Progress</h2>
-          <p class="text-sm text-slate-500">Track your curriculum mastery, study time, and AI recommendations.</p>
-        </div>
-
-        <div id="progress-view-content" class="space-y-6">
-          <!-- Progress dashboard injected dynamically -->
-        </div>
-      </div>
-
-      <!-- ==================== 8. SUBJECTS PAGE ==================== -->
-      <div id="page-subjects" class="page-view hidden space-y-6">
-        <div class="flex items-center justify-between">
-          <div>
-            <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Subjects & Topics</h2>
-            <p class="text-sm text-slate-500">Curriculum hierarchy: Semester &rarr; Subject &rarr; Topic &rarr; Materials.</p>
-          </div>
-          <button onclick="App.openAddSubjectModal()" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm transition">
-            + Add Subject
-          </button>
-        </div>
-
-        <div id="subjects-cards-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <!-- Rendered dynamically -->
-        </div>
-      </div>
-
-      <!-- ==================== 9. SETTINGS PAGE ==================== -->
-      <div id="page-settings" class="page-view hidden space-y-6 max-w-4xl">
-        <div>
-          <h2 class="text-2xl font-extrabold text-slate-900 tracking-tight">Settings</h2>
-          <p class="text-sm text-slate-500">Manage your profile, AI provider configuration, and learning data.</p>
-        </div>
-
-        <div class="bg-white rounded-xl border border-slate-200/80 shadow-xs divide-y divide-slate-100">
-          <!-- Profile Section -->
-          <div class="p-6 space-y-4">
-            <h3 class="text-base font-bold text-slate-900">Student Profile</h3>
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Student Name</label>
-                <input type="text" value="Vishal Singh" readonly class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
-              </div>
-              <div>
-                <label class="block text-xs font-semibold text-slate-600 mb-1">Academic Program</label>
-                <input type="text" value="Master of Business Administration (MBA)" readonly class="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
-              </div>
-            </div>
-          </div>
-
-          <!-- AI Configuration -->
-          <div class="p-6 space-y-4">
-            <div class="flex items-center justify-between">
-              <div>
-                <h3 class="text-base font-bold text-slate-900">Google Gemini AI Configuration</h3>
-                <p class="text-xs text-slate-500">Connect your Google Gemini API key for live cloud reasoning & synthesis.</p>
-              </div>
-              <span id="gemini-status-badge" class="px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Ready</span>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-600 mb-1">Gemini API Key</label>
-              <div class="flex space-x-2">
-                <input id="settings-gemini-key" type="password" placeholder="Enter your Gemini API key (e.g. AIzaSy...)" class="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-                <button onclick="App.saveGeminiKey()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition">Save Key</button>
-              </div>
-              <p class="text-[11px] text-slate-400 mt-1.5">When no key is configured, the built-in pedagogical MBA tutor runs automatically using your indexed slides and notes.</p>
-            </div>
-          </div>
-
-          <!-- Sample Curriculum Reset -->
-          <div class="p-6 space-y-4">
-            <h3 class="text-base font-bold text-slate-900">Data Management</h3>
-            <p class="text-xs text-slate-500">Reset the database to the default MBA Masterclass curriculum data matching the design mockups.</p>
-            <button onclick="App.resetToSampleData()" class="px-4 py-2 border border-slate-200 hover:bg-slate-50 rounded-lg text-sm font-semibold text-slate-700 transition">
-              Reset to Sample MBA Curriculum
-            </button>
-          </div>
-        </div>
-      </div>
-
-    </main>
-  </div>
-
-  <!-- ==================== UPLOAD MODAL ==================== -->
-  <div id="modal-upload" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border border-slate-100 space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div class="flex items-center space-x-2">
-          <i data-lucide="upload" class="w-5 h-5 text-blue-600"></i>
-          <h3 class="text-lg font-bold text-slate-900">Upload Study Material</h3>
-        </div>
-        <button onclick="App.closeUploadModal()" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-
-      <!-- Drag & drop zone -->
-      <div id="upload-dropzone" onclick="document.getElementById('file-upload-input').click()" class="border-2 border-dashed border-slate-200 hover:border-blue-500 bg-slate-50/60 hover:bg-blue-50/30 rounded-xl p-8 text-center cursor-pointer transition">
-        <input type="file" id="file-upload-input" class="hidden" accept=".ppt,.pptx,.pdf,.docx,.txt,.md" onchange="App.handleFileSelected(this.files)">
-        <div class="w-12 h-12 rounded-full bg-blue-100/70 text-blue-600 flex items-center justify-center mx-auto mb-3">
-          <i data-lucide="cloud-upload" class="w-6 h-6"></i>
-        </div>
-        <p class="text-sm font-bold text-slate-800">Drag and drop files here <span class="font-normal text-slate-500">or click to browse</span></p>
-        <p class="text-xs text-slate-400 mt-1">Supports: PPT, PPTX, PDF, DOCX, TXT, MD &bull; Max file size: 50MB</p>
-        <div id="upload-selected-file-label" class="mt-3 text-xs font-semibold text-blue-600"></div>
-      </div>
-
-      <!-- Metadata Fields -->
-      <div class="space-y-3.5">
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Subject *</label>
-            <select id="upload-subject-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-              <!-- Dynamically populated -->
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Semester *</label>
-            <select id="upload-semester-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-              <option value="Semester 1">Semester 1</option>
-              <option value="Semester 2">Semester 2</option>
-              <option value="Semester 3">Semester 3</option>
-              <option value="Semester 4">Semester 4</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Faculty (optional)</label>
-          <input id="upload-faculty-input" type="text" placeholder="Enter faculty name" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-        </div>
-
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Description (optional)</label>
-          <textarea id="upload-description-input" rows="2" placeholder="Add a short description..." class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none"></textarea>
-        </div>
-
-        <!-- Tags -->
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1.5">Tags</label>
-          <div class="flex flex-wrap gap-2 text-xs" id="upload-tags-container">
-            <span class="upload-tag-pill px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 border border-blue-200 cursor-pointer" onclick="App.toggleTag(this)">Important</span>
-            <span class="upload-tag-pill px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 cursor-pointer" onclick="App.toggleTag(this)">Exam Preparation</span>
-            <span class="upload-tag-pill px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 cursor-pointer" onclick="App.toggleTag(this)">Revision</span>
-            <span class="upload-tag-pill px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 border border-slate-200 cursor-pointer" onclick="App.toggleTag(this)">Assignment</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- Action Buttons -->
-      <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
-        <button onclick="App.closeUploadModal()" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50 transition">Cancel</button>
-        <button id="upload-submit-btn" onclick="App.submitDocumentUpload()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">Upload</button>
-      </div>
     </div>
-  </div>
 
-  <!-- ==================== LOGIN MODAL ==================== -->
-  <div id="modal-login" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-2xl max-w-md w-full p-8 shadow-2xl border border-slate-100 space-y-6">
-      <div class="text-center space-y-2">
-        <div class="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center mx-auto font-bold text-lg shadow-md">
-          VS
+  </main>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- 1. CREATE SUBJECT MODAL -->
+  <div id="modal-create-subject" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
+            <i data-lucide="folder-plus" class="w-5 h-5"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">Create New Subject</h3>
         </div>
-        <h3 class="text-xl font-extrabold text-slate-900 tracking-tight">VISHAL SINGH</h3>
-        <p class="text-xs text-slate-500">Sign in to your personal AI learning space</p>
+        <button onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
 
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Username</label>
-          <input id="login-username" type="text" value="vishal" class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Subject Name *</label>
+          <input 
+            id="modal-subject-name-input" 
+            type="text" 
+            placeholder="e.g. Product Management, Business Analytics" 
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+          >
+          <p id="modal-subject-error" class="hidden text-rose-400 text-xs mt-1.5"></p>
         </div>
+
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Password</label>
-          <input id="login-password" type="password" value="vishal123" class="w-full text-sm px-3.5 py-2.5 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500" onkeydown="if(event.key === 'Enter') App.submitLogin()">
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Description (Optional)</label>
+          <textarea 
+            id="modal-subject-desc-input" 
+            rows="3" 
+            placeholder="Brief description of the course curriculum or semester focus..." 
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm resize-none"
+          ></textarea>
         </div>
-        <p class="text-[11px] text-slate-400 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-          Default credentials: Username <strong class="text-slate-700">vishal</strong> &bull; Password <strong class="text-slate-700">vishal123</strong>
-        </p>
-        <button id="login-submit-btn" onclick="App.submitLogin()" class="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold shadow-sm transition">
-          Sign In
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition">
+          Cancel
+        </button>
+        <button onclick="App.submitCreateSubject()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-1.5">
+          <span>Create Subject</span>
         </button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== QUIZ GENERATOR MODAL ==================== -->
-  <div id="modal-quiz-generator" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-5">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <div class="flex items-center space-x-2">
-          <i data-lucide="sparkles" class="w-5 h-5 text-blue-600"></i>
-          <h3 class="text-lg font-bold text-slate-900">Generate Practice Quiz</h3>
-        </div>
-        <button onclick="document.getElementById('modal-quiz-generator').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+  <!-- 2. RENAME SUBJECT MODAL -->
+  <div id="modal-rename-subject" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white">Rename Subject</h3>
+        <button onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
 
-      <div class="space-y-3.5">
+      <input type="hidden" id="modal-rename-subject-id">
+      <div class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Select Presentation / Document *</label>
-          <select id="quiz-gen-doc-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-            <!-- Dynamically populated -->
-          </select>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">New Subject Name *</label>
+          <input 
+            id="modal-rename-subject-input" 
+            type="text" 
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+          >
         </div>
-
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Difficulty Level</label>
-            <select id="quiz-gen-difficulty-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-              <option value="MBA Examination Level">MBA Examination Level</option>
-              <option value="Advanced">Advanced</option>
-              <option value="Intermediate">Intermediate</option>
-              <option value="Beginner">Beginner</option>
-            </select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Number of Questions</label>
-            <select id="quiz-gen-count-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-              <option value="3">3 Questions (Quick Check)</option>
-              <option value="5" selected>5 Questions (Standard)</option>
-              <option value="10">10 Questions (Comprehensive)</option>
-            </select>
-          </div>
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Description</label>
+          <textarea 
+            id="modal-rename-subject-desc-input" 
+            rows="2" 
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm resize-none"
+          ></textarea>
         </div>
       </div>
 
-      <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
-        <button onclick="document.getElementById('modal-quiz-generator').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Cancel</button>
-        <button id="quiz-gen-submit-btn" onclick="App.submitQuizGeneration()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">Generate Quiz</button>
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
+        <button onclick="App.submitRenameSubject()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition">Save Changes</button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== NEW NOTE MODAL ==================== -->
-  <div id="modal-new-note" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 class="text-lg font-bold text-slate-900">Create New Note</h3>
-        <button onclick="document.getElementById('modal-new-note').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
+  <!-- 3. RENAME PRESENTATION MODAL -->
+  <div id="modal-rename-doc" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <h3 class="text-lg font-bold text-white">Rename Presentation</h3>
+        <button onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
       </div>
 
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Title *</label>
-          <input id="new-note-title" type="text" placeholder="e.g. DCF Valuation Key Steps" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-        </div>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Subject</label>
-            <select id="new-note-subject-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500"></select>
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-slate-700 mb-1">Note Type</label>
-            <select id="new-note-type-select" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-              <option value="quick_revision">Quick Revision</option>
-              <option value="detailed_study">Detailed Study</option>
-              <option value="exam_notes">Examination Notes</option>
-              <option value="formula_sheet">Formula Sheet</option>
-            </select>
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Content (Markdown supported)</label>
-          <textarea id="new-note-content" rows="5" placeholder="Write your notes here..." class="w-full text-xs p-3 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none"></textarea>
-        </div>
+      <input type="hidden" id="modal-rename-doc-id">
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1.5">Presentation Title *</label>
+        <input 
+          id="modal-rename-doc-input" 
+          type="text" 
+          class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+        >
       </div>
 
-      <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
-        <button onclick="document.getElementById('modal-new-note').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600">Cancel</button>
-        <button onclick="App.submitCreateNote()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">Save Note</button>
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
+        <button onclick="App.submitRenamePresentation()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition">Save</button>
       </div>
     </div>
   </div>
 
-  <!-- ==================== ADD SUBJECT MODAL ==================== -->
-  <div id="modal-add-subject" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 class="text-lg font-bold text-slate-900">Add New Subject</h3>
-        <button onclick="document.getElementById('modal-add-subject').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-
-      <div class="space-y-3">
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Subject Name *</label>
-          <input id="add-subject-name" type="text" placeholder="e.g. Corporate Finance" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Semester</label>
-          <select id="add-subject-semester" class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg bg-slate-50 focus:outline-none focus:border-blue-500">
-            <option value="Semester 1">Semester 1</option>
-            <option value="Semester 2">Semester 2</option>
-            <option value="Semester 3">Semester 3</option>
-            <option value="Semester 4">Semester 4</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-slate-700 mb-1">Description</label>
-          <textarea id="add-subject-description" rows="2" placeholder="Course overview..." class="w-full text-xs px-3 py-2 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500 resize-none"></textarea>
-        </div>
-      </div>
-
-      <div class="flex items-center justify-end space-x-3 pt-3 border-t border-slate-100">
-        <button onclick="document.getElementById('modal-add-subject').classList.add('hidden')" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600">Cancel</button>
-        <button onclick="App.submitAddSubject()" class="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold shadow-sm transition">Create Subject</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ==================== DOC PICKER FOR TUTOR MODAL ==================== -->
-  <div id="modal-doc-picker" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
-      <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-        <h3 class="text-base font-bold text-slate-900">Attach Document for AI Tutor</h3>
-        <button onclick="document.getElementById('modal-doc-picker').classList.add('hidden')" class="text-slate-400 hover:text-slate-600"><i data-lucide="x" class="w-5 h-5"></i></button>
-      </div>
-      <p class="text-xs text-slate-500">Choose a document from your library to focus the AI's explanation:</p>
-      <div id="tutor-doc-picker-list" class="max-h-60 overflow-y-auto space-y-2 text-xs">
-        <!-- Rendered dynamically -->
-      </div>
-    </div>
-  <!-- ==================== PPT ANALYSIS PROGRESS MODAL ==================== -->
-  <div id="modal-ppt-analysis" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
-    <div class="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-slate-100 space-y-6">
+  <!-- 4. UPLOAD PPT MODAL (WITH 7-STAGE ANIMATED PROCESSING FLOW) -->
+  <div id="modal-upload-ppt" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-fade-in">
       
-      <!-- Processing State -->
-      <div id="analysis-processing-state" class="space-y-6">
-        <div class="text-center space-y-2">
-          <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
-            <i data-lucide="sparkles" class="w-7 h-7 animate-spin"></i>
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+            <i data-lucide="upload" class="w-5 h-5"></i>
           </div>
-          <h3 class="text-xl font-extrabold text-slate-900">Analyzing Presentation</h3>
-          <p id="analysis-doc-name-label" class="text-xs text-slate-500 font-medium truncate max-w-xs mx-auto">Product_Strategy.pptx</p>
+          <h3 class="text-lg font-bold text-white">Upload PowerPoint Presentation</h3>
+        </div>
+        <button id="upload-modal-close-btn" onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- State A: Form Input (Subject selector & File drop area) -->
+      <div id="upload-stage-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Select Subject *</label>
+          <select 
+            id="modal-upload-subject-select"
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+          >
+            <!-- Populated dynamically -->
+          </select>
         </div>
 
-        <!-- 5 Stages List -->
-        <div class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs">
-          <div id="stage-1" class="flex items-center space-x-3 text-slate-400">
-            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">1</span>
-            <span class="stage-text font-medium">Reading presentation...</span>
+        <!-- Drag & Drop Dropzone -->
+        <div 
+          id="upload-dropzone" 
+          onclick="document.getElementById('modal-ppt-file-input').click()"
+          class="border-2 border-dashed border-white/20 hover:border-blue-500/60 rounded-2xl p-8 text-center cursor-pointer transition bg-white/[0.02] hover:bg-white/[0.04]"
+        >
+          <input 
+            type="file" 
+            id="modal-ppt-file-input" 
+            accept=".ppt,.pptx" 
+            class="hidden"
+            onchange="App.handleFileSelected(this.files[0])"
+          >
+          <div class="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="file-up" class="w-7 h-7"></i>
           </div>
-          <div id="stage-2" class="flex items-center space-x-3 text-slate-400">
-            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">2</span>
-            <span class="stage-text font-medium">Extracting slide content & speaker notes...</span>
-          </div>
-          <div id="stage-3" class="flex items-center space-x-3 text-slate-400">
-            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">3</span>
-            <span class="stage-text font-medium">Identifying strategic concepts & frameworks...</span>
-          </div>
-          <div id="stage-4" class="flex items-center space-x-3 text-slate-400">
-            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">4</span>
-            <span class="stage-text font-medium">Preparing 8-part detailed summary...</span>
-          </div>
-          <div id="stage-5" class="flex items-center space-x-3 text-slate-400">
-            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">5</span>
-            <span class="stage-text font-medium">Creating structured learning modules...</span>
-          </div>
+          <p id="dropzone-text-title" class="text-sm font-semibold text-white">Click to browse or drag and drop presentation</p>
+          <p id="dropzone-text-subtitle" class="text-xs text-slate-400 mt-1">Accepts Microsoft PowerPoint (.ppt, .pptx)</p>
         </div>
 
-        <!-- Progress status text -->
-        <div class="text-center text-xs font-semibold text-blue-600 animate-pulse">
-          AI is synthesizing slides and building interactive modules...
+        <p id="modal-upload-error" class="hidden text-rose-400 text-xs"></p>
+
+        <div class="flex items-center justify-end space-x-3 pt-2">
+          <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
+          <button id="modal-upload-submit-btn" disabled onclick="App.startUploadAndProcess()" class="px-5 py-2.5 rounded-xl bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-1.5">
+            <span>Upload & Analyze</span>
+          </button>
         </div>
       </div>
 
-      <!-- Success State -->
-      <div id="analysis-success-state" class="hidden text-center space-y-5 animate-fade-in">
-        <div class="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
-          <i data-lucide="check-circle-2" class="w-9 h-9"></i>
+      <!-- State B: 7-Stage Animated Processing Flow -->
+      <div id="upload-stage-processing" class="hidden space-y-4">
+        <div class="text-center py-2">
+          <h4 class="text-base font-bold text-white">Processing Presentation</h4>
+          <p class="text-xs text-slate-400 mt-0.5" id="upload-processing-filename">lecture_notes.pptx</p>
+        </div>
+
+        <!-- 7 Stages Checklist -->
+        <div class="space-y-2 bg-white/[0.02] p-4 rounded-2xl border border-white/10 text-xs">
+          <div id="stage-step-1" class="stage-item pending">
+            <div class="stage-indicator">1</div>
+            <span class="font-medium">1. Uploading presentation...</span>
+          </div>
+          <div id="stage-step-2" class="stage-item pending">
+            <div class="stage-indicator">2</div>
+            <span class="font-medium">2. Reading slides...</span>
+          </div>
+          <div id="stage-step-3" class="stage-item pending">
+            <div class="stage-indicator">3</div>
+            <span class="font-medium">3. Extracting slide content...</span>
+          </div>
+          <div id="stage-step-4" class="stage-item pending">
+            <div class="stage-indicator">4</div>
+            <span class="font-medium">4. Identifying key concepts...</span>
+          </div>
+          <div id="stage-step-5" class="stage-item pending">
+            <div class="stage-indicator">5</div>
+            <span class="font-medium">5. Creating detailed summary...</span>
+          </div>
+          <div id="stage-step-6" class="stage-item pending">
+            <div class="stage-indicator">6</div>
+            <span class="font-medium">6. Preparing AI learning modules...</span>
+          </div>
+          <div id="stage-step-7" class="stage-item pending">
+            <div class="stage-indicator">7</div>
+            <span class="font-medium">7. Finalizing your study space...</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- State C: Success Card -->
+      <div id="upload-stage-success" class="hidden text-center py-6 space-y-4">
+        <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
+          <i data-lucide="check" class="w-8 h-8"></i>
         </div>
         <div>
-          <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Analysis Complete</span>
-          <h3 class="text-2xl font-extrabold text-slate-900 mt-2">Your presentation is ready to learn.</h3>
-          <p id="analysis-success-meta" class="text-xs text-slate-500 mt-1">12 slides processed &bull; 8 concepts identified &bull; 3 learning modules ready</p>
+          <h4 class="text-lg font-bold text-white">Your presentation is ready to learn!</h4>
+          <p id="upload-success-meta" class="text-xs text-slate-300 mt-1">Extracted 24 slides and created structured learning modules.</p>
         </div>
-
-        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left text-xs space-y-1.5 text-slate-600">
-          <div class="flex items-center justify-between font-semibold text-slate-800">
-            <span>Detailed Summary:</span>
-            <span class="text-emerald-600 font-bold">Generated</span>
-          </div>
-          <div class="flex items-center justify-between font-semibold text-slate-800">
-            <span>Pedagogical Teaching Steps:</span>
-            <span class="text-emerald-600 font-bold">Ready</span>
-          </div>
-          <div class="flex items-center justify-between font-semibold text-slate-800">
-            <span>Flashcards & Exam Questions:</span>
-            <span class="text-emerald-600 font-bold">Ready</span>
-          </div>
-        </div>
-
-        <div class="flex items-center space-x-3 pt-2">
-          <button onclick="document.getElementById('modal-ppt-analysis').classList.add('hidden')" class="w-1/2 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
-            Close
-          </button>
-          <button id="analysis-open-workspace-btn" onclick="App.openAnalyzedWorkspace()" class="w-1/2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-1.5">
-            <span>Open Learning Workspace</span>
-            <i data-lucide="arrow-right" class="w-4 h-4"></i>
-          </button>
-        </div>
+        <button 
+          id="upload-open-presentation-btn" 
+          onclick="App.openUploadedPresentation()" 
+          class="w-full py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-sm shadow-lg shadow-blue-500/30 transition flex items-center justify-center space-x-2"
+        >
+          <span>Open Presentation</span>
+          <i data-lucide="arrow-right" class="w-4 h-4"></i>
+        </button>
       </div>
 
     </div>
   </div>
 
-  <!-- Main Application Logic Script -->
+  <!-- Client Application Script -->
   <script type="module" src="/static/js/app.js"></script>
 </body>
 </html>
