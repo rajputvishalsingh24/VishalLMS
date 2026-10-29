@@ -19,23 +19,7 @@ from .extractor import extract_document
 from .ai_tutor import answer_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
 from .seed_data import seed_all_data
 from .summarizer import analyze_presentation, get_concept_teaching_package, process_tutor_conversation
-from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app_instance: FastAPI):
-    try:
-        init_db()
-        conn = get_connection()
-        c = conn.cursor()
-        count = c.execute("SELECT count(*) FROM subjects").fetchone()[0]
-        conn.close()
-        if count == 0:
-            seed_all_data()
-    except Exception as e:
-        print(f"Lifespan startup notice: {e}", file=sys.stderr)
-    yield
-
-app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0")
 
 app.add_middleware(
     CORSMiddleware,
