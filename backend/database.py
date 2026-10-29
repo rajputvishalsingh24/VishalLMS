@@ -15,21 +15,6 @@ def is_cloud_env():
         or not os.access(os.path.dirname(os.path.dirname(__file__)), os.W_OK)
     )
 
-if is_cloud_env():
-    DB_PATH = os.path.join(tempfile.gettempdir(), "lms.db")
-    ORIGINAL_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
-    if not os.path.exists(DB_PATH) and os.path.exists(ORIGINAL_DB):
-        try:
-            shutil.copyfile(ORIGINAL_DB, DB_PATH)
-            try:
-                os.chmod(DB_PATH, 0o666)
-            except Exception:
-                pass
-        except Exception as e:
-            print(f"Notice copying DB on cloud: {e}")
-else:
-    DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
-
 _db_is_ready = False
 
 def hash_password(password: str, salt: Optional[str] = None) -> str:
@@ -249,11 +234,24 @@ def _run_init_script(conn):
 
 def get_connection():
     global _db_is_ready
+    if is_cloud_env():
+        db_path = os.path.join(tempfile.gettempdir(), "lms.db")
+        if not os.path.exists(db_path):
+            orig_db = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
+            if os.path.exists(orig_db):
+                try:
+                    shutil.copyfile(orig_db, db_path)
+                except Exception as e:
+                    print(f"Notice copying original DB: {e}")
+    else:
+        db_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
+
     try:
-        os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
     except Exception:
         pass
-    conn = sqlite3.connect(DB_PATH, timeout=30.0)
+
+    conn = sqlite3.connect(db_path, timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA foreign_keys = ON")

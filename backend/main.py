@@ -29,15 +29,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-if is_cloud_env():
-    UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "uploads")
-else:
-    UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
-
-try:
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-except Exception:
-    pass
+def get_upload_dir() -> str:
+    if is_cloud_env():
+        d = os.path.join(tempfile.gettempdir(), "uploads")
+    else:
+        d = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except Exception:
+        pass
+    return d
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -334,7 +335,7 @@ async def upload_document(
 
     doc_id = f"doc_{uuid.uuid4().hex[:10]}"
     saved_filename = f"{doc_id}_{file.filename}"
-    file_path = os.path.join(UPLOAD_DIR, saved_filename)
+    file_path = os.path.join(get_upload_dir(), saved_filename)
 
     # Save file contents
     contents = await file.read()
