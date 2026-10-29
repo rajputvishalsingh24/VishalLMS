@@ -100,24 +100,29 @@ def search_chunks(query: str, subject_id: Optional[str] = None, document_id: Opt
     return results
 
 def call_gemini(prompt: str, system_instruction: str = "") -> Optional[str]:
-    """Call Google Gemini API if key is present."""
+    """Call Google Gemini API via REST endpoint with zero extra binary dependencies."""
     api_key = get_configured_api_key()
     if not api_key:
         return None
     try:
-        from google import genai
-        client = genai.Client(api_key=api_key)
-        response = client.models.generate_content(
-            model='gemini-2.5-flash',
-            contents=prompt,
-            config={
-                'system_instruction': system_instruction
-            } if system_instruction else None
-        )
-        return response.text
+        import requests
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}]
+        }
+        if system_instruction:
+            payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
+        resp = requests.post(url, json=payload, timeout=30)
+        if resp.status_code == 200:
+            data = resp.json()
+            candidates = data.get("candidates", [])
+            if candidates:
+                parts = candidates[0].get("content", {}).get("parts", [])
+                if parts:
+                    return parts[0].get("text", "")
     except Exception as e:
-        print(f"Gemini API call error: {e}")
-        return None
+        print(f"Gemini REST API notice: {e}")
+    return None
 
 def answer_tutor_query(query: str, mode: str = "ask_materials", subject_id: Optional[str] = None, document_id: Optional[str] = None, detail_level: str = "normal") -> Dict[str, Any]:
     """

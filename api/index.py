@@ -17,6 +17,7 @@ except Exception as e:
     
     app = FastAPI(title="VISHAL SINGH LMS - Startup Diagnostics")
     
+    @app.get("/")
     @app.get("/{full_path:path}")
     def fallback_diagnostics(full_path: str = ""):
         html = f"""<!DOCTYPE html>
