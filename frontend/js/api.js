@@ -408,5 +408,325 @@ export const API = {
     const res = await fetch('/api/progress/analytics');
     if (!res.ok) throw new Error('Failed to fetch learning analytics');
     return res.json();
+  },
+
+  // Smart Flashcards (SM-2)
+  async getDueFlashcards(subjectId = '', docId = '') {
+    const q = new URLSearchParams();
+    if (subjectId) q.append('subject_id', subjectId);
+    if (docId) q.append('document_id', docId);
+    const res = await fetch(`/api/flashcards/due?${q.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch due flashcards');
+    return res.json();
+  },
+
+  async getAllFlashcards(subjectId = '', docId = '') {
+    const q = new URLSearchParams();
+    if (subjectId) q.append('subject_id', subjectId);
+    if (docId) q.append('document_id', docId);
+    const res = await fetch(`/api/flashcards?${q.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch flashcards');
+    return res.json();
+  },
+
+  async createFlashcard(data) {
+    const res = await fetch('/api/flashcards', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to create flashcard');
+    return res.json();
+  },
+
+  async reviewFlashcard(cardId, rating) {
+    const res = await fetch(`/api/flashcards/${cardId}/review`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rating })
+    });
+    if (!res.ok) throw new Error('Failed to review flashcard');
+    return res.json();
+  },
+
+  async generateFlashcardsFromDoc(docId) {
+    const res = await fetch(`/api/documents/${docId}/generate-flashcards`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to generate flashcards from document');
+    return res.json();
+  },
+
+  // Doubt Notebook
+  async getDoubts(params = {}) {
+    const q = new URLSearchParams();
+    if (params.subject_id) q.append('subject_id', params.subject_id);
+    if (params.document_id) q.append('document_id', params.document_id);
+    if (params.status) q.append('status', params.status);
+    if (params.search) q.append('search', params.search);
+    const res = await fetch(`/api/doubts?${q.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch doubts');
+    return res.json();
+  },
+
+  async createDoubt(data) {
+    const res = await fetch('/api/doubts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to record doubt');
+    return res.json();
+  },
+
+  async updateDoubtStatus(doubtId, status) {
+    const res = await fetch(`/api/doubts/${doubtId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (!res.ok) throw new Error('Failed to update doubt status');
+    return res.json();
+  },
+
+  async resolveDoubtWithAI(doubtId, clarificationPrompt = '') {
+    const res = await fetch(`/api/doubts/${doubtId}/resolve`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ clarification_prompt: clarificationPrompt })
+    });
+    if (!res.ok) throw new Error('Failed to resolve doubt with AI');
+    return res.json();
+  },
+
+  async convertDoubtToFlashcard(doubtId) {
+    const res = await fetch(`/api/doubts/${doubtId}/to-flashcard`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to convert doubt to flashcard');
+    return res.json();
+  },
+
+  // Business Cases
+  async getCases(subjectId = '', role = '') {
+    const q = new URLSearchParams();
+    if (subjectId) q.append('subject_id', subjectId);
+    if (role) q.append('role', role);
+    const res = await fetch(`/api/cases?${q.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch cases');
+    return res.json();
+  },
+
+  async generateCase(data) {
+    const res = await fetch('/api/cases/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to generate business case');
+    return res.json();
+  },
+
+  async submitCase(caseId, solutionText) {
+    const res = await fetch(`/api/cases/${caseId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ solution_text: solutionText })
+    });
+    if (!res.ok) throw new Error('Failed to submit case evaluation');
+    return res.json();
+  },
+
+  // AI Interview Simulator
+  async getInterviewHistory(subjectId = '') {
+    const q = subjectId ? `?subject_id=${subjectId}` : '';
+    const res = await fetch(`/api/interviews/history${q}`);
+    if (!res.ok) throw new Error('Failed to fetch interview history');
+    return res.json();
+  },
+
+  async startInterview(data) {
+    const res = await fetch('/api/interviews/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to start interview session');
+    return res.json();
+  },
+
+  async submitInterviewAnswer(sessionId, questionIndex, answerText) {
+    const res = await fetch(`/api/interviews/${sessionId}/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question_index: questionIndex, answer_text: answerText })
+    });
+    if (!res.ok) throw new Error('Failed to submit interview answer');
+    return res.json();
+  },
+
+  // Deterministic Calculators
+  async calculateLtvCac(data) {
+    const res = await fetch('/api/calculator/ltv-cac', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to calculate LTV:CAC');
+    return res.json();
+  },
+
+  async calculateNpv(data) {
+    const res = await fetch('/api/calculator/npv-payback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to calculate NPV');
+    return res.json();
+  },
+
+  async calculateBreakeven(data) {
+    const res = await fetch('/api/calculator/breakeven', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to calculate Break-Even');
+    return res.json();
+  },
+
+  async calculateEoq(data) {
+    const res = await fetch('/api/calculator/eoq', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to calculate EOQ');
+    return res.json();
+  },
+
+  async calculateRice(data) {
+    const res = await fetch('/api/calculator/rice', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to calculate RICE');
+    return res.json();
+  },
+
+  async calculateWacc(data) {
+    const res = await fetch('/api/calculator/wacc', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to calculate WACC');
+    return res.json();
+  },
+
+  // Frameworks Library
+  async getFrameworks(category = '', search = '') {
+    const q = new URLSearchParams();
+    if (category) q.append('category', category);
+    if (search) q.append('search', search);
+    const res = await fetch(`/api/frameworks?${q.toString()}`);
+    if (!res.ok) throw new Error('Failed to fetch frameworks');
+    return res.json();
+  },
+
+  async getFrameworkDetail(id) {
+    const res = await fetch(`/api/frameworks/${id}`);
+    if (!res.ok) throw new Error('Failed to fetch framework detail');
+    return res.json();
+  },
+
+  async saveFrameworkNotes(id, notes, linkedDocId = null) {
+    const res = await fetch(`/api/frameworks/${id}/notes`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ notes, linked_doc_id: linkedDocId })
+    });
+    if (!res.ok) throw new Error('Failed to save framework notes');
+    return res.json();
+  },
+
+  // Exams & Mock Tests
+  async getExamPlans(subjectId = '') {
+    const q = subjectId ? `?subject_id=${subjectId}` : '';
+    const res = await fetch(`/api/exams/plans${q}`);
+    if (!res.ok) throw new Error('Failed to fetch exam plans');
+    return res.json();
+  },
+
+  async generateExamPlan(data) {
+    const res = await fetch('/api/exams/plans/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to generate exam plan');
+    return res.json();
+  },
+
+  async generateMockExam(data) {
+    const res = await fetch('/api/exams/mock/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to generate mock exam');
+    return res.json();
+  },
+
+  async submitMockExam(mockId, answers) {
+    const res = await fetch(`/api/exams/mock/${mockId}/submit`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ answers })
+    });
+    if (!res.ok) throw new Error('Failed to submit mock exam');
+    return res.json();
+  },
+
+  // Prerequisites
+  async getPrerequisiteGaps(subjectId = '') {
+    const q = subjectId ? `?subject_id=${subjectId}` : '';
+    const res = await fetch(`/api/prerequisites/gaps${q}`);
+    if (!res.ok) throw new Error('Failed to fetch prerequisite gaps');
+    return res.json();
+  },
+
+  // Cross-Presentation Search
+  async crossSearch(query, subjectId = '') {
+    const q = new URLSearchParams({ query });
+    if (subjectId) q.append('subject_id', subjectId);
+    const res = await fetch(`/api/search/cross-presentation?${q.toString()}`);
+    if (!res.ok) throw new Error('Failed to execute cross-presentation search');
+    return res.json();
+  },
+
+  async synthesizeCrossSearch(query, subjectId = '') {
+    const res = await fetch('/api/search/cross-presentation/synthesize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, subject_id: subjectId })
+    });
+    if (!res.ok) throw new Error('Failed to synthesize cross-presentation query');
+    return res.json();
+  },
+
+  // Metacognitive Confidence Matrix
+  async logConfidence(data) {
+    const res = await fetch('/api/confidence/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) return { success: false };
+    return res.json();
+  },
+
+  async getConfidenceMatrix() {
+    const res = await fetch('/api/confidence/matrix');
+    if (!res.ok) throw new Error('Failed to fetch confidence matrix');
+    return res.json();
   }
 };

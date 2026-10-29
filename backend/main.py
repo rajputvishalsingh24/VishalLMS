@@ -25,6 +25,34 @@ from .tracker import (
     get_subject_progress_cards, get_presentation_progress_list,
     get_study_recommendations, get_daily_study_time_chart
 )
+from .flashcards_engine import (
+    get_due_flashcards, get_all_flashcards, review_flashcard,
+    create_flashcard, generate_smart_flashcards_from_doc
+)
+from .doubt_engine import (
+    create_doubt, get_doubts, update_doubt_status,
+    resolve_doubt_with_ai, convert_doubt_to_flashcard
+)
+from .case_engine import (
+    generate_business_case, get_business_cases, submit_case_solution,
+    ROLE_TEMPLATES, EVALUATION_RUBRICS
+)
+from .interview_engine import (
+    start_interview_session, submit_interview_answer, get_interview_history
+)
+from .calculator_engine import (
+    calculate_ltv_cac, calculate_npv_payback, calculate_breakeven,
+    calculate_eoq_inventory, calculate_rice_score, calculate_wacc
+)
+from .framework_engine import (
+    get_all_frameworks, get_framework_by_id, save_framework_notes
+)
+from .exam_engine import (
+    generate_exam_plan, get_exam_plans, generate_mock_exam, submit_mock_exam
+)
+from .prerequisite_engine import analyze_student_prerequisite_gaps
+from .cross_search import cross_search_presentations, synthesize_cross_presentation_query
+from .confidence_engine import log_confidence_entry, get_confidence_matrix_analytics
 app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0")
 
 app.add_middleware(
@@ -474,6 +502,7 @@ def update_document(id: str, doc_update: DocumentUpdate):
 class TutorChatRequest(BaseModel):
     query: str
     mode: str = "ask_materials" # simple_explanation, teach_step_by_step, presentation_explainer, ask_materials
+    teaching_mode: Optional[str] = "MBA" # Beginner, MBA, Exam, Expert
     subject_id: Optional[str] = None
     document_id: Optional[str] = None
     detail_level: str = "normal"
@@ -485,7 +514,8 @@ def tutor_chat(req: TutorChatRequest):
         mode=req.mode,
         subject_id=req.subject_id,
         document_id=req.document_id,
-        detail_level=req.detail_level
+        detail_level=req.detail_level,
+        teaching_mode=req.teaching_mode or "MBA"
     )
 
     # Save to chat history
@@ -1212,6 +1242,409 @@ def api_get_learning_analytics():
         "recommendations": get_study_recommendations(),
         "daily_chart": get_daily_study_time_chart()
     }
+
+# ----------------- SMART FLASHCARDS (SM-2 SPACED REPETITION) ----------------- #
+class FlashcardCreateReq(BaseModel):
+    front: str
+    back: str
+    concept_name: Optional[str] = "General"
+    subject_id: Optional[str] = None
+    document_id: Optional[str] = None
+    slide_number: Optional[int] = 1
+    difficulty: Optional[str] = "Medium"
+
+class FlashcardReviewReq(BaseModel):
+    rating: int # 0=Again, 1=Difficult, 2=Good, 3=Easy
+
+@app.get("/api/flashcards/due")
+def api_get_due_flashcards(subject_id: Optional[str] = None, document_id: Optional[str] = None):
+    cards = get_due_flashcards(user_id="user_vishal", subject_id=subject_id, document_id=document_id)
+    return {"due_flashcards": cards, "count": len(cards)}
+
+@app.get("/api/flashcards")
+def api_get_all_flashcards(subject_id: Optional[str] = None, document_id: Optional[str] = None):
+    cards = get_all_flashcards(user_id="user_vishal", subject_id=subject_id, document_id=document_id)
+    return {"flashcards": cards, "count": len(cards)}
+
+@app.post("/api/flashcards")
+def api_create_flashcard(req: FlashcardCreateReq):
+    return create_flashcard(
+        front=req.front, back=req.back, concept_name=req.concept_name or "General",
+        subject_id=req.subject_id, document_id=req.document_id,
+        slide_number=req.slide_number or 1, difficulty=req.difficulty or "Medium"
+    )
+
+@app.post("/api/flashcards/{card_id}/review")
+def api_review_flashcard(card_id: str, req: FlashcardReviewReq):
+    try:
+        return review_flashcard(card_id, req.rating, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/documents/{doc_id}/generate-flashcards")
+def api_generate_flashcards_from_doc(doc_id: str):
+    try:
+        cards = generate_smart_flashcards_from_doc(doc_id, user_id="user_vishal")
+        return {"success": True, "created_cards": cards, "total": len(cards)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ----------------- DOUBT NOTEBOOK ----------------- #
+class DoubtCreateReq(BaseModel):
+    title: str
+    doubt_text: str
+    subject_id: Optional[str] = None
+    document_id: Optional[str] = None
+    concept_name: Optional[str] = ""
+    slide_number: Optional[int] = 1
+    tags: Optional[List[str]] = None
+    auto_resolve: Optional[bool] = True
+
+class DoubtStatusReq(BaseModel):
+    status: str # Unresolved, Understood, Needs Revision
+
+class DoubtResolveReq(BaseModel):
+    clarification_prompt: Optional[str] = ""
+
+@app.get("/api/doubts")
+def api_get_doubts(subject_id: Optional[str] = None, document_id: Optional[str] = None, status: Optional[str] = None, search: Optional[str] = None):
+    doubts = get_doubts(user_id="user_vishal", subject_id=subject_id, document_id=document_id, status=status, search=search)
+    return {"doubts": doubts, "count": len(doubts)}
+
+@app.post("/api/doubts")
+def api_create_doubt(req: DoubtCreateReq):
+    return create_doubt(
+        title=req.title, doubt_text=req.doubt_text,
+        subject_id=req.subject_id, document_id=req.document_id,
+        concept_name=req.concept_name or "", slide_number=req.slide_number or 1,
+        tags=req.tags, auto_resolve=req.auto_resolve if req.auto_resolve is not None else True
+    )
+
+@app.patch("/api/doubts/{doubt_id}/status")
+def api_update_doubt_status(doubt_id: str, req: DoubtStatusReq):
+    try:
+        return update_doubt_status(doubt_id, req.status, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/doubts/{doubt_id}/resolve")
+def api_resolve_doubt_ai(doubt_id: str, req: DoubtResolveReq = DoubtResolveReq()):
+    try:
+        return resolve_doubt_with_ai(doubt_id, req.clarification_prompt or "", user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/doubts/{doubt_id}/to-flashcard")
+def api_convert_doubt_flashcard(doubt_id: str):
+    try:
+        return convert_doubt_to_flashcard(doubt_id, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ----------------- AI BUSINESS CASES (6 ROLES & 8 RUBRICS) ----------------- #
+class CaseGenerateReq(BaseModel):
+    role: Optional[str] = "Product Manager"
+    industry: Optional[str] = None
+    difficulty: Optional[str] = "Medium"
+    subject_id: Optional[str] = None
+    document_id: Optional[str] = None
+
+class CaseSubmitReq(BaseModel):
+    solution_text: str
+
+@app.get("/api/cases")
+def api_list_cases(subject_id: Optional[str] = None, role: Optional[str] = None):
+    cases = get_business_cases(user_id="user_vishal", subject_id=subject_id, role=role)
+    return {"cases": cases, "count": len(cases), "roles": list(ROLE_TEMPLATES.keys())}
+
+@app.post("/api/cases/generate")
+def api_generate_case(req: CaseGenerateReq):
+    try:
+        return generate_business_case(
+            subject_id=req.subject_id, document_id=req.document_id,
+            role=req.role or "Product Manager", industry=req.industry,
+            difficulty=req.difficulty or "Medium", user_id="user_vishal"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/cases/{case_id}/submit")
+def api_submit_case(case_id: str, req: CaseSubmitReq):
+    try:
+        return submit_case_solution(case_id, req.solution_text, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ----------------- AI INTERVIEW PREPARATION (4 MODES) ----------------- #
+class InterviewStartReq(BaseModel):
+    role: Optional[str] = "Product Manager"
+    mode: Optional[str] = "product_sense"
+    difficulty: Optional[str] = "Medium"
+    subject_id: Optional[str] = None
+
+class InterviewAnswerReq(BaseModel):
+    question_index: int
+    answer_text: str
+
+@app.get("/api/interviews/history")
+def api_get_interview_history(subject_id: Optional[str] = None):
+    hist = get_interview_history(user_id="user_vishal", subject_id=subject_id)
+    return {"history": hist, "count": len(hist)}
+
+@app.post("/api/interviews/start")
+def api_start_interview(req: InterviewStartReq):
+    try:
+        return start_interview_session(
+            subject_id=req.subject_id, role=req.role or "Product Manager",
+            mode=req.mode or "product_sense", difficulty=req.difficulty or "Medium",
+            user_id="user_vishal"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/interviews/{session_id}/answer")
+def api_submit_interview_answer(session_id: str, req: InterviewAnswerReq):
+    try:
+        return submit_interview_answer(session_id, req.question_index, req.answer_text, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ----------------- DETERMINISTIC MBA CALCULATORS ----------------- #
+class LtvCacReq(BaseModel):
+    arpu: float
+    gross_margin_pct: float
+    monthly_churn_pct: float
+    cac: float
+
+class NpvReq(BaseModel):
+    initial_investment: float
+    discount_rate_pct: float
+    cash_flows: List[float]
+
+class BreakevenReq(BaseModel):
+    fixed_costs: float
+    selling_price_per_unit: float
+    variable_cost_per_unit: float
+    expected_sales_units: Optional[float] = 0
+
+class EoqReq(BaseModel):
+    annual_demand: float
+    order_cost_per_order: float
+    holding_cost_per_unit_year: float
+
+class RiceReq(BaseModel):
+    reach: float
+    impact: float
+    confidence_pct: float
+    effort_person_weeks: float
+
+class WaccReq(BaseModel):
+    market_value_equity: float
+    market_value_debt: float
+    cost_of_equity_pct: float
+    cost_of_debt_pct: float
+    tax_rate_pct: float
+
+@app.post("/api/calculator/ltv-cac")
+def api_calc_ltv_cac(req: LtvCacReq):
+    try:
+        return calculate_ltv_cac(req.arpu, req.gross_margin_pct, req.monthly_churn_pct, req.cac)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/calculator/npv-payback")
+def api_calc_npv(req: NpvReq):
+    try:
+        return calculate_npv_payback(req.initial_investment, req.discount_rate_pct, req.cash_flows)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/calculator/breakeven")
+def api_calc_breakeven(req: BreakevenReq):
+    try:
+        return calculate_breakeven(req.fixed_costs, req.selling_price_per_unit, req.variable_cost_per_unit, req.expected_sales_units or 0)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/calculator/eoq")
+def api_calc_eoq(req: EoqReq):
+    try:
+        return calculate_eoq_inventory(req.annual_demand, req.order_cost_per_order, req.holding_cost_per_unit_year)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/calculator/rice")
+def api_calc_rice(req: RiceReq):
+    try:
+        return calculate_rice_score(req.reach, req.impact, req.confidence_pct, req.effort_person_weeks)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@app.post("/api/calculator/wacc")
+def api_calc_wacc(req: WaccReq):
+    try:
+        return calculate_wacc(req.market_value_equity, req.market_value_debt, req.cost_of_equity_pct, req.cost_of_debt_pct, req.tax_rate_pct)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ----------------- BUSINESS FRAMEWORKS LIBRARY ----------------- #
+class FrameworkNotesReq(BaseModel):
+    notes: str
+    linked_doc_id: Optional[str] = None
+
+@app.get("/api/frameworks")
+def api_get_frameworks(category: Optional[str] = None, search: Optional[str] = None):
+    fw = get_all_frameworks(category=category, search=search)
+    return {"frameworks": fw, "count": len(fw)}
+
+@app.get("/api/frameworks/{framework_id}")
+def api_get_framework_detail(framework_id: str):
+    fw = get_framework_by_id(framework_id, user_id="user_vishal")
+    if not fw:
+        raise HTTPException(status_code=404, detail="Framework not found")
+    return fw
+
+@app.post("/api/frameworks/{framework_id}/notes")
+def api_save_framework_notes(framework_id: str, req: FrameworkNotesReq):
+    return save_framework_notes(framework_id, req.notes, req.linked_doc_id, user_id="user_vishal")
+
+# ----------------- EXAM PREPARATION & MOCK EXAMS ----------------- #
+class ExamPlanReq(BaseModel):
+    subject_id: str
+    duration_days: Optional[int] = 7
+    exam_date: Optional[str] = None
+
+class MockExamGenReq(BaseModel):
+    subject_id: str
+    document_id: Optional[str] = None
+    question_count: Optional[int] = 10
+    time_limit_minutes: Optional[int] = 30
+
+class MockExamSubmitReq(BaseModel):
+    answers: Dict[str, Any]
+
+@app.get("/api/exams/plans")
+def api_get_exam_plans(subject_id: Optional[str] = None):
+    plans = get_exam_plans(user_id="user_vishal", subject_id=subject_id)
+    return {"plans": plans, "count": len(plans)}
+
+@app.post("/api/exams/plans/generate")
+def api_generate_exam_plan(req: ExamPlanReq):
+    try:
+        return generate_exam_plan(req.subject_id, req.duration_days or 7, req.exam_date, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/exams/mock/generate")
+def api_generate_mock_exam(req: MockExamGenReq):
+    try:
+        return generate_mock_exam(
+            req.subject_id, req.document_id,
+            req.question_count or 10, req.time_limit_minutes or 30,
+            user_id="user_vishal"
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/api/exams/mock/{mock_id}/submit")
+def api_submit_mock_exam(mock_id: str, req: MockExamSubmitReq):
+    try:
+        return submit_mock_exam(mock_id, req.answers, user_id="user_vishal")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# ----------------- PREREQUISITES & DIAGNOSTIC GAPS ----------------- #
+@app.get("/api/prerequisites/gaps")
+def api_get_prerequisite_gaps(subject_id: Optional[str] = None):
+    return {"gaps": analyze_student_prerequisite_gaps(user_id="user_vishal", subject_id=subject_id)}
+
+# ----------------- CROSS-PRESENTATION SEARCH & SYNTHESIS ----------------- #
+class CrossSynthesizeReq(BaseModel):
+    query: str
+    subject_id: Optional[str] = None
+
+@app.get("/api/search/cross-presentation")
+def api_cross_search(query: str = Query(...), subject_id: Optional[str] = None, limit: int = 15):
+    return cross_search_presentations(query=query, subject_id=subject_id, limit=limit)
+
+@app.post("/api/search/cross-presentation/synthesize")
+def api_synthesize_cross_search(req: CrossSynthesizeReq):
+    return synthesize_cross_presentation_query(query=req.query, subject_id=req.subject_id)
+
+# ----------------- CONFIDENCE & 2x2 KNOWLEDGE MATRIX ----------------- #
+class ConfidenceLogReq(BaseModel):
+    quiz_attempt_id: Optional[str] = None
+    question_id: str
+    confidence_level: str # Guessing, Somewhat Confident, Very Confident
+    is_correct: bool
+
+@app.post("/api/confidence/log")
+def api_log_confidence(req: ConfidenceLogReq):
+    return log_confidence_entry(req.quiz_attempt_id, req.question_id, req.confidence_level, req.is_correct)
+
+@app.get("/api/confidence/matrix")
+def api_get_confidence_matrix():
+    return get_confidence_matrix_analytics(user_id="user_vishal")
+
+# ----------------- EXPORT TOOLS (MARKDOWN & JSON) ----------------- #
+@app.get("/api/export/notes/markdown")
+def api_export_notes_markdown():
+    conn = get_connection()
+    notes = conn.execute("SELECT n.*, s.name as subject_name FROM notes n LEFT JOIN subjects s ON n.subject_id = s.id ORDER BY n.created_at DESC").fetchall()
+    summaries = conn.execute("SELECT ps.*, COALESCE(d.name, d.original_filename, 'Presentation') as filename FROM presentation_summaries ps JOIN documents d ON ps.document_id = d.id").fetchall()
+    conn.close()
+
+    md = "# VISHAL SINGH LMS — Study Notes & Master Summaries\n\n"
+    md += f"Generated on: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S UTC')}\n\n---\n\n"
+
+    for s in summaries:
+        md += f"## Presentation Summary: {s['filename']}\n"
+        try:
+            ov = json.loads(s["overview_json"])
+            md += f"**Core Essence:** {ov.get('core_essence', '')}\n\n"
+        except Exception:
+            pass
+        try:
+            rev = json.loads(s["revision_sheet_json"])
+            md += "### Key Takeaways:\n"
+            for pt in rev.get("must_know_points", []):
+                md += f"- {pt}\n"
+            md += "\n"
+        except Exception:
+            pass
+
+    for n in notes:
+        n_dict = dict(n)
+        subj = n_dict.get("subject_name") or "General"
+        md += f"## Note: {n_dict['title']} ({subj})\n\n{n_dict['content']}\n\n---\n\n"
+
+    return Response(
+        content=md,
+        media_type="text/markdown",
+        headers={"Content-Disposition": "attachment; filename=Vishal_Singh_MBA_Notes.md"}
+    )
+
+@app.get("/api/export/progress/json")
+def api_export_progress_json():
+    conn = get_connection()
+    stats = get_learning_analytics()
+    cards = get_subject_progress_cards()
+    attempts = [dict(r) for r in conn.execute("SELECT * FROM quiz_attempts ORDER BY completed_at DESC LIMIT 50").fetchall()]
+    milestones = [dict(r) for r in conn.execute("SELECT * FROM user_milestones ORDER BY achieved_at DESC").fetchall()]
+    conn.close()
+
+    payload = {
+        "user": "Vishal Singh",
+        "exported_at": datetime.utcnow().isoformat(),
+        "analytics": stats,
+        "subjects": cards,
+        "recent_quiz_attempts": attempts,
+        "achieved_milestones": milestones
+    }
+    return JSONResponse(
+        content=payload,
+        headers={"Content-Disposition": "attachment; filename=Vishal_Singh_LMS_Progress.json"}
+    )
 
 # ----------------- STATIC FRONTEND SERVING ----------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")

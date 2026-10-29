@@ -61,18 +61,30 @@
       </div>
 
       <!-- Center Minimal Navigation -->
-      <nav class="hidden md:flex items-center space-x-1 bg-white/5 border border-white/10 rounded-full px-3 py-1.5 backdrop-blur-md">
-        <button onclick="App.navigate('dashboard')" data-nav-pill="dashboard" class="nav-pill px-3.5 py-1.5 rounded-full text-xs font-semibold transition text-white bg-blue-600 shadow-sm flex items-center space-x-1.5">
+      <nav class="hidden md:flex items-center space-x-1 bg-white/5 border border-white/10 rounded-full px-2 py-1 backdrop-blur-md">
+        <button onclick="App.navigate('dashboard')" data-nav-pill="dashboard" class="nav-pill px-3 py-1 rounded-full text-xs font-semibold transition text-white bg-blue-600 shadow-sm flex items-center space-x-1.5">
           <i data-lucide="home" class="w-3.5 h-3.5"></i>
           <span>Home</span>
         </button>
-        <button onclick="App.navigate('dashboard')" data-nav-pill="subjects" class="nav-pill px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
-          <i data-lucide="layers" class="w-3.5 h-3.5"></i>
-          <span>My Subjects</span>
+        <button onclick="App.navigate('tutor')" data-nav-pill="tutor" class="nav-pill px-3 py-1 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span>AI Tutor</span>
         </button>
-        <button onclick="App.navigate('progress')" data-nav-pill="progress" class="nav-pill px-3.5 py-1.5 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
+        <button onclick="App.navigate('practice')" data-nav-pill="practice" class="nav-pill px-3 py-1 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
+          <i data-lucide="target" class="w-3.5 h-3.5 text-indigo-400"></i>
+          <span>Practice Hub</span>
+        </button>
+        <button onclick="App.navigate('revision')" data-nav-pill="revision" class="nav-pill px-3 py-1 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-amber-400"></i>
+          <span>Revision Hub</span>
+        </button>
+        <button onclick="App.navigate('mba-tools')" data-nav-pill="mba-tools" class="nav-pill px-3 py-1 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
+          <i data-lucide="compass" class="w-3.5 h-3.5 text-emerald-400"></i>
+          <span>MBA Tools</span>
+        </button>
+        <button onclick="App.navigate('progress')" data-nav-pill="progress" class="nav-pill px-3 py-1 rounded-full text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5">
           <i data-lucide="trending-up" class="w-3.5 h-3.5 text-cyan-400"></i>
-          <span>My Learning Progress</span>
+          <span>Progress</span>
         </button>
       </nav>
 
@@ -1037,9 +1049,413 @@
         <div id="progress-presentations-container" class="space-y-3"></div>
       </div>
 
+      <!-- Section: 2x2 Metacognitive Knowledge Matrix -->
+      <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-5">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-bold text-white flex items-center space-x-2">
+              <i data-lucide="grid" class="w-4 h-4 text-purple-400"></i>
+              <span>2×2 Knowledge Calibration Matrix</span>
+            </h3>
+            <p class="text-xs text-slate-400 mt-1">Cross-referencing your subjective confidence against test accuracy</p>
+          </div>
+          <button onclick="App.loadConfidenceMatrix()" class="text-xs px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 flex items-center space-x-1">
+            <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+            <span>Refresh</span>
+          </button>
+        </div>
+        <div id="confidence-matrix-container" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <!-- Rendered via App.loadConfidenceMatrix() -->
+        </div>
+      </div>
+
+      <!-- Section: Data Export Tools -->
+      <div class="glass-panel p-6 sm:p-8 rounded-3xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center space-x-2">
+            <i data-lucide="download" class="w-4 h-4 text-emerald-400"></i>
+            <span>Export Learning Assets</span>
+          </h3>
+          <p class="text-xs text-slate-400 mt-1">Download complete notes, formulas, and progress metrics for offline revision</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <a href="/api/export/notes/markdown" download="Vishal_Singh_MBA_Notes.md" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md flex items-center space-x-2 transition">
+            <i data-lucide="file-text" class="w-4 h-4"></i>
+            <span>Export Notes (Markdown)</span>
+          </a>
+          <a href="/api/export/progress/json" download="Vishal_Singh_Progress.json" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 flex items-center space-x-2 transition">
+            <i data-lucide="database" class="w-4 h-4"></i>
+            <span>Export Data (JSON)</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ==================== PAGE 2: GLOBAL AI TUTOR ==================== -->
+    <div id="page-tutor" class="page-view hidden animate-fade-in space-y-6">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div>
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-semibold mb-2">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+            <span>Grounded Personal AI Tutor</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">Interactive Classroom & AI Mentor</h2>
+          <p class="text-xs text-slate-400">Ask questions grounded in your uploaded lecture slides, frameworks, or general MBA theory.</p>
+        </div>
+        
+        <!-- Teaching Mode Selector -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
+          <button onclick="App.setTeachingMode('Beginner')" data-tutor-mode="Beginner" class="tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            🌱 Beginner
+          </button>
+          <button onclick="App.setTeachingMode('MBA')" data-tutor-mode="MBA" class="tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 shadow-sm transition">
+            🏛️ MBA Prof
+          </button>
+          <button onclick="App.setTeachingMode('Exam')" data-tutor-mode="Exam" class="tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            📝 Exam Prep
+          </button>
+          <button onclick="App.setTeachingMode('Expert')" data-tutor-mode="Expert" class="tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            ⚡ Expert
+          </button>
+        </div>
+      </div>
+
+      <!-- Grounding Filter & Presentation Scope -->
+      <div class="flex flex-wrap items-center gap-3">
+        <div class="flex-1 min-w-[220px]">
+          <select id="tutor-subject-select" class="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500" onchange="App.handleTutorSubjectChange(this.value)">
+            <option value="">All MBA Subjects (Cross-Subject)</option>
+          </select>
+        </div>
+        <div class="flex-1 min-w-[220px]">
+          <select id="tutor-doc-select" class="w-full px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200 focus:outline-none focus:border-blue-500">
+            <option value="">All Uploaded Presentations</option>
+          </select>
+        </div>
+        <button onclick="App.clearTutorChat()" class="px-3 py-2 rounded-xl text-xs bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white border border-white/10 transition flex items-center space-x-1">
+          <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+          <span>Clear</span>
+        </button>
+      </div>
+
+      <!-- Chat Stream Window -->
+      <div class="glass-panel rounded-3xl p-4 sm:p-6 flex flex-col h-[540px]">
+        <div id="tutor-messages-container" class="flex-1 overflow-y-auto space-y-4 pr-2">
+          <!-- Welcome Greeting Message -->
+          <div class="flex items-start gap-3 animate-fade-in">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">
+              AI
+            </div>
+            <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200 leading-relaxed space-y-2">
+              <p class="font-semibold text-white">Hello Vishal! I am your MBA Personal Tutor.</p>
+              <p>I can explain difficult concepts, analyze trade-offs, break down your uploaded slide decks, or quiz your readiness. Current mode: <span id="current-tutor-mode-label" class="font-bold text-blue-400">MBA Professor</span>.</p>
+              <div class="flex flex-wrap gap-2 pt-2">
+                <button onclick="App.sendQuickTutorPrompt('Explain the difference between customer LTV and CAC with an example')" class="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-blue-300">💡 LTV vs CAC</button>
+                <button onclick="App.sendQuickTutorPrompt('How does Porter\\'s Five Forces apply to SaaS platform businesses?')" class="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-blue-300">🏛️ Porter's 5 Forces in SaaS</button>
+                <button onclick="App.sendQuickTutorPrompt('Give me a 3-step break-even formula walkthrough')" class="text-[11px] px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-blue-300">📊 Break-even Analysis</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chat Input Bar -->
+        <div class="pt-4 border-t border-white/10 flex items-center gap-2">
+          <button id="tutor-voice-btn" onclick="App.toggleSpeechRecognition()" class="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition flex-shrink-0" title="Voice Input (Speech-to-Text)">
+            <i data-lucide="mic" class="w-4 h-4"></i>
+          </button>
+          <input 
+            id="tutor-chat-input"
+            type="text" 
+            placeholder="Ask your tutor anything about your MBA study materials..."
+            class="flex-1 px-4 py-3 text-xs bg-white/5 border border-white/10 rounded-2xl text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:bg-white/10 transition"
+            onkeydown="if(event.key === 'Enter') App.handleTutorSend()"
+          >
+          <button onclick="App.handleTutorSend()" class="px-5 py-3 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-lg shadow-blue-500/25 flex items-center space-x-1.5 transition flex-shrink-0">
+            <span>Send</span>
+            <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE 3: PRACTICE HUB ==================== -->
+    <div id="page-practice" class="page-view hidden animate-fade-in space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div>
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold mb-2">
+            <i data-lucide="target" class="w-3.5 h-3.5"></i>
+            <span>Applied Executive Practice</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">Practice Hub</h2>
+          <p class="text-xs text-slate-400">Sharpen executive decision making through realistic cases, recruitment interviews, and timed mock exams.</p>
+        </div>
+
+        <!-- Practice Sub-Navigation -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
+          <button onclick="App.switchPracticeTab('cases')" data-practice-tab="cases" class="practice-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 shadow-sm transition">
+            💼 Business Cases
+          </button>
+          <button onclick="App.switchPracticeTab('interviews')" data-practice-tab="interviews" class="practice-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            🎙️ AI Interviews
+          </button>
+          <button onclick="App.switchPracticeTab('mock-exams')" data-practice-tab="mock-exams" class="practice-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            ⏱️ Timed Mock Exams
+          </button>
+        </div>
+      </div>
+
+      <!-- Practice Tab 1: Business Cases -->
+      <div id="practice-tab-cases" class="space-y-6">
+        <div class="glass-panel p-6 rounded-3xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white">Generate Executive Business Case</h3>
+              <p class="text-xs text-slate-400">Select your target executive role and challenge difficulty.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="case-role-select" class="px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200">
+                <option value="Product Manager">Product Manager</option>
+                <option value="Marketing Manager">Marketing Manager</option>
+                <option value="Strategy Consultant">Strategy Consultant</option>
+                <option value="Finance Analyst">Finance Analyst</option>
+                <option value="Operations Manager">Operations Manager</option>
+                <option value="Business Analyst">Business Analyst</option>
+              </select>
+              <select id="case-difficulty-select" class="px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200">
+                <option value="Medium">Medium Rigor</option>
+                <option value="Hard">Advanced Boardroom</option>
+              </select>
+              <button onclick="App.generateNewCase()" class="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-md flex items-center space-x-1.5 transition">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Generate Case</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="active-case-view" class="space-y-6 hidden">
+          <!-- Populated dynamically via App.renderActiveCase() -->
+        </div>
+
+        <div class="space-y-4">
+          <h4 class="text-base font-bold text-white">Case Study Archive</h4>
+          <div id="cases-archive-list" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- Practice Tab 2: AI Interviews -->
+      <div id="practice-tab-interviews" class="space-y-6 hidden">
+        <div class="glass-panel p-6 rounded-3xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white">AI MBA & Recruitment Interview Simulator</h3>
+              <p class="text-xs text-slate-400">Simulate high-stakes interview rounds with instant feedback on structure and impact.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="interview-mode-select" class="px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200">
+                <option value="product_sense">Product Sense (Design & Strategy)</option>
+                <option value="concept">Concept Rigor (MBA Theory)</option>
+                <option value="case">Market Sizing & Profitability Case</option>
+                <option value="behavioral">Behavioral (STAR Method)</option>
+              </select>
+              <button onclick="App.startNewInterview()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md flex items-center space-x-1.5 transition">
+                <i data-lucide="play" class="w-3.5 h-3.5"></i>
+                <span>Start Simulation</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="active-interview-view" class="space-y-6 hidden">
+          <!-- Populated dynamically via App.renderActiveInterview() -->
+        </div>
+
+        <div class="space-y-4">
+          <h4 class="text-base font-bold text-white">Completed Interview Sessions</h4>
+          <div id="interviews-history-list" class="space-y-3"></div>
+        </div>
+      </div>
+
+      <!-- Practice Tab 3: Mock Exams -->
+      <div id="practice-tab-mock-exams" class="space-y-6 hidden">
+        <div class="glass-panel p-6 rounded-3xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-base font-bold text-white">Timed Full-Length Examination</h3>
+              <p class="text-xs text-slate-400">Anti-cheat examination simulator with countdown timer and grading analytics.</p>
+            </div>
+            <div class="flex flex-wrap items-center gap-3">
+              <select id="mock-subject-select" class="px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200"></select>
+              <select id="mock-count-select" class="px-3 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200">
+                <option value="5">5 Questions (15 Mins)</option>
+                <option value="10" selected>10 Questions (30 Mins)</option>
+                <option value="15">15 Questions (45 Mins)</option>
+              </select>
+              <button onclick="App.generateMockExam()" class="px-4 py-2 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold shadow-md flex items-center space-x-1.5 transition">
+                <i data-lucide="play-circle" class="w-3.5 h-3.5"></i>
+                <span>Start Exam</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div id="active-mock-exam-view" class="space-y-6 hidden">
+          <!-- Populated dynamically via App.renderMockExam() -->
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE 4: REVISION HUB ==================== -->
+    <div id="page-revision" class="page-view hidden animate-fade-in space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div>
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/20 text-amber-400 text-xs font-semibold mb-2">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>Active Recall & Spaced Repetition</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">Revision Hub</h2>
+          <p class="text-xs text-slate-400">SM-2 flashcards, doubt resolution, and prerequisite gap detection.</p>
+        </div>
+
+        <!-- Revision Sub-Navigation -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
+          <button onclick="App.switchRevisionTab('flashcards')" data-revision-tab="flashcards" class="revision-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-amber-600 shadow-sm transition">
+            🗂️ Smart Flashcards
+          </button>
+          <button onclick="App.switchRevisionTab('doubts')" data-revision-tab="doubts" class="revision-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            📓 Doubt Notebook
+          </button>
+          <button onclick="App.switchRevisionTab('prerequisites')" data-revision-tab="prerequisites" class="revision-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            🔍 Prerequisite Gaps
+          </button>
+        </div>
+      </div>
+
+      <!-- Revision Tab 1: Smart Flashcards -->
+      <div id="revision-tab-flashcards" class="space-y-6">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span id="due-flashcards-badge" class="px-3 py-1 rounded-full bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-bold">
+              Due Today: 0
+            </span>
+            <span id="total-flashcards-badge" class="text-xs text-slate-400">Total Cards: 0</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="App.openCreateFlashcardModal()" class="px-3.5 py-1.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 flex items-center space-x-1.5 transition">
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>New Card</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="flashcard-player-container" class="max-w-xl mx-auto space-y-6">
+          <!-- Rendered via App.renderFlashcardPlayer() -->
+        </div>
+      </div>
+
+      <!-- Revision Tab 2: Doubt Notebook -->
+      <div id="revision-tab-doubts" class="space-y-6 hidden">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-2">
+            <button onclick="App.filterDoubts('All')" data-doubt-filter="All" class="doubt-filter-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white">All</button>
+            <button onclick="App.filterDoubts('Unresolved')" data-doubt-filter="Unresolved" class="doubt-filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Unresolved</button>
+            <button onclick="App.filterDoubts('Needs Revision')" data-doubt-filter="Needs Revision" class="doubt-filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Needs Revision</button>
+            <button onclick="App.filterDoubts('Understood')" data-doubt-filter="Understood" class="doubt-filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Understood</button>
+          </div>
+          <button onclick="App.openCreateDoubtModal()" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md flex items-center space-x-1.5 transition">
+            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+            <span>Capture Doubt</span>
+          </button>
+        </div>
+
+        <div id="doubts-list-container" class="space-y-4"></div>
+      </div>
+
+      <!-- Revision Tab 3: Prerequisite Gaps -->
+      <div id="revision-tab-prerequisites" class="space-y-6 hidden">
+        <div class="glass-panel p-6 rounded-3xl space-y-2">
+          <h3 class="text-base font-bold text-white flex items-center space-x-2">
+            <i data-lucide="network" class="w-4 h-4 text-cyan-400"></i>
+            <span>Cognitive Dependency Map</span>
+          </h3>
+          <p class="text-xs text-slate-400">Identifies foundational gaps where performance dipped below mastery thresholds.</p>
+        </div>
+        <div id="prerequisite-gaps-container" class="space-y-4"></div>
+      </div>
+    </div>
+
+    <!-- ==================== PAGE 5: MBA TOOLS ==================== -->
+    <div id="page-mba-tools" class="page-view hidden animate-fade-in space-y-6">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
+        <div>
+          <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold mb-2">
+            <i data-lucide="compass" class="w-3.5 h-3.5"></i>
+            <span>Executive Reference & Calculations</span>
+          </div>
+          <h2 class="text-2xl font-extrabold text-white">MBA Frameworks & Calculators</h2>
+          <p class="text-xs text-slate-400">16+ strategic business frameworks and deterministic quantitative calculators.</p>
+        </div>
+
+        <!-- MBA Tools Sub-Navigation -->
+        <div class="flex items-center gap-1.5 p-1 rounded-2xl bg-white/5 border border-white/10">
+          <button onclick="App.switchMbaToolsTab('frameworks')" data-mba-tools-tab="frameworks" class="mba-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 shadow-sm transition">
+            📐 Frameworks Library
+          </button>
+          <button onclick="App.switchMbaToolsTab('calculators')" data-mba-tools-tab="calculators" class="mba-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition">
+            🧮 Quantitative Calculators
+          </button>
+        </div>
+      </div>
+
+      <!-- MBA Tools Tab 1: Frameworks Library -->
+      <div id="mba-tools-tab-frameworks" class="space-y-6">
+        <div class="flex flex-wrap items-center gap-2">
+          <input 
+            type="text" 
+            placeholder="Search frameworks (e.g., SWOT, Porter, RICE, Ansoff)..." 
+            class="px-4 py-2 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200 focus:outline-none focus:border-emerald-500 flex-1 min-w-[240px]"
+            oninput="App.filterFrameworks(this.value)"
+          >
+          <button onclick="App.filterFrameworksCategory('All')" class="fw-cat-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white">All</button>
+          <button onclick="App.filterFrameworksCategory('Strategy')" class="fw-cat-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Strategy</button>
+          <button onclick="App.filterFrameworksCategory('Product Management')" class="fw-cat-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Product</button>
+          <button onclick="App.filterFrameworksCategory('Marketing')" class="fw-cat-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Marketing</button>
+        </div>
+
+        <div id="frameworks-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+      </div>
+
+      <!-- MBA Tools Tab 2: Calculators -->
+      <div id="mba-tools-tab-calculators" class="space-y-6 hidden">
+        <div class="flex flex-wrap items-center gap-2 pb-2 border-b border-white/10">
+          <button onclick="App.selectCalculator('ltv-cac')" data-calc-btn="ltv-cac" class="calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white">LTV:CAC Unit Economics</button>
+          <button onclick="App.selectCalculator('npv')" data-calc-btn="npv" class="calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">NPV & Payback</button>
+          <button onclick="App.selectCalculator('breakeven')" data-calc-btn="breakeven" class="calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">Break-Even Point</button>
+          <button onclick="App.selectCalculator('eoq')" data-calc-btn="eoq" class="calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">EOQ (Inventory)</button>
+          <button onclick="App.selectCalculator('rice')" data-calc-btn="rice" class="calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">RICE Prioritization</button>
+          <button onclick="App.selectCalculator('wacc')" data-calc-btn="wacc" class="calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300">WACC (Cost of Capital)</button>
+        </div>
+
+        <div id="calculator-panel-container" class="max-w-2xl mx-auto space-y-6">
+          <!-- Populated dynamically via App.renderSelectedCalculator() -->
+        </div>
+      </div>
     </div>
 
   </main>
+
+  <!-- ==================== INTERACTIVE AI MASCOT (NOVA) ==================== -->
+  <div id="ai-mascot-widget" class="mascot-container">
+    <div id="mascot-speech" class="mascot-speech-bubble hidden">
+      <span id="mascot-speech-text">Welcome Vishal! Keep up your study streak.</span>
+    </div>
+    <div class="mascot-avatar" onclick="App.handleMascotClick()" title="Ask Nova for a study tip">
+      <div class="mascot-avatar-inner">
+        <i data-lucide="bot" class="w-6 h-6 text-white"></i>
+      </div>
+    </div>
+  </div>
 
   <!-- ==================== MODALS ==================== -->
 

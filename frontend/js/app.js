@@ -263,6 +263,14 @@ export const App = {
       await this.loadPresentationLearning(options.docId);
     } else if (pageId === 'progress') {
       await this.loadLearningProgressPage();
+    } else if (pageId === 'tutor') {
+      await this.loadTutorPage();
+    } else if (pageId === 'practice') {
+      await this.loadPracticePage();
+    } else if (pageId === 'revision') {
+      await this.loadRevisionPage();
+    } else if (pageId === 'mba-tools') {
+      await this.loadMbaToolsPage();
     }
 
     this.initLucide();
@@ -1714,6 +1722,7 @@ export const App = {
 
       // 5. Render Presentation Learning Tracker
       this.renderPresentationProgressList(data.presentation_progress || []);
+      await this.loadConfidenceMatrix();
 
       this.initLucide();
     } catch (e) {
@@ -2141,7 +2150,1225 @@ export const App = {
     document.querySelectorAll('[id^="modal-"]').forEach(m => m.classList.add('hidden'));
   },
 
-  // ==================== SEARCH ====================
+  // ==================== 2X2 KNOWLEDGE MATRIX & METRICS ====================
+  async loadConfidenceMatrix() {
+    const container = document.getElementById('confidence-matrix-container');
+    if (!container) return;
+    container.innerHTML = `<div class="p-6 text-center text-xs text-slate-400 col-span-2">Analyzing calibration matrix...</div>`;
+
+    try {
+      const data = await API.getConfidenceMatrix();
+      const m = data.matrix || {};
+      const sum = data.summary || {};
+
+      container.innerHTML = `
+        <!-- Quadrant 1: Mastered -->
+        <div class="matrix-quadrant p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/25 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-emerald-300 flex items-center space-x-1.5">
+              <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+              <span>Mastered Concepts</span>
+            </span>
+            <span class="text-lg font-black text-emerald-400">${m.mastered || 0}</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-snug">High Confidence + Correct. True conceptual mastery.</p>
+        </div>
+
+        <!-- Quadrant 2: Dangerous Blindspot -->
+        <div class="matrix-quadrant p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-rose-300 flex items-center space-x-1.5">
+              <i data-lucide="alert-triangle" class="w-4 h-4 text-rose-400"></i>
+              <span>Dangerous Blindspots</span>
+            </span>
+            <span class="text-lg font-black text-rose-400">${m.dangerous_blindspot || 0}</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-snug">High Confidence + Incorrect. High-risk misconceptions requiring urgent review.</p>
+        </div>
+
+        <!-- Quadrant 3: Shaky Ground -->
+        <div class="matrix-quadrant p-5 rounded-2xl bg-amber-500/10 border border-amber-500/25 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-amber-300 flex items-center space-x-1.5">
+              <i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i>
+              <span>Lucky Guesses / Shaky</span>
+            </span>
+            <span class="text-lg font-black text-amber-400">${m.shaky_ground || 0}</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-snug">Low Confidence + Correct. Right answer without complete certainty.</p>
+        </div>
+
+        <!-- Quadrant 4: Known Gaps -->
+        <div class="matrix-quadrant p-5 rounded-2xl bg-slate-500/10 border border-slate-500/25 space-y-2">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="book-open" class="w-4 h-4 text-slate-400"></i>
+              <span>Recognized Knowledge Gaps</span>
+            </span>
+            <span class="text-lg font-black text-slate-300">${m.known_gap || 0}</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-snug">Low Confidence + Incorrect. Acknowledged learning opportunities.</p>
+        </div>
+
+        <div class="col-span-1 sm:col-span-2 p-3.5 rounded-xl bg-white/5 border border-white/10 text-xs text-slate-300 flex items-center justify-between">
+          <span><strong>Calibration Advisory:</strong> ${this.escapeHtml(data.advisory)}</span>
+          <span class="text-[11px] text-purple-400 font-semibold">${sum.mastered_pct || 0}% Mastered</span>
+        </div>
+      `;
+      this.initLucide();
+    } catch (e) {
+      container.innerHTML = `<div class="p-4 text-xs text-rose-400 col-span-2">Notice: ${e.message}</div>`;
+    }
+  },
+
+  // ==================== GLOBAL AI TUTOR (4 TEACHING MODES) ====================
+  currentTeachingMode: 'MBA',
+  isListening: false,
+
+  async loadTutorPage() {
+    this.currentTeachingMode = 'MBA';
+    const subSelect = document.getElementById('tutor-subject-select');
+    if (subSelect) {
+      subSelect.innerHTML = `<option value="">All MBA Subjects (Cross-Subject)</option>` + 
+        this.state.subjects.map(s => `<option value="${s.id}">${this.escapeHtml(s.name)}</option>`).join('');
+    }
+    await this.handleTutorSubjectChange('');
+  },
+
+  async handleTutorSubjectChange(subjectId) {
+    const docSelect = document.getElementById('tutor-doc-select');
+    if (!docSelect) return;
+    try {
+      const docs = await API.getDocuments(subjectId ? { subject_id: subjectId } : {});
+      docSelect.innerHTML = `<option value="">All Uploaded Presentations</option>` +
+        (docs || []).map(d => `<option value="${d.id}">${this.escapeHtml(d.name || d.original_filename)}</option>`).join('');
+    } catch (e) {
+      docSelect.innerHTML = `<option value="">All Uploaded Presentations</option>`;
+    }
+  },
+
+  setTeachingMode(mode) {
+    this.currentTeachingMode = mode;
+    document.querySelectorAll('.tutor-mode-pill').forEach(btn => {
+      if (btn.getAttribute('data-tutor-mode') === mode) {
+        btn.className = 'tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 shadow-sm transition';
+      } else {
+        btn.className = 'tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition';
+      }
+    });
+    const label = document.getElementById('current-tutor-mode-label');
+    if (label) {
+      const modeNames = { Beginner: '🌱 Beginner (ELI5)', MBA: '🏛️ MBA Professor', Exam: '📝 Exam Prep', Expert: '⚡ C-Suite Expert' };
+      label.innerText = modeNames[mode] || mode;
+    }
+  },
+
+  async handleTutorSend() {
+    const input = document.getElementById('tutor-chat-input');
+    if (!input) return;
+    const query = input.value.trim();
+    if (!query) return;
+    input.value = '';
+
+    const container = document.getElementById('tutor-messages-container');
+    if (!container) return;
+
+    // Render User Bubble
+    const userMsgHtml = `
+      <div class="flex items-start justify-end gap-3 animate-fade-in">
+        <div class="bg-blue-600 text-white rounded-2xl p-4 max-w-2xl text-xs shadow-md">
+          ${this.escapeHtml(query)}
+        </div>
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-700 to-indigo-700 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">
+          VS
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', userMsgHtml);
+
+    // Render Loading Placeholder
+    const loadingId = `tutor-loading-${Date.now()}`;
+    const loadingHtml = `
+      <div id="${loadingId}" class="flex items-start gap-3 animate-fade-in">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">
+          AI
+        </div>
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-slate-400 flex items-center space-x-2">
+          <span class="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
+          <span>Synthesizing response in ${this.currentTeachingMode} mode...</span>
+        </div>
+      </div>
+    `;
+    container.insertAdjacentHTML('beforeend', loadingHtml);
+    container.scrollTop = container.scrollHeight;
+
+    const subId = document.getElementById('tutor-subject-select')?.value || null;
+    const docId = document.getElementById('tutor-doc-select')?.value || null;
+
+    try {
+      const res = await fetch('/api/tutor/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query,
+          teaching_mode: this.currentTeachingMode,
+          subject_id: subId,
+          document_id: docId
+        })
+      });
+      const data = await res.json();
+      document.getElementById(loadingId)?.remove();
+
+      const parsedContent = window.marked ? window.marked.parse(data.response || '') : this.escapeHtml(data.response || '');
+      const citationsHtml = (data.citations && data.citations.length > 0) ? `
+        <div class="pt-2 border-t border-white/10 text-[11px] text-slate-400 space-y-1">
+          <span class="font-bold text-blue-400">📚 Source Citations:</span>
+          <div class="flex flex-wrap gap-1.5">
+            ${data.citations.map(c => `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">${this.escapeHtml(c.document)} (Slide ${c.slide})</span>`).join('')}
+          </div>
+        </div>
+      ` : '';
+
+      const aiMsgHtml = `
+        <div class="flex items-start gap-3 animate-fade-in">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">
+            AI
+          </div>
+          <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200 leading-relaxed space-y-3">
+            <div class="prose prose-invert prose-sm max-w-none">${parsedContent}</div>
+            ${citationsHtml}
+            <div class="pt-2 flex items-center space-x-2">
+              <button onclick="App.speakText(decodeURIComponent('${encodeURIComponent(data.response || '')}'))" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] flex items-center space-x-1" title="Read Aloud">
+                <i data-lucide="volume-2" class="w-3.5 h-3.5 text-cyan-400"></i>
+                <span>Listen</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+      container.insertAdjacentHTML('beforeend', aiMsgHtml);
+      this.initLucide();
+      container.scrollTop = container.scrollHeight;
+    } catch (e) {
+      document.getElementById(loadingId)?.remove();
+      container.insertAdjacentHTML('beforeend', `
+        <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+          Error: ${e.message}
+        </div>
+      `);
+    }
+  },
+
+  sendQuickTutorPrompt(promptText) {
+    const input = document.getElementById('tutor-chat-input');
+    if (input) {
+      input.value = promptText;
+      this.handleTutorSend();
+    }
+  },
+
+  clearTutorChat() {
+    const container = document.getElementById('tutor-messages-container');
+    if (container) {
+      container.innerHTML = `
+        <div class="flex items-start gap-3 animate-fade-in">
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">AI</div>
+          <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200">
+            <p class="font-semibold text-white">Chat cleared. What topic shall we master next, Vishal?</p>
+          </div>
+        </div>
+      `;
+    }
+  },
+
+  toggleSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert('Speech Recognition is not supported by your browser. Please use Chrome, Edge, or Safari.');
+      return;
+    }
+
+    const btn = document.getElementById('tutor-voice-btn');
+    if (this.isListening) {
+      this.isListening = false;
+      btn?.classList.remove('voice-pulse', 'bg-rose-600', 'text-white');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onstart = () => {
+      this.isListening = true;
+      btn?.classList.add('voice-pulse', 'bg-rose-600', 'text-white');
+    };
+
+    recognition.onresult = (e) => {
+      const transcript = e.results[0][0].transcript;
+      const input = document.getElementById('tutor-chat-input');
+      if (input) {
+        input.value = transcript;
+        this.handleTutorSend();
+      }
+    };
+
+    recognition.onerror = (e) => {
+      console.warn('Speech error:', e);
+      this.isListening = false;
+      btn?.classList.remove('voice-pulse', 'bg-rose-600', 'text-white');
+    };
+
+    recognition.onend = () => {
+      this.isListening = false;
+      btn?.classList.remove('voice-pulse', 'bg-rose-600', 'text-white');
+    };
+
+    recognition.start();
+  },
+
+  speakText(text) {
+    if (!('speechSynthesis' in window)) {
+      alert('Speech synthesis is not supported on this device.');
+      return;
+    }
+    window.speechSynthesis.cancel();
+    const clean = text.replace(/[*#`_>-]/g, ' ');
+    const utterance = new SpeechSynthesisUtterance(clean.substring(0, 500));
+    utterance.rate = 1.0;
+    utterance.pitch = 1.0;
+    window.speechSynthesis.speak(utterance);
+  },
+
+  // ==================== PRACTICE HUB (CASES, INTERVIEWS, MOCK EXAMS) ====================
+  activePracticeTab: 'cases',
+
+  async loadPracticePage() {
+    this.switchPracticeTab(this.activePracticeTab);
+    const mockSelect = document.getElementById('mock-subject-select');
+    if (mockSelect) {
+      mockSelect.innerHTML = this.state.subjects.map(s => `<option value="${s.id}">${this.escapeHtml(s.name)}</option>`).join('');
+    }
+  },
+
+  switchPracticeTab(tab) {
+    this.activePracticeTab = tab;
+    document.querySelectorAll('.practice-tab-pill').forEach(btn => {
+      if (btn.getAttribute('data-practice-tab') === tab) {
+        btn.className = 'practice-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 shadow-sm transition';
+      } else {
+        btn.className = 'practice-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition';
+      }
+    });
+
+    ['cases', 'interviews', 'mock-exams'].forEach(t => {
+      const el = document.getElementById(`practice-tab-${t}`);
+      if (el) el.classList.toggle('hidden', t !== tab);
+    });
+
+    if (tab === 'cases') this.loadCasesArchive();
+    if (tab === 'interviews') this.loadInterviewsHistory();
+  },
+
+  async loadCasesArchive() {
+    const list = document.getElementById('cases-archive-list');
+    if (!list) return;
+    try {
+      const data = await API.getCases();
+      const cases = data.cases || [];
+      if (cases.length === 0) {
+        list.innerHTML = `<p class="text-xs text-slate-400 italic">No business cases generated yet. Click 'Generate Case' above.</p>`;
+        return;
+      }
+      list.innerHTML = cases.map(c => `
+        <div class="glass-panel p-4 rounded-2xl flex items-center justify-between gap-4">
+          <div class="space-y-1">
+            <div class="flex items-center space-x-2">
+              <span class="text-xs font-bold text-white">${this.escapeHtml(c.title)}</span>
+              <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-300 font-semibold">${c.role}</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Industry: ${c.industry} • Status: ${c.status} • Score: <strong class="text-indigo-400">${c.score || 0}%</strong></p>
+          </div>
+          <button onclick="App.openCaseDetail('${c.id}')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white text-xs border border-white/10">View Case</button>
+        </div>
+      `).join('');
+    } catch (e) {
+      list.innerHTML = `<p class="text-xs text-rose-400">Notice: ${e.message}</p>`;
+    }
+  },
+
+  async generateNewCase() {
+    const role = document.getElementById('case-role-select')?.value || 'Product Manager';
+    const diff = document.getElementById('case-difficulty-select')?.value || 'Medium';
+
+    const activeView = document.getElementById('active-case-view');
+    if (!activeView) return;
+    activeView.classList.remove('hidden');
+    activeView.innerHTML = `<div class="glass-panel p-8 rounded-3xl text-center text-xs text-slate-300"><span class="w-3 h-3 rounded-full bg-indigo-500 animate-ping inline-block mr-2"></span> Synthesizing realistic ${role} case study...</div>`;
+
+    try {
+      const caseObj = await API.generateCase({ role, difficulty: diff });
+      this.renderActiveCase(caseObj);
+    } catch (e) {
+      activeView.innerHTML = `<div class="p-4 rounded-2xl bg-rose-500/10 text-rose-300 text-xs">Error: ${e.message}</div>`;
+    }
+  },
+
+  renderActiveCase(c) {
+    const activeView = document.getElementById('active-case-view');
+    if (!activeView) return;
+    activeView.classList.remove('hidden');
+
+    const d = c.case_data || {};
+    const metricsHtml = (d.market_and_financial_data || []).map(m => `
+      <div class="p-3 rounded-xl bg-white/5 border border-white/10 text-center">
+        <span class="text-[10px] text-slate-400 block">${m.metric}</span>
+        <span class="text-sm font-extrabold text-white">${m.value}</span>
+        <span class="text-[10px] text-indigo-400 font-semibold block">${m.trend}</span>
+      </div>
+    `).join('');
+
+    const deliverablesHtml = (d.deliverables || []).map(dl => `<li class="text-xs text-slate-300 font-medium">${dl}</li>`).join('');
+
+    activeView.innerHTML = `
+      <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-6">
+        <div class="flex items-center justify-between pb-4 border-b border-white/10">
+          <div>
+            <span class="text-xs font-bold text-indigo-400 uppercase tracking-wider">${c.role} • ${c.industry}</span>
+            <h3 class="text-xl font-extrabold text-white mt-1">${this.escapeHtml(d.title || c.title)}</h3>
+          </div>
+          <span class="text-xs px-3 py-1 rounded-full bg-white/5 border border-white/10 text-slate-300">${c.difficulty}</span>
+        </div>
+
+        <div class="space-y-3">
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider">Executive Scenario</h4>
+          <p class="text-xs text-slate-300 leading-relaxed">${this.escapeHtml(d.executive_summary || '')}</p>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          ${metricsHtml}
+        </div>
+
+        <div class="space-y-2">
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider">Expected Deliverables</h4>
+          <ul class="list-disc pl-5 space-y-1">${deliverablesHtml}</ul>
+        </div>
+
+        <!-- Student Solution Area -->
+        <div class="space-y-3 pt-4 border-t border-white/10">
+          <div class="flex items-center justify-between">
+            <h4 class="text-xs font-bold text-white uppercase tracking-wider">Your Executive Solution</h4>
+            <span class="text-[11px] text-slate-400">Graded against 8 MBA rubrics</span>
+          </div>
+          <textarea 
+            id="student-case-textarea"
+            rows="6" 
+            placeholder="Structure your answer: 1) Problem Framing & Diagnosis, 2) Strategic Prioritization & Tradeoffs, 3) Quantified Impact & Success Metrics..."
+            class="w-full p-4 text-xs bg-white/5 border border-white/10 rounded-2xl text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+          ></textarea>
+          <div class="flex justify-end">
+            <button onclick="App.submitCaseAttempt('${c.id}')" class="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-2">
+              <i data-lucide="check-square" class="w-4 h-4"></i>
+              <span>Submit for Executive Evaluation</span>
+            </button>
+          </div>
+        </div>
+
+        <div id="case-evaluation-results" class="hidden space-y-4 pt-4 border-t border-white/10"></div>
+      </div>
+    `;
+    this.initLucide();
+  },
+
+  async submitCaseAttempt(caseId) {
+    const text = document.getElementById('student-case-textarea')?.value || '';
+    if (!text.trim() || text.length < 30) {
+      alert('Please provide a substantive answer (at least 30 characters) to evaluate against the 8 rubrics.');
+      return;
+    }
+
+    const evalContainer = document.getElementById('case-evaluation-results');
+    if (!evalContainer) return;
+    evalContainer.classList.remove('hidden');
+    evalContainer.innerHTML = `<div class="p-6 text-center text-xs text-slate-400"><span class="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping inline-block mr-2"></span> Executive faculty evaluating solution across 8 MBA rubrics...</div>`;
+
+    try {
+      const res = await API.submitCase(caseId, text);
+      const ev = res.evaluation || {};
+
+      const rubricsHtml = (ev.rubric_scores || []).map(r => `
+        <div class="p-3 rounded-xl bg-white/5 border border-white/10 space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="text-xs font-bold text-white">${r.rubric}</span>
+            <span class="text-xs font-bold text-indigo-400">${r.score}/${r.max}</span>
+          </div>
+          <p class="text-[11px] text-slate-300 leading-tight">${r.comment}</p>
+        </div>
+      `).join('');
+
+      evalContainer.innerHTML = `
+        <div class="space-y-4 animate-fade-in">
+          <div class="flex items-center justify-between p-4 rounded-2xl bg-indigo-500/10 border border-indigo-500/30">
+            <div>
+              <span class="text-[10px] uppercase font-bold text-indigo-400">Overall Score</span>
+              <h4 class="text-2xl font-black text-white">${res.score}%</h4>
+            </div>
+            <p class="text-xs text-slate-300 max-w-md">${this.escapeHtml(ev.executive_feedback || '')}</p>
+          </div>
+
+          <h5 class="text-xs font-bold text-white uppercase tracking-wider">Rubric Evaluation Breakdown</h5>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${rubricsHtml}</div>
+
+          <div class="p-5 rounded-2xl bg-white/5 border border-white/10 space-y-2">
+            <h5 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Benchmark 1% Model Answer</h5>
+            <div class="text-xs text-slate-200 prose prose-invert prose-sm max-w-none">
+              ${window.marked ? window.marked.parse(ev.model_answer || '') : this.escapeHtml(ev.model_answer || '')}
+            </div>
+          </div>
+        </div>
+      `;
+      this.loadCasesArchive();
+      this.initLucide();
+    } catch (e) {
+      evalContainer.innerHTML = `<div class="p-3 rounded-xl bg-rose-500/10 text-rose-300 text-xs">Error: ${e.message}</div>`;
+    }
+  },
+
+  // ==================== REVISION HUB (SM-2 FLASHCARDS & DOUBTS) ====================
+  activeRevisionTab: 'flashcards',
+  flashcardsList: [],
+  currentCardIndex: 0,
+  isCardFlipped: false,
+
+  async loadRevisionPage() {
+    this.switchRevisionTab(this.activeRevisionTab);
+  },
+
+  switchRevisionTab(tab) {
+    this.activeRevisionTab = tab;
+    document.querySelectorAll('.revision-tab-pill').forEach(btn => {
+      if (btn.getAttribute('data-revision-tab') === tab) {
+        btn.className = 'revision-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-amber-600 shadow-sm transition';
+      } else {
+        btn.className = 'revision-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition';
+      }
+    });
+
+    ['flashcards', 'doubts', 'prerequisites'].forEach(t => {
+      const el = document.getElementById(`revision-tab-${t}`);
+      if (el) el.classList.toggle('hidden', t !== tab);
+    });
+
+    if (tab === 'flashcards') this.loadFlashcards();
+    if (tab === 'doubts') this.loadDoubts();
+    if (tab === 'prerequisites') this.loadPrerequisiteGaps();
+  },
+
+  async loadFlashcards() {
+    try {
+      const dueData = await API.getDueFlashcards();
+      const allData = await API.getAllFlashcards();
+      this.flashcardsList = dueData.due_flashcards && dueData.due_flashcards.length > 0 ? dueData.due_flashcards : (allData.flashcards || []);
+      this.currentCardIndex = 0;
+      this.isCardFlipped = false;
+
+      const dueBadge = document.getElementById('due-flashcards-badge');
+      if (dueBadge) dueBadge.innerText = `Due Today: ${dueData.count || 0}`;
+      const totalBadge = document.getElementById('total-flashcards-badge');
+      if (totalBadge) totalBadge.innerText = `Total Cards: ${allData.count || 0}`;
+
+      this.renderFlashcardPlayer();
+    } catch (e) {
+      console.warn('Flashcards load notice:', e);
+    }
+  },
+
+  renderFlashcardPlayer() {
+    const container = document.getElementById('flashcard-player-container');
+    if (!container) return;
+
+    if (!this.flashcardsList || this.flashcardsList.length === 0) {
+      container.innerHTML = `
+        <div class="glass-panel p-10 rounded-3xl text-center space-y-4">
+          <i data-lucide="award" class="w-12 h-12 text-amber-400 mx-auto"></i>
+          <h3 class="text-base font-bold text-white">All Caught Up!</h3>
+          <p class="text-xs text-slate-400">Zero flashcards due right now. Open any uploaded presentation to auto-generate concept cards or add custom cards.</p>
+        </div>
+      `;
+      this.initLucide();
+      return;
+    }
+
+    const card = this.flashcardsList[this.currentCardIndex];
+    container.innerHTML = `
+      <div class="space-y-4">
+        <div class="flex items-center justify-between text-xs text-slate-400">
+          <span>Card ${this.currentCardIndex + 1} of ${this.flashcardsList.length} • Concept: <strong class="text-slate-200">${this.escapeHtml(card.concept_name)}</strong></span>
+          <span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-amber-300">Repetitions: ${card.repetitions || 0}</span>
+        </div>
+
+        <!-- 3D Flip Card Container -->
+        <div class="flashcard-3d-scene w-full h-72">
+          <div id="flashcard-card-inner" class="flashcard-inner ${this.isCardFlipped ? 'is-flipped' : ''}" onclick="App.flipCurrentCard()">
+            <!-- Front Face -->
+            <div class="flashcard-face glass-panel p-8 flex flex-col justify-between border-2 border-white/10 hover:border-amber-500/40 transition">
+              <span class="text-[10px] uppercase font-bold text-slate-400 text-left">Front • Click anywhere to flip</span>
+              <p class="text-base sm:text-lg font-bold text-white my-auto px-4">${this.escapeHtml(card.front)}</p>
+              <div class="text-[11px] text-amber-400 font-semibold text-center flex items-center justify-center space-x-1">
+                <i data-lucide="rotate-cw" class="w-3.5 h-3.5"></i>
+                <span>Tap to reveal answer</span>
+              </div>
+            </div>
+
+            <!-- Back Face -->
+            <div class="flashcard-face flashcard-face-back glass-panel p-8 flex flex-col justify-between border-2 border-amber-500/50 bg-[#0E1626]">
+              <span class="text-[10px] uppercase font-bold text-amber-400 text-left">Back • Strategic Explanation</span>
+              <p class="text-xs sm:text-sm text-slate-200 my-auto px-4 leading-relaxed">${this.escapeHtml(card.back)}</p>
+              <span class="text-[10px] text-slate-400">Rate your active recall below to calibrate SM-2 interval</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- SM-2 Rating Buttons -->
+        <div class="grid grid-cols-4 gap-2 pt-2">
+          <button onclick="App.rateFlashcard('${card.id}', 0)" class="py-2.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 font-bold text-xs border border-rose-500/30 transition flex flex-col items-center">
+            <span>Again</span>
+            <span class="text-[9px] font-normal text-rose-400 mt-0.5">Reset (1d)</span>
+          </button>
+          <button onclick="App.rateFlashcard('${card.id}', 1)" class="py-2.5 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 font-bold text-xs border border-amber-500/30 transition flex flex-col items-center">
+            <span>Difficult</span>
+            <span class="text-[9px] font-normal text-amber-400 mt-0.5">Hard (1d)</span>
+          </button>
+          <button onclick="App.rateFlashcard('${card.id}', 2)" class="py-2.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 font-bold text-xs border border-blue-500/30 transition flex flex-col items-center">
+            <span>Good</span>
+            <span class="text-[9px] font-normal text-blue-400 mt-0.5">Optimal SM-2</span>
+          </button>
+          <button onclick="App.rateFlashcard('${card.id}', 3)" class="py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 font-bold text-xs border border-emerald-500/30 transition flex flex-col items-center">
+            <span>Easy</span>
+            <span class="text-[9px] font-normal text-emerald-400 mt-0.5">Bonus Interval</span>
+          </button>
+        </div>
+      </div>
+    `;
+    this.initLucide();
+  },
+
+  flipCurrentCard() {
+    this.isCardFlipped = !this.isCardFlipped;
+    const inner = document.getElementById('flashcard-card-inner');
+    if (inner) {
+      inner.classList.toggle('is-flipped', this.isCardFlipped);
+    }
+  },
+
+  async rateFlashcard(cardId, rating) {
+    try {
+      await API.reviewFlashcard(cardId, rating);
+      this.isCardFlipped = false;
+      this.currentCardIndex++;
+      if (this.currentCardIndex >= this.flashcardsList.length) {
+        await this.loadFlashcards();
+      } else {
+        this.renderFlashcardPlayer();
+      }
+    } catch (e) {
+      alert(e.message || 'Review failed');
+    }
+  },
+
+  // ==================== DOUBT NOTEBOOK ====================
+  currentDoubtFilter: 'All',
+
+  async loadDoubts() {
+    const list = document.getElementById('doubts-list-container');
+    if (!list) return;
+    try {
+      const data = await API.getDoubts({ status: this.currentDoubtFilter });
+      const doubts = data.doubts || [];
+
+      if (doubts.length === 0) {
+        list.innerHTML = `<div class="glass-panel p-8 rounded-3xl text-center text-xs text-slate-400">No doubts recorded in this status.</div>`;
+        return;
+      }
+
+      list.innerHTML = doubts.map(d => {
+        const statusColors = {
+          Unresolved: 'bg-rose-500/20 text-rose-300 border-rose-500/30',
+          Understood: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+          'Needs Revision': 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+        };
+        const badge = statusColors[d.status] || 'bg-white/10 text-slate-300 border-white/10';
+
+        return `
+          <div class="glass-panel p-6 rounded-3xl space-y-3">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div class="space-y-1">
+                <div class="flex items-center space-x-2">
+                  <h4 class="text-sm font-bold text-white">${this.escapeHtml(d.title)}</h4>
+                  <span class="text-[10px] font-semibold px-2.5 py-0.5 rounded-full border ${badge}">${d.status}</span>
+                </div>
+                <p class="text-xs text-slate-400">Concept: ${this.escapeHtml(d.concept_name || 'General')} • Slide: ${d.slide_number || 1}</p>
+              </div>
+
+              <div class="flex items-center space-x-2">
+                <select onchange="App.updateDoubtStatus('${d.id}', this.value)" class="px-2.5 py-1 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-300">
+                  <option value="Unresolved" ${d.status === 'Unresolved' ? 'selected' : ''}>Unresolved</option>
+                  <option value="Needs Revision" ${d.status === 'Needs Revision' ? 'selected' : ''}>Needs Revision</option>
+                  <option value="Understood" ${d.status === 'Understood' ? 'selected' : ''}>Understood</option>
+                </select>
+                <button onclick="App.convertDoubtToFlashcard('${d.id}')" class="px-3 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 text-xs font-semibold border border-amber-500/30" title="Convert to Flashcard">
+                  To Card
+                </button>
+              </div>
+            </div>
+
+            <p class="text-xs text-slate-300 bg-white/[0.02] p-3 rounded-xl border border-white/5">
+              <strong>Question:</strong> ${this.escapeHtml(d.doubt_text)}
+            </p>
+
+            ${d.ai_resolution ? `
+              <div class="p-3.5 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs text-slate-200 leading-relaxed">
+                <span class="font-bold text-blue-400 block mb-1">💡 AI Pedagogical Resolution:</span>
+                ${window.marked ? window.marked.parse(d.ai_resolution) : this.escapeHtml(d.ai_resolution)}
+              </div>
+            ` : ''}
+
+            <div class="flex justify-end pt-1">
+              <button onclick="App.resolveDoubt('${d.id}')" class="text-xs text-blue-400 hover:text-blue-300 flex items-center space-x-1">
+                <i data-lucide="sparkles" class="w-3.5 h-3.5"></i>
+                <span>Ask AI to clarify further</span>
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+      this.initLucide();
+    } catch (e) {
+      list.innerHTML = `<div class="p-4 text-xs text-rose-400">Error: ${e.message}</div>`;
+    }
+  },
+
+  filterDoubts(status) {
+    this.currentDoubtFilter = status;
+    document.querySelectorAll('.doubt-filter-pill').forEach(btn => {
+      const target = btn.getAttribute('data-doubt-filter');
+      if (target === status) {
+        btn.className = 'doubt-filter-pill px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white';
+      } else {
+        btn.className = 'doubt-filter-pill px-3 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300';
+      }
+    });
+    this.loadDoubts();
+  },
+
+  async updateDoubtStatus(doubtId, status) {
+    try {
+      await API.updateDoubtStatus(doubtId, status);
+      this.loadDoubts();
+    } catch (e) {
+      alert(e.message || 'Status update failed');
+    }
+  },
+
+  async convertDoubtToFlashcard(doubtId) {
+    try {
+      await API.convertDoubtToFlashcard(doubtId);
+      alert('Successfully converted doubt into an active SM-2 flashcard!');
+      this.loadDoubts();
+    } catch (e) {
+      alert(e.message || 'Conversion failed');
+    }
+  },
+
+  async resolveDoubt(doubtId) {
+    const prompt = window.prompt('Any specific clarification or example you want to focus on?');
+    try {
+      await API.resolveDoubtWithAI(doubtId, prompt || '');
+      this.loadDoubts();
+    } catch (e) {
+      alert(e.message || 'AI resolution failed');
+    }
+  },
+
+  openCreateDoubtModal() {
+    const title = window.prompt('Doubt / Question Title:');
+    if (!title) return;
+    const body = window.prompt('Describe your doubt in detail:');
+    if (!body) return;
+
+    API.createDoubt({ title, doubt_text: body, auto_resolve: true })
+      .then(() => this.loadDoubts())
+      .catch(e => alert(e.message));
+  },
+
+  openCreateFlashcardModal() {
+    const front = window.prompt('Front of card (Question or Key Term):');
+    if (!front) return;
+    const back = window.prompt('Back of card (Answer or Concept Breakdown):');
+    if (!back) return;
+
+    API.createFlashcard({ front, back, concept_name: 'Custom' })
+      .then(() => this.loadFlashcards())
+      .catch(e => alert(e.message));
+  },
+
+  // ==================== PREREQUISITE GAP DETECTOR ====================
+  async loadPrerequisiteGaps() {
+    const container = document.getElementById('prerequisite-gaps-container');
+    if (!container) return;
+    try {
+      const data = await API.getPrerequisiteGaps();
+      const gaps = data.gaps || [];
+
+      container.innerHTML = gaps.map(g => `
+        <div class="glass-panel p-6 rounded-3xl space-y-3">
+          <div class="flex items-center justify-between">
+            <h4 class="text-sm font-bold text-white flex items-center space-x-2">
+              <i data-lucide="alert-circle" class="w-4 h-4 text-cyan-400"></i>
+              <span>Concept: ${this.escapeHtml(g.struggling_concept)}</span>
+            </h4>
+            <span class="text-xs px-2.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 font-semibold border border-cyan-500/30">
+              Mastery Score: ${g.recent_score}%
+            </span>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-1.5">
+            <span class="text-[11px] font-bold text-slate-400 uppercase tracking-wider block">Identified Prerequisite Gaps:</span>
+            <div class="flex flex-wrap gap-1.5">
+              ${g.missing_prerequisites.map(p => `<span class="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-semibold">${p}</span>`).join('')}
+            </div>
+          </div>
+
+          <div class="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-xs text-purple-200">
+            <strong>Diagnostic Check Question:</strong> ${this.escapeHtml(g.diagnostic_check)}
+          </div>
+        </div>
+      `).join('');
+      this.initLucide();
+    } catch (e) {
+      container.innerHTML = `<div class="p-4 text-xs text-rose-400">Error: ${e.message}</div>`;
+    }
+  },
+
+  // ==================== MBA TOOLS (FRAMEWORKS & CALCULATORS) ====================
+  activeMbaToolsTab: 'frameworks',
+  currentCalculator: 'ltv-cac',
+  frameworksList: [],
+
+  async loadMbaToolsPage() {
+    this.switchMbaToolsTab(this.activeMbaToolsTab);
+  },
+
+  switchMbaToolsTab(tab) {
+    this.activeMbaToolsTab = tab;
+    document.querySelectorAll('.mba-tab-pill').forEach(btn => {
+      if (btn.getAttribute('data-mba-tools-tab') === tab) {
+        btn.className = 'mba-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold text-white bg-emerald-600 shadow-sm transition';
+      } else {
+        btn.className = 'mba-tab-pill px-3.5 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition';
+      }
+    });
+
+    ['frameworks', 'calculators'].forEach(t => {
+      const el = document.getElementById(`mba-tools-tab-${t}`);
+      if (el) el.classList.toggle('hidden', t !== tab);
+    });
+
+    if (tab === 'frameworks') this.loadFrameworks();
+    if (tab === 'calculators') this.selectCalculator(this.currentCalculator);
+  },
+
+  async loadFrameworks(category = '', search = '') {
+    const grid = document.getElementById('frameworks-grid-container');
+    if (!grid) return;
+    try {
+      const data = await API.getFrameworks(category, search);
+      this.frameworksList = data.frameworks || [];
+
+      grid.innerHTML = this.frameworksList.map(fw => `
+        <div class="glass-panel p-6 rounded-3xl border border-white/10 hover:border-emerald-500/40 transition flex flex-col justify-between space-y-4">
+          <div class="space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-[10px] uppercase font-bold text-emerald-400 tracking-wider">${fw.category}</span>
+              <i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i>
+            </div>
+            <h4 class="text-base font-bold text-white">${this.escapeHtml(fw.name)}</h4>
+            <p class="text-xs text-slate-300 leading-snug">${this.escapeHtml(fw.tagline)}</p>
+          </div>
+
+          <div class="pt-3 border-t border-white/10 flex items-center justify-between">
+            <span class="text-[11px] text-slate-400">${fw.components.length} Elements</span>
+            <button onclick="App.openFrameworkDetail('${fw.id}')" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-emerald-300 hover:text-white text-xs font-semibold border border-white/10 transition">
+              Explore & Notes
+            </button>
+          </div>
+        </div>
+      `).join('');
+      this.initLucide();
+    } catch (e) {
+      grid.innerHTML = `<div class="p-4 text-xs text-rose-400 col-span-3">Notice: ${e.message}</div>`;
+    }
+  },
+
+  filterFrameworks(query) {
+    this.loadFrameworks('', query);
+  },
+
+  filterFrameworksCategory(category) {
+    this.loadFrameworks(category === 'All' ? '' : category, '');
+  },
+
+  async openFrameworkDetail(fwId) {
+    try {
+      const fw = await API.getFrameworkDetail(fwId);
+      const componentsHtml = (fw.components || []).map(c => `<li class="text-xs text-slate-200">${c}</li>`).join('');
+      const noteVal = fw.user_notes || '';
+
+      const modalHtml = `
+        <div id="framework-detail-modal" class="fixed inset-0 z-50 bg-black/75 backdrop-blur-md flex items-center justify-center p-4">
+          <div class="glass-panel max-w-xl w-full p-6 sm:p-8 rounded-3xl space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto">
+            <div class="flex items-center justify-between pb-3 border-b border-white/10">
+              <div>
+                <span class="text-[10px] font-bold uppercase text-emerald-400">${fw.category}</span>
+                <h3 class="text-xl font-bold text-white">${fw.name}</h3>
+              </div>
+              <button onclick="document.getElementById('framework-detail-modal').remove()" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white">
+                <i data-lucide="x" class="w-4 h-4"></i>
+              </button>
+            </div>
+
+            <div class="space-y-2">
+              <h4 class="text-xs font-bold text-white uppercase tracking-wider">Core Components</h4>
+              <ul class="list-disc pl-5 space-y-1">${componentsHtml}</ul>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-1">
+              <span class="text-[11px] font-bold text-emerald-400 block">When to Use:</span>
+              <p class="text-xs text-slate-300 leading-relaxed">${this.escapeHtml(fw.when_to_use)}</p>
+            </div>
+
+            <div class="p-4 rounded-2xl bg-white/[0.02] border border-white/10 space-y-1">
+              <span class="text-[11px] font-bold text-cyan-400 block">Worked Example:</span>
+              <p class="text-xs text-slate-300 leading-relaxed">${this.escapeHtml(fw.example)}</p>
+            </div>
+
+            <!-- Persistent Framework Notes -->
+            <div class="space-y-2 pt-2 border-t border-white/10">
+              <h4 class="text-xs font-bold text-white uppercase tracking-wider">Your Framework Study Notes</h4>
+              <textarea id="framework-user-notes" rows="3" class="w-full p-3 text-xs bg-white/5 border border-white/10 rounded-xl text-slate-200 placeholder-slate-500">${this.escapeHtml(noteVal)}</textarea>
+              <div class="flex justify-end">
+                <button onclick="App.saveFrameworkNotes('${fw.id}')" class="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition">
+                  Save Notes
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+      document.body.insertAdjacentHTML('beforeend', modalHtml);
+      this.initLucide();
+    } catch (e) {
+      alert(e.message);
+    }
+  },
+
+  async saveFrameworkNotes(fwId) {
+    const notes = document.getElementById('framework-user-notes')?.value || '';
+    try {
+      await API.saveFrameworkNotes(fwId, notes);
+      alert('Framework notes saved successfully!');
+      document.getElementById('framework-detail-modal')?.remove();
+    } catch (e) {
+      alert(e.message || 'Failed to save notes');
+    }
+  },
+
+  // ==================== DETERMINISTIC QUANTITATIVE CALCULATORS ====================
+  selectCalculator(calcId) {
+    this.currentCalculator = calcId;
+    document.querySelectorAll('.calc-sel-pill').forEach(btn => {
+      if (btn.getAttribute('data-calc-btn') === calcId) {
+        btn.className = 'calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-emerald-600 text-white';
+      } else {
+        btn.className = 'calc-sel-pill px-3.5 py-1.5 rounded-xl text-xs font-medium bg-white/5 text-slate-300';
+      }
+    });
+    this.renderSelectedCalculator(calcId);
+  },
+
+  renderSelectedCalculator(calcId) {
+    const container = document.getElementById('calculator-panel-container');
+    if (!container) return;
+
+    if (calcId === 'ltv-cac') {
+      container.innerHTML = `
+        <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-6">
+          <div class="pb-3 border-b border-white/10">
+            <h3 class="text-base font-bold text-white">LTV:CAC Unit Economics Calculator</h3>
+            <p class="text-xs text-slate-400">Formula: LTV = (ARPU × Gross Margin %) / Churn Rate • Target Ratio ≥ 3.0x</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">ARPU ($/month)</label>
+              <input id="calc-arpu" type="number" value="120" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Gross Margin (%)</label>
+              <input id="calc-gm" type="number" value="80" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Monthly Churn (%)</label>
+              <input id="calc-churn" type="number" step="0.1" value="4.0" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">CAC ($)</label>
+              <input id="calc-cac" type="number" value="600" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+          </div>
+          <button onclick="App.runLtvCacCalc()" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition">
+            Compute Deterministic LTV:CAC
+          </button>
+          <div id="calc-results-output" class="space-y-3 pt-4 border-t border-white/10"></div>
+        </div>
+      `;
+    } else if (calcId === 'npv') {
+      container.innerHTML = `
+        <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-6">
+          <div class="pb-3 border-b border-white/10">
+            <h3 class="text-base font-bold text-white">Net Present Value (NPV) & Payback Calculator</h3>
+            <p class="text-xs text-slate-400">Formula: NPV = Σ [CF_t / (1 + r)^t] - C_0</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Initial Outlay ($)</label>
+              <input id="calc-npv-c0" type="number" value="100000" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Discount Rate / WACC (%)</label>
+              <input id="calc-npv-r" type="number" step="0.5" value="10.0" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+          </div>
+          <div>
+            <label class="text-[11px] font-bold text-slate-400 block mb-1">Annual Cash Flows (Comma-separated, e.g. 35000, 45000, 50000)</label>
+            <input id="calc-npv-flows" type="text" value="35000, 45000, 50000, 30000" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+          </div>
+          <button onclick="App.runNpvCalc()" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition">
+            Compute Deterministic NPV
+          </button>
+          <div id="calc-results-output" class="space-y-3 pt-4 border-t border-white/10"></div>
+        </div>
+      `;
+    } else if (calcId === 'breakeven') {
+      container.innerHTML = `
+        <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-6">
+          <div class="pb-3 border-b border-white/10">
+            <h3 class="text-base font-bold text-white">Cost-Volume-Profit Break-Even Calculator</h3>
+            <p class="text-xs text-slate-400">Formula: Break-even Units = Fixed Costs / (Price - Variable Cost)</p>
+          </div>
+          <div class="grid grid-cols-3 gap-4">
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Fixed Costs ($)</label>
+              <input id="calc-be-fc" type="number" value="50000" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Price per Unit ($)</label>
+              <input id="calc-be-price" type="number" value="100" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Variable Cost ($)</label>
+              <input id="calc-be-vc" type="number" value="40" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+          </div>
+          <button onclick="App.runBreakevenCalc()" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition">
+            Compute Break-Even Point
+          </button>
+          <div id="calc-results-output" class="space-y-3 pt-4 border-t border-white/10"></div>
+        </div>
+      `;
+    } else {
+      // General RICE / WACC / EOQ
+      container.innerHTML = `
+        <div class="glass-panel p-6 sm:p-8 rounded-3xl space-y-6">
+          <div class="pb-3 border-b border-white/10">
+            <h3 class="text-base font-bold text-white">RICE Product Prioritization Calculator</h3>
+            <p class="text-xs text-slate-400">Formula: Score = (Reach × Impact × Confidence %) / Effort</p>
+          </div>
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Reach (Target users/qtr)</label>
+              <input id="calc-rice-reach" type="number" value="10000" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Impact Multiplier (0.25 to 3.0)</label>
+              <input id="calc-rice-impact" type="number" step="0.5" value="2.0" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Confidence (%)</label>
+              <input id="calc-rice-conf" type="number" value="80" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+            <div>
+              <label class="text-[11px] font-bold text-slate-400 block mb-1">Effort (Person-weeks)</label>
+              <input id="calc-rice-effort" type="number" value="4" class="w-full p-2.5 bg-white/5 border border-white/10 rounded-xl text-white text-xs">
+            </div>
+          </div>
+          <button onclick="App.runRiceCalc()" class="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-md transition">
+            Compute RICE Prioritization Score
+          </button>
+          <div id="calc-results-output" class="space-y-3 pt-4 border-t border-white/10"></div>
+        </div>
+      `;
+    }
+  },
+
+  async runLtvCacCalc() {
+    const arpu = parseFloat(document.getElementById('calc-arpu')?.value || 120);
+    const gm = parseFloat(document.getElementById('calc-gm')?.value || 80);
+    const churn = parseFloat(document.getElementById('calc-churn')?.value || 4);
+    const cac = parseFloat(document.getElementById('calc-cac')?.value || 600);
+
+    const out = document.getElementById('calc-results-output');
+    if (!out) return;
+
+    try {
+      const res = await API.calculateLtvCac({ arpu, gross_margin_pct: gm, monthly_churn_pct: churn, cac });
+      out.innerHTML = `
+        <div class="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 animate-fade-in">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-bold">LTV:CAC Ratio</span>
+              <h4 class="text-3xl font-black text-emerald-400">${res.ltv_cac_ratio}x</h4>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 uppercase font-bold">Customer LTV</span>
+              <h4 class="text-xl font-bold text-white">$${res.ltv}</h4>
+            </div>
+          </div>
+          <div class="text-xs text-slate-300">
+            <strong>Strategic Assessment:</strong> ${res.health_status} — ${res.strategic_recommendation}
+          </div>
+          <div class="pt-2 border-t border-white/10 space-y-1">
+            <span class="text-[10px] font-bold text-slate-400 uppercase">Calculation Steps:</span>
+            ${res.calculation_steps.map(s => `<p class="text-[11px] text-slate-300">${s}</p>`).join('')}
+          </div>
+        </div>
+      `;
+    } catch (e) {
+      out.innerHTML = `<div class="p-3 text-xs text-rose-400">${e.message}</div>`;
+    }
+  },
+
+  async runNpvCalc() {
+    const c0 = parseFloat(document.getElementById('calc-npv-c0')?.value || 100000);
+    const r = parseFloat(document.getElementById('calc-npv-r')?.value || 10);
+    const rawFlows = document.getElementById('calc-npv-flows')?.value || '';
+    const flows = rawFlows.split(',').map(s => parseFloat(s.trim())).filter(n => !isNaN(n));
+
+    const out = document.getElementById('calc-results-output');
+    if (!out) return;
+
+    try {
+      const res = await API.calculateNpv({ initial_investment: c0, discount_rate_pct: r, cash_flows: flows });
+      out.innerHTML = `
+        <div class="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 animate-fade-in">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-bold">Net Present Value (NPV)</span>
+              <h4 class="text-3xl font-black ${res.npv >= 0 ? 'text-emerald-400' : 'text-rose-400'}">$${res.npv.toLocaleString()}</h4>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 uppercase font-bold">Payback Period</span>
+              <h4 class="text-lg font-bold text-white">${res.payback_years} Yrs</h4>
+            </div>
+          </div>
+          <p class="text-xs text-slate-200"><strong>Recommendation:</strong> ${res.decision} — ${res.strategic_recommendation}</p>
+        </div>
+      `;
+    } catch (e) {
+      out.innerHTML = `<div class="p-3 text-xs text-rose-400">${e.message}</div>`;
+    }
+  },
+
+  async runBreakevenCalc() {
+    const fc = parseFloat(document.getElementById('calc-be-fc')?.value || 50000);
+    const price = parseFloat(document.getElementById('calc-be-price')?.value || 100);
+    const vc = parseFloat(document.getElementById('calc-be-vc')?.value || 40);
+
+    const out = document.getElementById('calc-results-output');
+    if (!out) return;
+
+    try {
+      const res = await API.calculateBreakeven({ fixed_costs: fc, selling_price_per_unit: price, variable_cost_per_unit: vc });
+      out.innerHTML = `
+        <div class="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 animate-fade-in">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-bold">Break-Even Units</span>
+              <h4 class="text-3xl font-black text-emerald-400">${res.breakeven_units.toLocaleString()} Units</h4>
+            </div>
+            <div class="text-right">
+              <span class="text-[10px] text-slate-400 uppercase font-bold">Break-Even Revenue</span>
+              <h4 class="text-xl font-bold text-white">$${res.breakeven_revenue.toLocaleString()}</h4>
+            </div>
+          </div>
+          <p class="text-xs text-slate-200">${res.strategic_recommendation}</p>
+        </div>
+      `;
+    } catch (e) {
+      out.innerHTML = `<div class="p-3 text-xs text-rose-400">${e.message}</div>`;
+    }
+  },
+
+  async runRiceCalc() {
+    const reach = parseFloat(document.getElementById('calc-rice-reach')?.value || 10000);
+    const impact = parseFloat(document.getElementById('calc-rice-impact')?.value || 2.0);
+    const conf = parseFloat(document.getElementById('calc-rice-conf')?.value || 80);
+    const effort = parseFloat(document.getElementById('calc-rice-effort')?.value || 4);
+
+    const out = document.getElementById('calc-results-output');
+    if (!out) return;
+
+    try {
+      const res = await API.calculateRice({ reach, impact, confidence_pct: conf, effort_person_weeks: effort });
+      out.innerHTML = `
+        <div class="p-5 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 space-y-3 animate-fade-in">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase font-bold">RICE Prioritization Score</span>
+              <h4 class="text-3xl font-black text-emerald-400">${res.rice_score}</h4>
+            </div>
+          </div>
+          <p class="text-xs text-slate-200">${res.strategic_recommendation}</p>
+        </div>
+      `;
+    } catch (e) {
+      out.innerHTML = `<div class="p-3 text-xs text-rose-400">${e.message}</div>`;
+    }
+  },
+
+  // ==================== AI MASCOT (NOVA) ====================
+  mascotTips: [
+    "Tip: Use SM-2 Spaced Repetition flashcards daily to cement MBA terminology into long-term memory!",
+    "Remember: In BCG matrix analysis, never reinvest Cash Cow profits into declining Dogs.",
+    "Exam Strategy: Focus on high-confidence blindspots in your 2×2 calibration matrix before test day.",
+    "Pro Tip: In case interviews, structure your hypothesis using the MECE framework before doing arithmetic.",
+    "You have completed active study today! Keep up the momentum, Vishal."
+  ],
+
+  handleMascotClick() {
+    const speech = document.getElementById('mascot-speech');
+    const textEl = document.getElementById('mascot-speech-text');
+    if (!speech || !textEl) return;
+
+    if (!speech.classList.contains('hidden')) {
+      speech.classList.add('hidden');
+    } else {
+      const tip = this.mascotTips[Math.floor(Math.random() * this.mascotTips.length)];
+      textEl.innerText = tip;
+      speech.classList.remove('hidden');
+      setTimeout(() => { speech.classList.add('hidden'); }, 7000);
+    }
+  },
   handleSearch(query) {
     const dropdown = document.getElementById('search-dropdown');
     if (!dropdown) return;

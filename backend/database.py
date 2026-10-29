@@ -7,6 +7,15 @@ import hashlib
 import secrets
 from typing import List, Dict, Any, Optional
 from datetime import datetime
+from contextlib import contextmanager
+
+@contextmanager
+def get_db():
+    conn = get_connection()
+    try:
+        yield conn
+    finally:
+        conn.close()
 
 def is_cloud_env():
     return bool(
@@ -273,6 +282,138 @@ def _run_init_script(conn):
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
+
+    CREATE TABLE IF NOT EXISTS smart_flashcards (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT NOT NULL,
+        front TEXT NOT NULL,
+        back TEXT NOT NULL,
+        slide_number INTEGER DEFAULT 1,
+        difficulty TEXT DEFAULT 'Medium',
+        interval_days INTEGER DEFAULT 1,
+        ease_factor REAL DEFAULT 2.5,
+        repetitions INTEGER DEFAULT 0,
+        next_review_date TEXT,
+        last_reviewed TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS doubt_notebook (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT DEFAULT '',
+        title TEXT NOT NULL,
+        doubt_text TEXT NOT NULL,
+        ai_resolution TEXT DEFAULT '',
+        slide_number INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'Unresolved',
+        tags TEXT DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS business_cases (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'Product Manager',
+        title TEXT NOT NULL,
+        industry TEXT DEFAULT 'Tech & SaaS',
+        difficulty TEXT DEFAULT 'Medium',
+        case_json TEXT NOT NULL,
+        student_attempt TEXT DEFAULT '',
+        evaluation_json TEXT DEFAULT '{}',
+        score REAL DEFAULT 0.0,
+        status TEXT DEFAULT 'Draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS interview_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        role TEXT NOT NULL DEFAULT 'Product Manager',
+        mode TEXT NOT NULL DEFAULT 'product_sense',
+        difficulty TEXT DEFAULT 'Medium',
+        current_q_index INTEGER DEFAULT 0,
+        questions_json TEXT NOT NULL,
+        responses_json TEXT DEFAULT '[]',
+        evaluation_json TEXT DEFAULT '{}',
+        overall_score REAL DEFAULT 0.0,
+        completed BOOLEAN DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS exam_plans (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        exam_date TEXT,
+        duration_days INTEGER DEFAULT 7,
+        daily_schedule_json TEXT NOT NULL,
+        status TEXT DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS mock_exams (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT NOT NULL,
+        document_id TEXT,
+        title TEXT NOT NULL,
+        time_limit_minutes INTEGER DEFAULT 45,
+        questions_json TEXT NOT NULL,
+        answers_json TEXT DEFAULT '[]',
+        results_json TEXT DEFAULT '{}',
+        score INTEGER DEFAULT 0,
+        total_questions INTEGER DEFAULT 10,
+        accuracy REAL DEFAULT 0.0,
+        completed BOOLEAN DEFAULT 0,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS confidence_logs (
+        id TEXT PRIMARY KEY,
+        quiz_attempt_id TEXT,
+        question_id TEXT,
+        confidence_level TEXT NOT NULL,
+        is_correct BOOLEAN NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_milestones (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        milestone_key TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        badge_icon TEXT DEFAULT 'award',
+        achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS framework_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        framework_id TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        linked_doc_id TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, framework_id) ON CONFLICT REPLACE
+    );
     """)
 
     try:
@@ -317,6 +458,141 @@ def _run_init_script(conn):
 
 def _run_safe_migrations(conn):
     c = conn.cursor()
+    # Ensure new tables exist
+    c.executescript("""
+    CREATE TABLE IF NOT EXISTS smart_flashcards (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT NOT NULL,
+        front TEXT NOT NULL,
+        back TEXT NOT NULL,
+        slide_number INTEGER DEFAULT 1,
+        difficulty TEXT DEFAULT 'Medium',
+        interval_days INTEGER DEFAULT 1,
+        ease_factor REAL DEFAULT 2.5,
+        repetitions INTEGER DEFAULT 0,
+        next_review_date TEXT,
+        last_reviewed TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS doubt_notebook (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT DEFAULT '',
+        title TEXT NOT NULL,
+        doubt_text TEXT NOT NULL,
+        ai_resolution TEXT DEFAULT '',
+        slide_number INTEGER DEFAULT 1,
+        status TEXT DEFAULT 'Unresolved',
+        tags TEXT DEFAULT '[]',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS business_cases (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        document_id TEXT,
+        concept_name TEXT DEFAULT '',
+        role TEXT NOT NULL DEFAULT 'Product Manager',
+        title TEXT NOT NULL,
+        industry TEXT DEFAULT 'Tech & SaaS',
+        difficulty TEXT DEFAULT 'Medium',
+        case_json TEXT NOT NULL,
+        student_attempt TEXT DEFAULT '',
+        evaluation_json TEXT DEFAULT '{}',
+        score REAL DEFAULT 0.0,
+        status TEXT DEFAULT 'Draft',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS interview_sessions (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT,
+        role TEXT NOT NULL DEFAULT 'Product Manager',
+        mode TEXT NOT NULL DEFAULT 'product_sense',
+        difficulty TEXT DEFAULT 'Medium',
+        current_q_index INTEGER DEFAULT 0,
+        questions_json TEXT NOT NULL,
+        responses_json TEXT DEFAULT '[]',
+        evaluation_json TEXT DEFAULT '{}',
+        overall_score REAL DEFAULT 0.0,
+        completed BOOLEAN DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS exam_plans (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT NOT NULL,
+        title TEXT NOT NULL,
+        exam_date TEXT,
+        duration_days INTEGER DEFAULT 7,
+        daily_schedule_json TEXT NOT NULL,
+        status TEXT DEFAULT 'Active',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS mock_exams (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        subject_id TEXT NOT NULL,
+        document_id TEXT,
+        title TEXT NOT NULL,
+        time_limit_minutes INTEGER DEFAULT 45,
+        questions_json TEXT NOT NULL,
+        answers_json TEXT DEFAULT '[]',
+        results_json TEXT DEFAULT '{}',
+        score INTEGER DEFAULT 0,
+        total_questions INTEGER DEFAULT 10,
+        accuracy REAL DEFAULT 0.0,
+        completed BOOLEAN DEFAULT 0,
+        completed_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS confidence_logs (
+        id TEXT PRIMARY KEY,
+        quiz_attempt_id TEXT,
+        question_id TEXT,
+        confidence_level TEXT NOT NULL,
+        is_correct BOOLEAN NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS user_milestones (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        milestone_key TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        badge_icon TEXT DEFAULT 'award',
+        achieved_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+    CREATE TABLE IF NOT EXISTS framework_notes (
+        id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
+        framework_id TEXT NOT NULL,
+        notes TEXT NOT NULL,
+        linked_doc_id TEXT,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(user_id, framework_id) ON CONFLICT REPLACE
+    );
+    """)
+
     try:
         q_cols = [r[1] for r in c.execute("PRAGMA table_info(quizzes)").fetchall()]
         if "concept_name" not in q_cols:

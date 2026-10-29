@@ -124,9 +124,20 @@ def call_gemini(prompt: str, system_instruction: str = "") -> Optional[str]:
         print(f"Gemini REST API notice: {e}")
     return None
 
-def answer_tutor_query(query: str, mode: str = "ask_materials", subject_id: Optional[str] = None, document_id: Optional[str] = None, detail_level: str = "normal") -> Dict[str, Any]:
+def answer_tutor_query(
+    query: str,
+    mode: str = "ask_materials",
+    subject_id: Optional[str] = None,
+    document_id: Optional[str] = None,
+    detail_level: str = "normal",
+    teaching_mode: str = "MBA"
+) -> Dict[str, Any]:
     """
-    Master AI Tutor dispatcher supporting the 4 Modes with citation and grounding.
+    Master AI Tutor dispatcher supporting citations, grounding, and 4 Teaching Modes:
+    - Beginner (ELI5 / Intuitive analogies, zero jargon)
+    - MBA (Executive business school rigor, frameworks, strategic tradeoffs)
+    - Exam (High-yield definitions, marking schemes, exam questions)
+    - Expert (First-principles, deep edge cases, counter-intuitive nuances)
     """
     chunks = search_chunks(query, subject_id=subject_id, document_id=document_id, limit=5)
     
@@ -140,8 +151,19 @@ def answer_tutor_query(query: str, mode: str = "ask_materials", subject_id: Opti
         citations.append({"document": doc_name, "slide": slide_num, "title": c.get("title", "")})
         context_str += f"\n--- SOURCE: {ref} | Topic: {c.get('title')} ---\n{c.get('content')}\n"
 
+    # Define mode-specific instructions
+    mode_instructions = {
+        "Beginner": "Adopt an ELI5 (Explain Like I'm 5) pedagogical approach. Avoid heavy corporate jargon, use everyday metaphors (e.g. lemonade stands, smartphones, sports), and explain concepts from fundamental human intuition.",
+        "MBA": "Adopt a top-tier MBA Professor persona. Emphasize strategic frameworks (Porter's 5 Forces, SWOT, Unit Economics, RICE), quantitative trade-offs, managerial decision-making, and market dynamics.",
+        "Exam": "Adopt a rigorous Exam Prep Tutor persona. Prioritize high-yield exam definitions, bullet-pointed summaries, structured marking-scheme criteria, common examiner trick questions, and concise memory mnemonics.",
+        "Expert": "Adopt a C-Suite Strategy & Principal Product Director persona. Focus on edge-case failure modes, first-principles unit economics, second-order consequences, organizational inertia, and counter-intuitive industry realpolitik."
+    }
+    pedagogy_guide = mode_instructions.get(teaching_mode, mode_instructions["MBA"])
+
     system_prompt = f"""You are the personal AI MBA Tutor for Vishal Singh on his platform 'VISHAL SINGH'.
 You are teaching Vishal using his uploaded MBA study materials.
+Pedagogy Style: {teaching_mode} Mode ({pedagogy_guide})
+
 Guidelines:
 1. Always cite exact source documents and slide/page numbers when referencing uploaded materials.
 2. If the user's question cannot be answered from the materials, explicitly clarify that it is not in the uploaded documents, but offer general MBA context clearly marked as [General Knowledge].
@@ -224,10 +246,28 @@ If information is missing, state it clearly.
     return {
         "query": query,
         "mode": mode,
+        "teaching_mode": teaching_mode,
         "response": ai_response,
         "citations": citations,
         "source_count": len(chunks)
     }
+
+def ask_ai_tutor_internal(
+    question: str,
+    document_id: Optional[str] = None,
+    slide_number: Optional[int] = None,
+    teaching_mode: str = "MBA"
+) -> Dict[str, Any]:
+    """Helper for internal backend engines to query AI tutor with consistent grounding."""
+    query = question
+    if slide_number:
+        query = f"[Slide {slide_number}] {question}"
+    return answer_tutor_query(
+        query=query,
+        mode="simple_explanation" if teaching_mode == "Beginner" else "ask_materials",
+        document_id=document_id,
+        teaching_mode=teaching_mode
+    )
 
 def generate_offline_mba_tutor_response(query: str, mode: str, chunks: List[Dict[str, Any]], citations: List[Dict[str, Any]]) -> str:
     """
