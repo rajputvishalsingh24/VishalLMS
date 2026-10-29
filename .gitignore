@@ -6,3 +6,5 @@ __pycache__/
 *.db-shm
 .DS_Store
 Thumbs.db
+data/uploads/doc_*
+test_*.pptx

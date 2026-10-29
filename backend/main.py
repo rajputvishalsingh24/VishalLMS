@@ -1,20 +1,24 @@
 import os
+import sys
 import json
 import uuid
+import tempfile
+import traceback
 from typing import Optional, List, Dict, Any
 from datetime import datetime
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
 from pydantic import BaseModel
 
 import secrets
-from .database import get_connection, init_db, verify_password, hash_password
+from .database import get_connection, init_db, verify_password, hash_password, is_cloud_env
 from .extractor import extract_document
 from .ai_tutor import answer_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
 from .seed_data import seed_all_data
+from .summarizer import analyze_presentation, get_concept_teaching_package, process_tutor_conversation
 
 app = FastAPI(title="VISHAL SINGH - AI Learning Platform", version="1.0.0")
 
@@ -26,9 +30,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
-if IS_VERCEL:
-    UPLOAD_DIR = "/tmp/uploads"
+if is_cloud_env():
+    UPLOAD_DIR = os.path.join(tempfile.gettempdir(), "uploads")
 else:
     UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "uploads")
 
@@ -36,6 +39,15 @@ try:
     os.makedirs(UPLOAD_DIR, exist_ok=True)
 except Exception:
     pass
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print("UNHANDLED ERROR DURING REQUEST:", tb, file=sys.stderr)
+    return JSONResponse(
+        status_code=500,
+        content={"error": str(exc), "traceback": tb}
+    )
 
 @app.on_event("startup")
 def startup_event():
@@ -48,7 +60,7 @@ def startup_event():
         if count == 0:
             seed_all_data()
     except Exception as e:
-        print(f"Startup initialization notice: {e}")
+        print(f"Startup initialization notice: {e}", file=sys.stderr)
 
 # ----------------- AUTHENTICATION ----------------- #
 class LoginRequest(BaseModel):
@@ -737,6 +749,243 @@ def reset_sample_data():
     seed_all_data()
     return {"success": True, "message": "Sample MBA curriculum re-initialized successfully"}
 
+# ----------------- PRESENTATION LEARNING & DETAILED SUMMARY ----------------- #
+@app.post("/api/presentations/{doc_id}/analyze")
+def api_analyze_presentation(doc_id: str):
+    try:
+        summary = analyze_presentation(doc_id)
+        return {"success": True, "summary": summary}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/presentations/{doc_id}/summary")
+def api_get_presentation_summary(doc_id: str):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM presentation_summaries WHERE document_id = ?", (doc_id,)).fetchone()
+    conn.close()
+    if not row:
+        # Generate summary automatically if not already generated
+        try:
+            summary = analyze_presentation(doc_id)
+            return summary
+        except Exception as e:
+            raise HTTPException(status_code=404, detail=f"Summary not found: {e}")
+    return {
+        "id": row["id"],
+        "document_id": row["document_id"],
+        "title": row["title"],
+        "overview": json.loads(row["overview_json"]),
+        "concepts": json.loads(row["concepts_json"]),
+        "frameworks": json.loads(row["frameworks_json"]),
+        "glossary": json.loads(row["glossary_json"]),
+        "formulas": json.loads(row["formulas_json"]),
+        "connections": json.loads(row["connections_json"]),
+        "slide_summaries": json.loads(row["slide_summaries_json"]),
+        "revision": json.loads(row["revision_json"]),
+        "learning_path": json.loads(row["learning_path_json"])
+    }
+
+@app.get("/api/presentations/{doc_id}/session")
+def api_get_presentation_session(doc_id: str):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM presentation_learning_sessions WHERE document_id = ?", (doc_id,)).fetchone()
+    conn.close()
+    if not row:
+        # Initialize
+        analyze_presentation(doc_id)
+        conn = get_connection()
+        row = conn.execute("SELECT * FROM presentation_learning_sessions WHERE document_id = ?", (doc_id,)).fetchone()
+        conn.close()
+    
+    return {
+        "id": row["id"],
+        "document_id": row["document_id"],
+        "current_module_id": row["current_module_id"],
+        "current_concept_name": row["current_concept_name"],
+        "current_slide_number": row["current_slide_number"],
+        "understood_concepts": json.loads(row["understood_concepts"] or "[]"),
+        "revision_needed_concepts": json.loads(row["revision_needed_concepts"] or "[]"),
+        "messages": json.loads(row["messages_json"] or "[]")
+    }
+
+class SessionUpdateRequest(BaseModel):
+    current_module_id: Optional[str] = None
+    current_concept_name: Optional[str] = None
+    current_slide_number: Optional[int] = None
+    mark_understood: Optional[str] = None
+    mark_revision: Optional[str] = None
+
+@app.post("/api/presentations/{doc_id}/session")
+def api_update_presentation_session(doc_id: str, req: SessionUpdateRequest):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM presentation_learning_sessions WHERE document_id = ?", (doc_id,)).fetchone()
+    if not row:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    understood = json.loads(row["understood_concepts"] or "[]")
+    revision = json.loads(row["revision_needed_concepts"] or "[]")
+
+    if req.mark_understood:
+        if req.mark_understood not in understood:
+            understood.append(req.mark_understood)
+        if req.mark_understood in revision:
+            revision.remove(req.mark_understood)
+            
+    if req.mark_revision:
+        if req.mark_revision not in revision:
+            revision.append(req.mark_revision)
+        if req.mark_revision in understood:
+            understood.remove(req.mark_revision)
+
+    curr_mod = req.current_module_id if req.current_module_id is not None else row["current_module_id"]
+    curr_concept = req.current_concept_name if req.current_concept_name is not None else row["current_concept_name"]
+    curr_slide = req.current_slide_number if req.current_slide_number is not None else row["current_slide_number"]
+
+    conn.execute("""
+    UPDATE presentation_learning_sessions
+    SET current_module_id = ?, current_concept_name = ?, current_slide_number = ?,
+        understood_concepts = ?, revision_needed_concepts = ?, last_accessed = CURRENT_TIMESTAMP
+    WHERE document_id = ?
+    """, (curr_mod, curr_concept, curr_slide, json.dumps(understood), json.dumps(revision), doc_id))
+    
+    # Update document progress
+    summary_row = conn.execute("SELECT concepts_json FROM presentation_summaries WHERE document_id = ?", (doc_id,)).fetchone()
+    if summary_row:
+        all_concepts = json.loads(summary_row["concepts_json"])
+        if all_concepts:
+            pct = int((len(understood) / len(all_concepts)) * 100)
+            conn.execute("UPDATE documents SET progress = ?, last_accessed = CURRENT_TIMESTAMP WHERE id = ?", (pct, doc_id))
+    
+    conn.commit()
+    conn.close()
+
+    return {
+        "success": True,
+        "understood_concepts": understood,
+        "revision_needed_concepts": revision,
+        "current_concept_name": curr_concept,
+        "current_slide_number": curr_slide
+    }
+
+class TeachRequest(BaseModel):
+    concept_name: str
+    control_action: Optional[str] = None
+
+@app.post("/api/presentations/{doc_id}/teach")
+def api_teach_presentation_concept(doc_id: str, req: TeachRequest):
+    try:
+        pkg = get_concept_teaching_package(doc_id, req.concept_name, req.control_action)
+        return pkg
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+class TutorChatRequest(BaseModel):
+    query: str
+    concept_name: str
+    slide_number: Optional[int] = 1
+
+@app.post("/api/presentations/{doc_id}/chat")
+def api_presentation_tutor_chat(doc_id: str, req: TutorChatRequest):
+    try:
+        resp = process_tutor_conversation(doc_id, req.query, req.concept_name, req.slide_number or 1)
+        return resp
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/presentations/{doc_id}/flashcards")
+def api_get_presentation_flashcards(doc_id: str):
+    conn = get_connection()
+    rows = conn.execute("SELECT * FROM presentation_flashcards WHERE document_id = ? ORDER BY slide_number ASC", (doc_id,)).fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+@app.post("/api/presentations/{doc_id}/flashcards/{card_id}/master")
+def api_master_flashcard(doc_id: str, card_id: str):
+    conn = get_connection()
+    conn.execute("UPDATE presentation_flashcards SET mastered = 1 WHERE id = ? AND document_id = ?", (card_id, doc_id))
+    conn.commit()
+    conn.close()
+    return {"success": True}
+
+@app.get("/api/presentations/{doc_id}/export-printable")
+def api_export_presentation_printable(doc_id: str):
+    conn = get_connection()
+    row = conn.execute("SELECT * FROM presentation_summaries WHERE document_id = ?", (doc_id,)).fetchone()
+    conn.close()
+    if not row:
+        raise HTTPException(status_code=404, detail="Summary not found")
+    
+    overview = json.loads(row["overview_json"])
+    concepts = json.loads(row["concepts_json"])
+    frameworks = json.loads(row["frameworks_json"])
+    revision = json.loads(row["revision_json"])
+
+    html = f"""<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>{overview.get('title')} — Detailed MBA Summary</title>
+    <style>
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; line-height: 1.6; color: #1e293b; padding: 40px; max-width: 900px; margin: 0 auto; }}
+        h1 {{ color: #1e40af; border-bottom: 2px solid #e2e8f0; padding-bottom: 12px; }}
+        h2 {{ color: #2563eb; margin-top: 30px; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }}
+        h3 {{ color: #0f172a; margin-top: 20px; }}
+        .badge {{ display: inline-block; background: #dbeafe; color: #1e40af; padding: 4px 10px; border-radius: 9999px; font-size: 12px; font-weight: 600; }}
+        .box {{ background: #f8fafc; border-left: 4px solid #3b82f6; padding: 14px 18px; margin: 15px 0; border-radius: 0 8px 8px 0; }}
+        .meta {{ color: #64748b; font-size: 14px; margin-bottom: 20px; }}
+        ul {{ padding-left: 20px; }}
+        li {{ margin-bottom: 6px; }}
+    </style>
+</head>
+<body>
+    <span class="badge">VISHAL SINGH — MBA Executive Study Material</span>
+    <h1>{overview.get('title')}</h1>
+    <div class="meta">Subject: {overview.get('subject')} | Total Slides: {overview.get('total_slides')} | Grounded MBA Summary</div>
+    
+    <div class="box">
+        <strong>Central Objective:</strong> {overview.get('central_objective')}
+    </div>
+
+    <h2>1. Concept-by-Concept Detailed Breakdown</h2>
+"""
+    for c in concepts:
+        html += f"""
+        <h3>{c.get('name')} <span style="font-size: 12px; color: #64748b;">(Slides {', '.join(map(str, c.get('slide_numbers', [])))})</span></h3>
+        <p><strong>Definition:</strong> {c.get('definition')}</p>
+        <p>{c.get('detailed_explanation')}</p>
+        <div class="box">
+            <strong>Real-World Case Example:</strong> {c.get('example')}
+        </div>
+        <ul>
+            {''.join([f"<li>{pt}</li>" for pt in c.get('key_points', [])])}
+        </ul>
+"""
+
+    if frameworks:
+        html += "<h2>2. Strategic Frameworks & Decision Models</h2>"
+        for fw in frameworks:
+            html += f"""
+            <h3>{fw.get('name')}</h3>
+            <p><strong>Why Used:</strong> {fw.get('why_used')}</p>
+            <p><strong>How It Works:</strong> {fw.get('how_works')}</p>
+            <p><strong>Step-by-Step Example:</strong> {fw.get('step_by_step_example')}</p>
+"""
+
+    html += f"""
+    <h2>3. High-Yield Revision Sheet (Exam Prep)</h2>
+    <h3>Must-Know Key Takeaways</h3>
+    <ul>
+        {''.join([f"<li>{pt}</li>" for pt in revision.get('must_know_points', [])])}
+    </ul>
+    <h3>Likely MBA Exam Questions</h3>
+    <ul>
+        {''.join([f"<li><strong>{q}</strong></li>" for q in revision.get('likely_exam_questions', [])])}
+    </ul>
+</body>
+</html>"""
+    return HTMLResponse(content=html)
+
 # ----------------- STATIC FRONTEND SERVING ----------------- #
 FRONTEND_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
 if os.path.exists(FRONTEND_DIR):
@@ -746,15 +995,35 @@ if os.path.exists(FRONTEND_DIR):
 def serve_index():
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
-    return {"message": "VISHAL SINGH API is running."}
+        with open(index_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
+    return JSONResponse({"message": "VISHAL SINGH API is running. Frontend index not found."})
 
 @app.get("/{full_path:path}")
 def serve_spa_paths(full_path: str):
+    if full_path.startswith("api/"):
+        raise HTTPException(status_code=404, detail="API route not found")
     potential_file = os.path.join(FRONTEND_DIR, full_path)
     if os.path.isfile(potential_file):
-        return FileResponse(potential_file)
+        media_type = "text/plain"
+        if full_path.endswith(".js"):
+            media_type = "application/javascript"
+        elif full_path.endswith(".css"):
+            media_type = "text/css"
+        elif full_path.endswith(".html"):
+            media_type = "text/html"
+        elif full_path.endswith(".png"):
+            media_type = "image/png"
+        elif full_path.endswith(".svg"):
+            media_type = "image/svg+xml"
+        try:
+            with open(potential_file, "rb") as f:
+                return Response(content=f.read(), media_type=media_type)
+        except Exception:
+            return FileResponse(potential_file)
+            
     index_file = os.path.join(FRONTEND_DIR, "index.html")
     if os.path.exists(index_file):
-        return FileResponse(index_file)
+        with open(index_file, "r", encoding="utf-8") as f:
+            return HTMLResponse(content=f.read(), status_code=200)
     raise HTTPException(status_code=404, detail="Page not found")

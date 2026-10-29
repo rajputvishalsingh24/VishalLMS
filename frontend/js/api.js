@@ -212,5 +212,75 @@ export const API = {
     const res = await fetch('/api/settings/reset-sample', { method: 'POST' });
     if (!res.ok) throw new Error('Failed to reset sample data');
     return res.json();
+  },
+
+  // Presentation Summarization & Interactive Learning
+  async analyzePresentation(docId) {
+    const res = await fetch(`/api/presentations/${docId}/analyze`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Presentation analysis failed');
+    }
+    return res.json();
+  },
+
+  async getPresentationSummary(docId) {
+    const res = await fetch(`/api/presentations/${docId}/summary`);
+    if (!res.ok) throw new Error('Failed to fetch presentation summary');
+    return res.json();
+  },
+
+  async getPresentationSession(docId) {
+    const res = await fetch(`/api/presentations/${docId}/session`);
+    if (!res.ok) throw new Error('Failed to fetch presentation session');
+    return res.json();
+  },
+
+  async updatePresentationSession(docId, data) {
+    const res = await fetch(`/api/presentations/${docId}/session`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    if (!res.ok) throw new Error('Failed to update presentation session');
+    return res.json();
+  },
+
+  async teachPresentationConcept(docId, conceptName, controlAction = null) {
+    const res = await fetch(`/api/presentations/${docId}/teach`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ concept_name: conceptName, control_action: controlAction })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Teaching generation failed');
+    }
+    return res.json();
+  },
+
+  async presentationTutorChat(docId, query, conceptName, slideNumber = 1) {
+    const res = await fetch(`/api/presentations/${docId}/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, concept_name: conceptName, slide_number: slideNumber })
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Tutor response failed');
+    }
+    return res.json();
+  },
+
+  async getPresentationFlashcards(docId) {
+    const res = await fetch(`/api/presentations/${docId}/flashcards`);
+    if (!res.ok) throw new Error('Failed to fetch presentation flashcards');
+    return res.json();
+  },
+
+  async masterFlashcard(docId, cardId) {
+    const res = await fetch(`/api/presentations/${docId}/flashcards/${cardId}/master`, { method: 'POST' });
+    if (!res.ok) throw new Error('Failed to master flashcard');
+    return res.json();
   }
 };

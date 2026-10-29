@@ -1,21 +1,32 @@
 import sqlite3
 import json
 import os
+import tempfile
+import shutil
+import hashlib
+import secrets
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-import shutil
+def is_cloud_env():
+    return bool(
+        os.environ.get("VERCEL") 
+        or os.environ.get("AWS_LAMBDA_FUNCTION_NAME") 
+        or not os.access(os.path.dirname(os.path.dirname(__file__)), os.W_OK)
+    )
 
-IS_VERCEL = bool(os.environ.get("VERCEL"))
-
-if IS_VERCEL:
-    DB_PATH = "/tmp/lms.db"
+if is_cloud_env():
+    DB_PATH = os.path.join(tempfile.gettempdir(), "lms.db")
     ORIGINAL_DB = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
     if not os.path.exists(DB_PATH) and os.path.exists(ORIGINAL_DB):
         try:
-            shutil.copy2(ORIGINAL_DB, DB_PATH)
+            shutil.copyfile(ORIGINAL_DB, DB_PATH)
+            try:
+                os.chmod(DB_PATH, 0o666)
+            except Exception:
+                pass
         except Exception as e:
-            print(f"Notice copying DB on Vercel: {e}")
+            print(f"Notice copying DB on cloud: {e}")
 else:
     DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "lms.db")
 
@@ -24,17 +35,13 @@ def get_connection():
         os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     except Exception:
         pass
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_PATH, timeout=30.0)
     conn.row_factory = sqlite3.Row
     try:
         conn.execute("PRAGMA foreign_keys = ON")
-        conn.execute("PRAGMA journal_mode = WAL")
     except Exception:
         pass
     return conn
-
-import hashlib
-import secrets
 
 def hash_password(password: str, salt: Optional[str] = None) -> str:
     if not salt:
@@ -183,6 +190,51 @@ def init_db():
     CREATE TABLE IF NOT EXISTS user_settings (
         key TEXT PRIMARY KEY,
         value TEXT NOT NULL
+    );
+
+    -- AI-Powered PPT Summarization & Interactive Learning Tables
+    CREATE TABLE IF NOT EXISTS presentation_summaries (
+        id TEXT PRIMARY KEY,
+        document_id TEXT UNIQUE NOT NULL,
+        title TEXT NOT NULL,
+        overview_json TEXT NOT NULL,
+        concepts_json TEXT NOT NULL,
+        frameworks_json TEXT NOT NULL,
+        glossary_json TEXT NOT NULL,
+        formulas_json TEXT NOT NULL,
+        connections_json TEXT NOT NULL,
+        slide_summaries_json TEXT NOT NULL,
+        revision_json TEXT NOT NULL,
+        learning_path_json TEXT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS presentation_learning_sessions (
+        id TEXT PRIMARY KEY,
+        document_id TEXT UNIQUE NOT NULL,
+        current_module_id TEXT DEFAULT '',
+        current_concept_name TEXT DEFAULT '',
+        current_slide_number INTEGER DEFAULT 1,
+        understood_concepts TEXT DEFAULT '[]',
+        revision_needed_concepts TEXT DEFAULT '[]',
+        messages_json TEXT DEFAULT '[]',
+        last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS presentation_flashcards (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        concept_name TEXT NOT NULL,
+        front TEXT NOT NULL,
+        back TEXT NOT NULL,
+        slide_number INTEGER DEFAULT 1,
+        mastered INTEGER DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
     );
     """)
 

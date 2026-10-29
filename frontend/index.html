@@ -61,6 +61,11 @@
         <span>Study Library</span>
       </button>
 
+      <button onclick="App.navigate('workspace')" data-nav="workspace" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
+        <i data-lucide="presentation" class="w-4 h-4 mr-3 text-indigo-400"></i>
+        <span>PPT Workspace</span>
+      </button>
+
       <button onclick="App.navigate('tutor')" data-nav="tutor" class="nav-item w-full flex items-center px-3 py-2.5 rounded-lg text-sm font-medium transition-colors text-slate-300 hover:text-white hover:bg-slate-800/60">
         <i data-lucide="bot" class="w-4 h-4 mr-3 text-emerald-400"></i>
         <span>AI Tutor</span>
@@ -151,6 +156,27 @@
       
       <!-- ==================== 1. DASHBOARD PAGE ==================== -->
       <div id="page-dashboard" class="page-view animate-fade-in space-y-6">
+        <!-- Resume Learning Hero Card (Persistent Learning Anchor) -->
+        <div id="dashboard-resume-card" class="hidden bg-gradient-to-r from-blue-600 via-indigo-600 to-slate-900 text-white rounded-2xl p-5 shadow-lg border border-blue-400/30 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center space-x-4">
+            <div class="w-12 h-12 rounded-xl bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-bold flex-shrink-0 shadow-inner">
+              <i data-lucide="play-circle" class="w-6 h-6"></i>
+            </div>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span class="text-[10px] font-bold uppercase tracking-wider bg-white/20 px-2 py-0.5 rounded-full text-blue-100">Resume Learning</span>
+                <span id="resume-card-time" class="text-xs text-blue-200">Active Session</span>
+              </div>
+              <h3 id="resume-card-title" class="text-base font-extrabold text-white mt-0.5">Resume Learning: Product Strategy</h3>
+              <p id="resume-card-subtitle" class="text-xs text-blue-100/90">Module 1: Strategic Foundations &bull; Current Concept: Product-Market Fit</p>
+            </div>
+          </div>
+          <button id="resume-card-btn" onclick="App.resumeCurrentPresentation()" class="px-5 py-2.5 bg-white text-blue-700 hover:bg-blue-50 font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2 flex-shrink-0">
+            <span>Continue Learning</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+
         <!-- Mountain Banner -->
         <div class="mountain-banner rounded-2xl p-7 border border-blue-100 shadow-sm flex flex-col justify-center min-h-[125px]">
           <h2 class="text-2xl sm:text-3xl font-extrabold text-slate-900 tracking-tight">Welcome back, Vishal.</h2>
@@ -565,6 +591,242 @@
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- ==================== 3B. PRESENTATION LEARNING WORKSPACE ==================== -->
+      <div id="page-workspace" class="page-view hidden space-y-4">
+        <!-- Top Workspace Bar -->
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between bg-white px-5 py-3 rounded-2xl border border-slate-200/80 shadow-xs gap-3">
+          <div class="flex items-center space-x-3">
+            <button onclick="App.navigate('library')" class="p-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-600 transition" title="Back to Library">
+              <i data-lucide="arrow-left" class="w-4 h-4"></i>
+            </button>
+            <div>
+              <div class="flex items-center space-x-2">
+                <span id="workspace-subject-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">MBA Core</span>
+                <span id="workspace-slide-badge" class="text-xs text-slate-400">12 Slides</span>
+                <span id="workspace-status-badge" class="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Analyzed</span>
+              </div>
+              <h2 id="workspace-doc-title" class="text-base font-extrabold text-slate-900 tracking-tight mt-0.5">Product Strategy: From Idea to Impact</h2>
+            </div>
+          </div>
+
+          <!-- Center Workspace Mode Switcher -->
+          <div class="flex items-center bg-slate-100 p-1 rounded-xl text-xs font-semibold self-start sm:self-auto">
+            <button onclick="App.switchWorkspaceTab('summary')" id="ws-tab-btn-summary" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-900 bg-white shadow-xs">
+              Detailed Summary
+            </button>
+            <button onclick="App.switchWorkspaceTab('learn')" id="ws-tab-btn-learn" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+              Learn with AI
+            </button>
+            <button onclick="App.switchWorkspaceTab('slides')" id="ws-tab-btn-slides" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+              Slide View
+            </button>
+            <button onclick="App.switchWorkspaceTab('practice')" id="ws-tab-btn-practice" class="px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900">
+              Practice & Flashcards
+            </button>
+          </div>
+
+          <!-- Right Action Controls -->
+          <div class="flex items-center space-x-2">
+            <button onclick="App.exportWorkspaceMarkdown()" class="text-xs font-semibold px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 flex items-center transition" title="Export Markdown">
+              <i data-lucide="file-down" class="w-3.5 h-3.5 mr-1.5 text-slate-500"></i> Markdown
+            </button>
+            <button onclick="App.exportWorkspacePrintable()" class="text-xs font-semibold px-3.5 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white flex items-center shadow-xs transition" title="Printable PDF Summary">
+              <i data-lucide="printer" class="w-3.5 h-3.5 mr-1.5"></i> Export PDF
+            </button>
+          </div>
+        </div>
+
+        <!-- 3-Column Presentation Workspace Layout -->
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 h-[calc(100vh-185px)]">
+          
+          <!-- LEFT COLUMN (3 Cols): Navigation & Structured Learning Path -->
+          <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col h-full overflow-hidden shadow-xs">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
+              <span class="text-xs font-bold text-slate-800 uppercase tracking-wider flex items-center">
+                <i data-lucide="map" class="w-3.5 h-3.5 mr-1.5 text-blue-600"></i> Learning Path
+              </span>
+              <span id="workspace-progress-pct" class="text-xs font-extrabold text-blue-600">0%</span>
+            </div>
+
+            <!-- Progress Bar -->
+            <div class="w-full bg-slate-100 h-1.5 rounded-full mt-2.5 mb-3 flex-shrink-0 overflow-hidden">
+              <div id="workspace-progress-bar" class="bg-blue-600 h-1.5 rounded-full transition-all duration-300" style="width: 0%"></div>
+            </div>
+
+            <!-- Scrollable Modules & Concepts List -->
+            <div id="workspace-modules-tree" class="flex-1 overflow-y-auto space-y-3 pr-1 text-xs">
+              <!-- Dynamically rendered modules and concepts -->
+            </div>
+
+            <!-- Bottom Slide Quick Jump -->
+            <div class="pt-3 border-t border-slate-100 flex-shrink-0">
+              <div class="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-2">
+                <span>SLIDE QUICK JUMP</span>
+                <span id="workspace-slide-counter">Slide 1 of 12</span>
+              </div>
+              <div id="workspace-slide-thumbnails" class="flex space-x-1.5 overflow-x-auto pb-1">
+                <!-- Mini slide numbers -->
+              </div>
+            </div>
+          </div>
+
+          <!-- CENTER COLUMN (6 Cols): Canvas (Summary / Learn / Slides / Practice) -->
+          <div class="lg:col-span-6 bg-white rounded-2xl border border-slate-200/80 p-5 flex flex-col h-full overflow-hidden shadow-xs relative">
+            
+            <!-- TAB 1: DETAILED SUMMARY -->
+            <div id="workspace-canvas-summary" class="flex-1 overflow-y-auto space-y-5 pr-2">
+              <!-- Search & Filter Controls -->
+              <div class="sticky top-0 bg-white/95 backdrop-blur-xs pb-3 pt-1 z-10 border-b border-slate-100 flex flex-col sm:flex-row gap-2.5 items-center justify-between">
+                <div class="relative w-full sm:w-64">
+                  <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-3 top-2.5"></i>
+                  <input id="summary-search-input" oninput="App.filterSummaryContent()" type="text" placeholder="Search concepts, frameworks..." class="w-full pl-8 pr-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+                </div>
+                <div class="flex items-center space-x-1.5 text-[11px] font-semibold overflow-x-auto w-full sm:w-auto">
+                  <button onclick="App.filterSummarySection('all')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200">All</button>
+                  <button onclick="App.filterSummarySection('concepts')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Concepts</button>
+                  <button onclick="App.filterSummarySection('frameworks')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Frameworks</button>
+                  <button onclick="App.filterSummarySection('glossary')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Glossary</button>
+                  <button onclick="App.filterSummarySection('revision')" class="sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200">Revision</button>
+                </div>
+              </div>
+
+              <!-- Detailed Summary Dynamic Content (8 Sections) -->
+              <div id="summary-rendered-sections" class="space-y-6">
+                <!-- Rendered by App.renderDetailedSummary() -->
+              </div>
+            </div>
+
+            <!-- TAB 2: LEARN WITH AI (8 PEDAGOGICAL STEPS) -->
+            <div id="workspace-canvas-learn" class="flex-1 overflow-y-auto space-y-4 pr-2 hidden">
+              <!-- Active Concept Top Banner -->
+              <div class="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 p-4 rounded-xl flex items-center justify-between">
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <span id="learn-module-badge" class="px-2 py-0.5 bg-blue-100 text-blue-800 text-[10px] font-bold rounded-full">Module 1</span>
+                    <span id="learn-slide-citation" class="text-xs text-blue-600 font-semibold">Source: Slide 1</span>
+                    <span id="learn-control-indicator" class="text-xs text-amber-700 font-semibold bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200 hidden"></span>
+                  </div>
+                  <h3 id="learn-active-concept-title" class="text-lg font-extrabold text-slate-900 mt-1">Product Strategy: From Idea to Impact</h3>
+                </div>
+                <div class="flex items-center space-x-2">
+                  <button onclick="App.markActiveConceptStatus('understood')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 shadow-xs transition">
+                    <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                    <span>Understood</span>
+                  </button>
+                  <button onclick="App.markActiveConceptStatus('revision')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-semibold flex items-center space-x-1 shadow-xs transition">
+                    <i data-lucide="bookmark" class="w-3.5 h-3.5"></i>
+                    <span>Needs Revision</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- 8 Pedagogical Teaching Cards Container -->
+              <div id="learn-steps-container" class="space-y-3.5">
+                <!-- Dynamically generated 8 steps -->
+              </div>
+            </div>
+
+            <!-- TAB 3: SLIDE VIEW (16:9 CANVAS) -->
+            <div id="workspace-canvas-slides" class="flex-1 flex flex-col justify-between hidden">
+              <div class="flex-1 flex items-center justify-center p-2">
+                <div id="ws-slide-card" class="slide-canvas w-full max-w-2xl p-7 flex flex-col justify-between bg-white border border-slate-200 rounded-2xl shadow-sm min-h-[340px]">
+                  <div>
+                    <div class="flex items-center justify-between text-xs text-slate-400 mb-2">
+                      <span id="ws-slide-num-label" class="font-bold text-blue-600">Slide 1 of 12</span>
+                      <span id="ws-slide-doc-label">Product_Strategy.pptx</span>
+                    </div>
+                    <h2 id="ws-slide-title" class="text-xl font-extrabold text-slate-900 leading-snug">Product Strategy: From Idea to Impact</h2>
+                    <div id="ws-slide-content" class="mt-4 text-xs text-slate-700 space-y-2 leading-relaxed">
+                      <!-- Bullets / text -->
+                    </div>
+                  </div>
+                  <div id="ws-slide-notes-container" class="mt-4 pt-3 border-t border-slate-100 text-[11px] text-slate-500 italic hidden">
+                    <!-- Speaker notes -->
+                  </div>
+                </div>
+              </div>
+
+              <!-- Slide Prev / Next Footer -->
+              <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                <button onclick="App.prevWorkspaceSlide()" class="px-4 py-2 border border-slate-200 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center space-x-1">
+                  <i data-lucide="chevron-left" class="w-4 h-4"></i>
+                  <span>Previous Slide</span>
+                </button>
+                <span id="ws-slide-page-indicator" class="text-xs font-semibold text-slate-500">1 / 12</span>
+                <button onclick="App.nextWorkspaceSlide()" class="px-4 py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold hover:bg-blue-700 flex items-center space-x-1 shadow-xs">
+                  <span>Next Slide</span>
+                  <i data-lucide="chevron-right" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- TAB 4: PRACTICE & FLASHCARDS -->
+            <div id="workspace-canvas-practice" class="flex-1 overflow-y-auto space-y-6 pr-2 hidden">
+              <div>
+                <h4 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-3 flex items-center">
+                  <i data-lucide="layers" class="w-4 h-4 mr-1.5 text-blue-600"></i> Flashcards for Revision
+                </h4>
+                <div id="ws-flashcard-stage" class="max-w-md mx-auto">
+                  <!-- Rendered Flashcard -->
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-slate-100">
+                <h4 class="text-sm font-extrabold text-slate-900 uppercase tracking-wider mb-3 flex items-center">
+                  <i data-lucide="graduation-cap" class="w-4 h-4 mr-1.5 text-indigo-600"></i> MBA Exam Preparation Questions
+                </h4>
+                <div id="ws-exam-questions-list" class="space-y-3">
+                  <!-- Exam questions with revealable model answers -->
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RIGHT COLUMN (3 Cols): Interactive AI Tutor & 12 Teaching Controls -->
+          <div class="lg:col-span-3 bg-white rounded-2xl border border-slate-200/80 p-4 flex flex-col h-full overflow-hidden shadow-xs">
+            <div class="flex items-center justify-between pb-3 border-b border-slate-100 flex-shrink-0">
+              <div class="flex items-center space-x-2">
+                <div class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                <h4 class="text-xs font-bold text-slate-900">MBA AI Tutor</h4>
+              </div>
+              <span id="tutor-active-slide-ref" class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-md">Slide 1</span>
+            </div>
+
+            <!-- 12 Quick Teaching Action Controls -->
+            <div class="py-2.5 border-b border-slate-100 flex-shrink-0">
+              <p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Teaching Controls</p>
+              <div class="flex flex-wrap gap-1 text-[11px]">
+                <button onclick="App.triggerTeachingControl('simpler_english')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Explain in simpler English">Simple English</button>
+                <button onclick="App.triggerTeachingControl('more_detail')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Give more detail">More Detail</button>
+                <button onclick="App.triggerTeachingControl('another_example')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Show another practical example">Example</button>
+                <button onclick="App.triggerTeachingControl('analogy')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Explain with an analogy">Analogy</button>
+                <button onclick="App.triggerTeachingControl('step_by_step')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Break it down step-by-step">Step-by-Step</button>
+                <button onclick="App.triggerTeachingControl('real_business')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="How is this used in real business?">Real Business</button>
+                <button onclick="App.triggerTeachingControl('compare')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Compare this with related concept">Compare</button>
+                <button onclick="App.triggerTeachingControl('test_me')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Test me on this concept">Test Me</button>
+                <button onclick="App.triggerTeachingControl('repeat')" class="px-2 py-1 rounded bg-slate-100 hover:bg-blue-50 hover:text-blue-700 text-slate-600 transition" title="Repeat this explanation">Repeat</button>
+                <button onclick="App.triggerTeachingControl('next_concept')" class="px-2 py-1 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold transition" title="I understand, move to next concept">Next Concept &rarr;</button>
+              </div>
+            </div>
+
+            <!-- Chat Messages Stream -->
+            <div id="workspace-tutor-messages" class="flex-1 overflow-y-auto space-y-3 py-3 pr-1 text-xs">
+              <!-- Rendered messages with citations -->
+            </div>
+
+            <!-- Chat Input Form -->
+            <div class="pt-2.5 border-t border-slate-100 flex-shrink-0 flex items-center space-x-1.5">
+              <input id="workspace-chat-input" type="text" placeholder="Ask a question about this slide or concept..." onkeydown="if(event.key === 'Enter') App.sendWorkspaceTutorQuery()" class="flex-1 px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 rounded-lg focus:outline-none focus:border-blue-500">
+              <button onclick="App.sendWorkspaceTutorQuery()" class="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition">
+                <i data-lucide="send" class="w-3.5 h-3.5"></i>
+              </button>
+            </div>
+          </div>
+
         </div>
       </div>
 
@@ -1017,6 +1279,88 @@
       <div id="tutor-doc-picker-list" class="max-h-60 overflow-y-auto space-y-2 text-xs">
         <!-- Rendered dynamically -->
       </div>
+    </div>
+  <!-- ==================== PPT ANALYSIS PROGRESS MODAL ==================== -->
+  <div id="modal-ppt-analysis" class="hidden fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-8 shadow-2xl border border-slate-100 space-y-6">
+      
+      <!-- Processing State -->
+      <div id="analysis-processing-state" class="space-y-6">
+        <div class="text-center space-y-2">
+          <div class="w-14 h-14 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto shadow-inner">
+            <i data-lucide="sparkles" class="w-7 h-7 animate-spin"></i>
+          </div>
+          <h3 class="text-xl font-extrabold text-slate-900">Analyzing Presentation</h3>
+          <p id="analysis-doc-name-label" class="text-xs text-slate-500 font-medium truncate max-w-xs mx-auto">Product_Strategy.pptx</p>
+        </div>
+
+        <!-- 5 Stages List -->
+        <div class="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100 text-xs">
+          <div id="stage-1" class="flex items-center space-x-3 text-slate-400">
+            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">1</span>
+            <span class="stage-text font-medium">Reading presentation...</span>
+          </div>
+          <div id="stage-2" class="flex items-center space-x-3 text-slate-400">
+            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">2</span>
+            <span class="stage-text font-medium">Extracting slide content & speaker notes...</span>
+          </div>
+          <div id="stage-3" class="flex items-center space-x-3 text-slate-400">
+            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">3</span>
+            <span class="stage-text font-medium">Identifying strategic concepts & frameworks...</span>
+          </div>
+          <div id="stage-4" class="flex items-center space-x-3 text-slate-400">
+            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">4</span>
+            <span class="stage-text font-medium">Preparing 8-part detailed summary...</span>
+          </div>
+          <div id="stage-5" class="flex items-center space-x-3 text-slate-400">
+            <span class="stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold">5</span>
+            <span class="stage-text font-medium">Creating structured learning modules...</span>
+          </div>
+        </div>
+
+        <!-- Progress status text -->
+        <div class="text-center text-xs font-semibold text-blue-600 animate-pulse">
+          AI is synthesizing slides and building interactive modules...
+        </div>
+      </div>
+
+      <!-- Success State -->
+      <div id="analysis-success-state" class="hidden text-center space-y-5 animate-fade-in">
+        <div class="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto shadow-inner">
+          <i data-lucide="check-circle-2" class="w-9 h-9"></i>
+        </div>
+        <div>
+          <span class="text-xs font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-200">Analysis Complete</span>
+          <h3 class="text-2xl font-extrabold text-slate-900 mt-2">Your presentation is ready to learn.</h3>
+          <p id="analysis-success-meta" class="text-xs text-slate-500 mt-1">12 slides processed &bull; 8 concepts identified &bull; 3 learning modules ready</p>
+        </div>
+
+        <div class="p-4 bg-slate-50 rounded-2xl border border-slate-100 text-left text-xs space-y-1.5 text-slate-600">
+          <div class="flex items-center justify-between font-semibold text-slate-800">
+            <span>Detailed Summary:</span>
+            <span class="text-emerald-600 font-bold">Generated</span>
+          </div>
+          <div class="flex items-center justify-between font-semibold text-slate-800">
+            <span>Pedagogical Teaching Steps:</span>
+            <span class="text-emerald-600 font-bold">Ready</span>
+          </div>
+          <div class="flex items-center justify-between font-semibold text-slate-800">
+            <span>Flashcards & Exam Questions:</span>
+            <span class="text-emerald-600 font-bold">Ready</span>
+          </div>
+        </div>
+
+        <div class="flex items-center space-x-3 pt-2">
+          <button onclick="document.getElementById('modal-ppt-analysis').classList.add('hidden')" class="w-1/2 py-2.5 border border-slate-200 rounded-xl text-xs font-semibold text-slate-600 hover:bg-slate-50">
+            Close
+          </button>
+          <button id="analysis-open-workspace-btn" onclick="App.openAnalyzedWorkspace()" class="w-1/2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold shadow-md transition flex items-center justify-center space-x-1.5">
+            <span>Open Learning Workspace</span>
+            <i data-lucide="arrow-right" class="w-4 h-4"></i>
+          </button>
+        </div>
+      </div>
+
     </div>
   </div>
 

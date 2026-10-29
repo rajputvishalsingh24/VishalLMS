@@ -6,7 +6,8 @@ from pptx.util import Inches, Pt
 from pptx.dml.color import RGBColor
 from pptx.enum.text import PP_ALIGN
 import pypdf
-from .database import get_connection, init_db
+import tempfile
+from .database import get_connection, init_db, is_cloud_env
 
 def create_sample_pptx(file_path: str):
     """Generate a realistic 12-slide MBA Product Management presentation."""
@@ -237,10 +238,17 @@ def seed_all_data():
         """, (t["id"], t["subject_id"], t["name"], t["status"], t["progress"], t["order_index"]))
 
     # 3. Create Sample PPTX file on disk
-    samples_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "sample_materials")
-    os.makedirs(samples_dir, exist_ok=True)
+    if is_cloud_env():
+        samples_dir = os.path.join(tempfile.gettempdir(), "sample_materials")
+    else:
+        samples_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "sample_materials")
     sample_pptx_path = os.path.join(samples_dir, "Product_Strategy.pptx")
-    create_sample_pptx(sample_pptx_path)
+    try:
+        os.makedirs(samples_dir, exist_ok=True)
+        if not os.path.exists(sample_pptx_path):
+            create_sample_pptx(sample_pptx_path)
+    except Exception as e:
+        print(f"Notice generating sample pptx on cloud: {e}")
 
     # 4. Documents matching screenshots
     docs_data = [

@@ -95,6 +95,7 @@ export const App = {
     if (pageId === 'dashboard') await this.loadDashboard();
     else if (pageId === 'library') await this.loadLibrary();
     else if (pageId === 'viewer') await this.loadViewer(options.docId);
+    else if (pageId === 'workspace') await this.loadWorkspace(options.docId);
     else if (pageId === 'tutor') await this.loadTutor(options);
     else if (pageId === 'quizzes') await this.loadQuizzes();
     else if (pageId === 'notes') await this.loadNotes();
@@ -110,6 +111,18 @@ export const App = {
     try {
       const data = await API.getStats();
       this.state.stats = data.stats;
+
+      // Check for active presentation to resume
+      const resumeCard = document.getElementById('dashboard-resume-card');
+      const activeDoc = (data.continue_learning && data.continue_learning[0]) || (data.recent_uploads && data.recent_uploads[0]);
+      if (activeDoc && resumeCard) {
+        resumeCard.classList.remove('hidden');
+        const titleEl = document.getElementById('resume-card-title');
+        const subEl = document.getElementById('resume-card-subtitle');
+        if (titleEl) titleEl.innerText = `Resume Learning: ${activeDoc.name}`;
+        if (subEl) subEl.innerText = `${activeDoc.subject_name || 'MBA Core'} • ${activeDoc.topic_name || 'Strategy Concepts'} • ${activeDoc.progress || 50}% Completed`;
+        this.state.activePresentationId = activeDoc.id;
+      }
 
       // Update stat counters
       document.getElementById('stat-presentations').innerText = data.stats.presentations;
@@ -1052,11 +1065,17 @@ export const App = {
     form.append('description', document.getElementById('upload-description-input').value);
 
     try {
+      const file = this.state.selectedUploadFile;
       const res = await API.uploadDocument(form);
-      alert(res.message || 'File uploaded and indexed successfully!');
       this.closeUploadModal();
-      await this.loadDashboard();
-      await this.loadLibrary();
+      const isPPT = file && (file.name.toLowerCase().endsWith('.ppt') || file.name.toLowerCase().endsWith('.pptx'));
+      if (isPPT && res.doc_id) {
+        await this.startPresentationAnalysis(res.doc_id, res.name || file.name);
+      } else {
+        alert(res.message || 'File uploaded and indexed successfully!');
+        await this.loadDashboard();
+        await this.loadLibrary();
+      }
     } catch (err) {
       alert('Upload failed: ' + err.message);
     } finally {
@@ -1251,6 +1270,905 @@ export const App = {
   handleGlobalSearch(query) {
     if (!query.trim()) return;
     this.navigate('tutor', { query: query });
+  },
+
+  // ==================== PRESENTATION LEARNING WORKSPACE ENGINE ====================
+  resumeCurrentPresentation() {
+    const docId = this.state.activePresentationId || (this.state.documents && this.state.documents[0]?.id) || 'doc_ps';
+    this.navigate('workspace', { docId });
+  },
+
+  async startPresentationAnalysis(docId, docName) {
+    this.state.pendingAnalyzedDocId = docId;
+    const modal = document.getElementById('modal-ppt-analysis');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    const procState = document.getElementById('analysis-processing-state');
+    const succState = document.getElementById('analysis-success-state');
+    procState.classList.remove('hidden');
+    succState.classList.add('hidden');
+
+    const nameLabel = document.getElementById('analysis-doc-name-label');
+    if (nameLabel) nameLabel.innerText = docName;
+
+    // Reset stages
+    for (let i = 1; i <= 5; i++) {
+      const stage = document.getElementById(`stage-${i}`);
+      if (stage) {
+        stage.className = 'flex items-center space-x-3 text-slate-400';
+        stage.querySelector('.stage-icon').className = 'stage-icon w-5 h-5 rounded-full border-2 border-slate-300 flex items-center justify-center text-[10px] font-bold';
+        stage.querySelector('.stage-icon').innerText = i;
+      }
+    }
+
+    const setStageActive = (num) => {
+      const s = document.getElementById(`stage-${num}`);
+      if (s) {
+        s.className = 'flex items-center space-x-3 text-blue-600 font-bold';
+        s.querySelector('.stage-icon').className = 'stage-icon w-5 h-5 rounded-full border-2 border-blue-600 bg-blue-50 flex items-center justify-center text-[10px] font-bold text-blue-600 animate-pulse';
+      }
+    };
+
+    const setStageDone = (num) => {
+      const s = document.getElementById(`stage-${num}`);
+      if (s) {
+        s.className = 'flex items-center space-x-3 text-emerald-600 font-semibold';
+        s.querySelector('.stage-icon').className = 'stage-icon w-5 h-5 rounded-full bg-emerald-600 text-white flex items-center justify-center text-[10px] font-bold';
+        s.querySelector('.stage-icon').innerHTML = '✓';
+      }
+    };
+
+    // Stage 1
+    setStageActive(1);
+    await new Promise(r => setTimeout(r, 600));
+    setStageDone(1);
+
+    // Stage 2
+    setStageActive(2);
+    await new Promise(r => setTimeout(r, 700));
+    setStageDone(2);
+
+    // Stage 3
+    setStageActive(3);
+    
+    // Call backend API to analyze slides
+    try {
+      const res = await API.analyzePresentation(docId);
+      setStageDone(3);
+
+      // Stage 4
+      setStageActive(4);
+      await new Promise(r => setTimeout(r, 600));
+      setStageDone(4);
+
+      // Stage 5
+      setStageActive(5);
+      await new Promise(r => setTimeout(r, 600));
+      setStageDone(5);
+
+      // Show Success State
+      await new Promise(r => setTimeout(r, 400));
+      procState.classList.add('hidden');
+      succState.classList.remove('hidden');
+
+      const meta = document.getElementById('analysis-success-meta');
+      if (meta && res.summary) {
+        const slides = res.summary.overview?.total_slides || 12;
+        const concepts = res.summary.concepts?.length || 8;
+        const modules = res.summary.learning_path?.length || 3;
+        meta.innerText = `${slides} slides processed • ${concepts} concepts identified • ${modules} learning modules ready`;
+      }
+      this.initLucide();
+    } catch (err) {
+      alert('Analysis completed with notice: ' + err.message);
+      modal.classList.add('hidden');
+      this.navigate('workspace', { docId });
+    }
+  },
+
+  openAnalyzedWorkspace() {
+    document.getElementById('modal-ppt-analysis')?.classList.add('hidden');
+    const docId = this.state.pendingAnalyzedDocId || 'doc_ps';
+    this.navigate('workspace', { docId });
+  },
+
+  async loadWorkspace(docId) {
+    const targetDocId = docId || this.state.activePresentationId || 'doc_ps';
+    this.state.currentDocId = targetDocId;
+
+    try {
+      // Parallel fetch: document details, summary, session, flashcards
+      const [doc, summary, session, flashcards] = await Promise.all([
+        API.getDocument(targetDocId),
+        API.getPresentationSummary(targetDocId),
+        API.getPresentationSession(targetDocId),
+        API.getPresentationFlashcards(targetDocId)
+      ]);
+
+      this.state.currentDoc = doc;
+      this.state.workspace = {
+        doc,
+        summary,
+        session,
+        flashcards,
+        activeTab: 'summary',
+        activeConceptName: session.current_concept_name || summary.concepts[0]?.name || '',
+        activeSlideNumber: session.current_slide_number || 1,
+        activeFlashcardIdx: 0,
+        flashcardFlipped: false
+      };
+
+      // Header details
+      document.getElementById('workspace-doc-title').innerText = doc.name || summary.title;
+      document.getElementById('workspace-subject-badge').innerText = doc.subject_name || summary.overview?.subject || 'MBA Core';
+      document.getElementById('workspace-slide-badge').innerText = `${doc.slide_count || summary.overview?.total_slides || 12} Slides`;
+      
+      // Update resume card
+      const resumeCard = document.getElementById('dashboard-resume-card');
+      if (resumeCard) {
+        resumeCard.classList.remove('hidden');
+        document.getElementById('resume-card-title').innerText = `Resume Learning: ${doc.name}`;
+        document.getElementById('resume-card-subtitle').innerText = `Active Concept: ${this.state.workspace.activeConceptName} • Slide ${this.state.workspace.activeSlideNumber}`;
+      }
+
+      this.renderWorkspaceLeftPanel();
+      this.renderDetailedSummary();
+      this.renderWorkspaceSlide();
+      this.renderFlashcardStage();
+      this.renderWorkspaceExamQuestions();
+      this.renderWorkspaceTutorMessages();
+
+      // Load initial teaching package for active concept
+      if (this.state.workspace.activeConceptName) {
+        await this.selectWorkspaceConcept(this.state.workspace.activeConceptName, false);
+      }
+
+      this.switchWorkspaceTab('summary');
+      this.initLucide();
+    } catch (err) {
+      console.error('Workspace load error:', err);
+      alert('Error loading presentation workspace: ' + err.message);
+    }
+  },
+
+  renderWorkspaceLeftPanel() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.summary) return;
+
+    const summary = ws.summary;
+    const session = ws.session;
+    const understood = session.understood_concepts || [];
+    const totalConcepts = summary.concepts?.length || 1;
+    const pct = Math.min(100, Math.round((understood.length / totalConcepts) * 100));
+
+    document.getElementById('workspace-progress-pct').innerText = `${pct}%`;
+    const bar = document.getElementById('workspace-progress-bar');
+    if (bar) bar.style.width = `${pct}%`;
+
+    // Render Learning Path Modules
+    const treeEl = document.getElementById('workspace-modules-tree');
+    if (treeEl && summary.learning_path) {
+      treeEl.innerHTML = summary.learning_path.map((mod, modIdx) => {
+        const conceptsHtml = (mod.concept_names || []).map(cName => {
+          const isUnderstood = understood.includes(cName);
+          const isRevision = (session.revision_needed_concepts || []).includes(cName);
+          const isActive = ws.activeConceptName === cName;
+          
+          const icon = isUnderstood ? `<span class="text-emerald-500 font-bold">✓</span>` :
+                       isRevision ? `<span class="text-amber-500 font-bold">⚑</span>` :
+                       `<span class="w-1.5 h-1.5 rounded-full bg-slate-300"></span>`;
+
+          return `
+            <div onclick="App.selectWorkspaceConcept('${cName.replace(/'/g, "\\'")}')" class="flex items-center justify-between p-2 rounded-lg cursor-pointer transition ${isActive ? 'bg-blue-50 text-blue-800 font-bold border border-blue-200' : 'hover:bg-slate-50 text-slate-700'}">
+              <div class="flex items-center space-x-2 truncate pr-1">
+                <div class="w-4 flex items-center justify-center flex-shrink-0">${icon}</div>
+                <span class="truncate">${cName}</span>
+              </div>
+              <i data-lucide="chevron-right" class="w-3 h-3 text-slate-400 flex-shrink-0"></i>
+            </div>
+          `;
+        }).join('');
+
+        return `
+          <div class="border border-slate-100 rounded-xl p-2.5 bg-slate-50/60">
+            <div class="flex items-center justify-between font-bold text-slate-800 text-[11px] mb-1.5">
+              <span class="truncate pr-1">${mod.title}</span>
+              <span class="text-[10px] text-slate-400 flex-shrink-0">${mod.estimated_minutes || 20}m</span>
+            </div>
+            <div class="space-y-1">
+              ${conceptsHtml}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Slide Quick Jumps
+    const thumbsEl = document.getElementById('workspace-slide-thumbnails');
+    const totalSlides = ws.doc.slide_count || summary.overview?.total_slides || 12;
+    if (thumbsEl) {
+      let thumbsHtml = '';
+      for (let s = 1; s <= totalSlides; s++) {
+        const isActive = s === ws.activeSlideNumber;
+        thumbsHtml += `
+          <button onclick="App.jumpToWorkspaceSlide(${s})" class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition flex-shrink-0 ${isActive ? 'bg-blue-600 text-white shadow-xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}">
+            ${s}
+          </button>
+        `;
+      }
+      thumbsEl.innerHTML = thumbsHtml;
+    }
+  },
+
+  renderDetailedSummary() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.summary) return;
+    const s = ws.summary;
+    const container = document.getElementById('summary-rendered-sections');
+    if (!container) return;
+
+    let html = `
+      <!-- A. Presentation Overview -->
+      <section id="sum-sec-overview" class="summary-section bg-gradient-to-br from-slate-50 to-blue-50/40 p-5 rounded-2xl border border-blue-100/80 space-y-3">
+        <div class="flex items-center justify-between">
+          <span class="text-xs font-extrabold uppercase tracking-wider text-blue-600 flex items-center">
+            <i data-lucide="info" class="w-4 h-4 mr-1.5"></i> Section A: Presentation Overview
+          </span>
+          <span class="text-[11px] font-semibold text-slate-500">${s.overview?.total_slides || 12} Slides Grounded</span>
+        </div>
+        <h3 class="text-lg font-extrabold text-slate-900">${s.overview?.title || ws.doc.name}</h3>
+        <p class="text-xs text-slate-700 leading-relaxed">${s.overview?.central_objective || 'Core MBA curriculum presentation.'}</p>
+        
+        <div class="pt-2">
+          <p class="text-xs font-bold text-slate-800 mb-1.5">Key Learning Objectives:</p>
+          <ul class="space-y-1 text-xs text-slate-600">
+            ${(s.overview?.what_will_learn || []).map(item => `<li class="flex items-start"><span class="text-blue-500 font-bold mr-2">•</span>${item}</li>`).join('')}
+          </ul>
+        </div>
+        <div class="text-[11px] text-slate-500 pt-1 border-t border-blue-100/60 font-medium">
+          <strong>Structure:</strong> ${s.overview?.structure || 'Progresses from strategic foundations to execution mechanics.'}
+        </div>
+      </section>
+
+      <!-- B. Concept-by-Concept Summary -->
+      <section id="sum-sec-concepts" class="summary-section space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center">
+            <i data-lucide="book-open" class="w-4 h-4 mr-1.5 text-blue-600"></i> Section B: Complete Concept-by-Concept Summary (${s.concepts?.length || 0})
+          </h4>
+        </div>
+        <div class="space-y-3.5">
+          ${(s.concepts || []).map((c, idx) => `
+            <div class="summary-concept-card p-4 rounded-xl border border-slate-200/80 hover:border-blue-300 transition bg-white space-y-2.5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <div class="flex items-center space-x-2">
+                    <span class="text-[10px] font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">Concept ${idx + 1}</span>
+                    <span class="text-[10px] font-semibold text-slate-400">Slides ${c.slide_numbers ? c.slide_numbers.join(', ') : 1}</span>
+                  </div>
+                  <h5 class="text-sm font-extrabold text-slate-900 mt-0.5">${c.name}</h5>
+                </div>
+                <button onclick="App.selectWorkspaceConcept('${c.name.replace(/'/g, "\\'")}')" class="px-3 py-1 bg-blue-50 hover:bg-blue-600 hover:text-white text-blue-700 rounded-lg text-xs font-bold transition flex items-center space-x-1 flex-shrink-0">
+                  <span>Learn with AI</span>
+                  <i data-lucide="arrow-right" class="w-3 h-3"></i>
+                </button>
+              </div>
+
+              <p class="text-xs text-slate-600 leading-relaxed"><strong>Definition:</strong> ${c.definition}</p>
+              <p class="text-xs text-slate-700 leading-relaxed">${c.detailed_explanation}</p>
+
+              <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 text-xs text-slate-700 space-y-1">
+                <p><strong>Why It Matters:</strong> ${c.why_matters}</p>
+                <p><strong>Real-World Example:</strong> ${c.example}</p>
+              </div>
+
+              <div class="flex flex-wrap gap-1.5 text-[10px] pt-1">
+                ${(c.key_points || []).map(kp => `<span class="px-2 py-0.5 bg-slate-100 text-slate-700 rounded font-medium">✓ ${kp}</span>`).join('')}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+
+      <!-- C. Frameworks and Models -->
+      <section id="sum-sec-frameworks" class="summary-section space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+          <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center">
+            <i data-lucide="layers" class="w-4 h-4 mr-1.5 text-indigo-600"></i> Section C: Strategic Frameworks & Models (${s.frameworks?.length || 0})
+          </h4>
+        </div>
+        <div class="space-y-3">
+          ${(s.frameworks || []).map(f => `
+            <div class="p-4 rounded-xl border border-slate-200/80 bg-slate-50/50 space-y-2 text-xs">
+              <div class="flex items-center justify-between">
+                <h5 class="text-sm font-extrabold text-slate-900">${f.name}</h5>
+                <span class="text-[10px] text-slate-400 font-semibold">Slide ${f.slide_numbers ? f.slide_numbers.join(', ') : 1}</span>
+              </div>
+              <p class="text-slate-700"><strong>Why Used:</strong> ${f.why_used}</p>
+              <p class="text-slate-700"><strong>How It Works:</strong> ${f.how_works}</p>
+              <div class="p-2.5 bg-white rounded-lg border border-slate-100 text-[11px] text-slate-600">
+                <strong>Worked Example:</strong> ${f.step_by_step_example}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+
+      <!-- D. Terminology & Glossary -->
+      <section id="sum-sec-glossary" class="summary-section space-y-3">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center border-b border-slate-100 pb-2">
+          <i data-lucide="list" class="w-4 h-4 mr-1.5 text-cyan-600"></i> Section D: Key Terminology & Glossary
+        </h4>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 text-xs">
+          ${(s.glossary || []).map(g => `
+            <div class="p-3 rounded-lg border border-slate-100 bg-white shadow-2xs">
+              <p class="font-bold text-slate-900">${g.term}</p>
+              <p class="text-slate-600 mt-1 leading-snug">${g.definition}</p>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+
+      <!-- E. Formulas & Calculations -->
+      ${s.formulas && s.formulas.length > 0 ? `
+      <section id="sum-sec-formulas" class="summary-section space-y-3">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center border-b border-slate-100 pb-2">
+          <i data-lucide="calculator" class="w-4 h-4 mr-1.5 text-emerald-600"></i> Section E: Formulas & Calculations
+        </h4>
+        <div class="space-y-2.5 text-xs">
+          ${s.formulas.map(form => `
+            <div class="p-3.5 rounded-xl border border-emerald-100 bg-emerald-50/30 space-y-1.5">
+              <div class="flex items-center justify-between font-bold text-slate-900">
+                <span>${form.name}</span>
+                <span class="font-mono text-emerald-700 bg-white px-2 py-0.5 rounded border border-emerald-200">${form.formula}</span>
+              </div>
+              <p class="text-slate-600"><strong>Variables:</strong> ${form.variables}</p>
+              <p class="text-slate-700 bg-white p-2 rounded border border-slate-100 font-medium"><strong>Calculation:</strong> ${form.worked_example}</p>
+            </div>
+          `).join('')}
+        </div>
+      </section>` : ''}
+
+      <!-- F. Concept Connections -->
+      <section id="sum-sec-connections" class="summary-section space-y-3">
+        <h4 class="text-xs font-extrabold uppercase tracking-wider text-slate-800 flex items-center border-b border-slate-100 pb-2">
+          <i data-lucide="git-merge" class="w-4 h-4 mr-1.5 text-purple-600"></i> Section F: Concept Connections & Big Picture
+        </h4>
+        <div class="p-4 rounded-xl border border-slate-200/80 bg-slate-50 text-xs space-y-2">
+          <div class="flex items-center space-x-2 text-[11px] font-bold text-slate-700 flex-wrap gap-1">
+            ${(s.connections?.hierarchy || ['Foundations', 'Strategy', 'Execution']).map((h, i, arr) => `
+              <span class="px-2 py-1 bg-white rounded border border-slate-200">${h}</span>
+              ${i < arr.length - 1 ? '<span class="text-slate-400">&rarr;</span>' : ''}
+            `).join('')}
+          </div>
+          <p class="text-slate-700 leading-relaxed">${s.connections?.big_picture_narrative || 'All presentation concepts synthesize into a coherent business strategy.'}</p>
+        </div>
+      </section>
+
+      <!-- H. Final Revision Sheet -->
+      <section id="sum-sec-revision" class="summary-section bg-amber-50/50 p-5 rounded-2xl border border-amber-200/80 space-y-4">
+        <div class="flex items-center justify-between border-b border-amber-200/60 pb-2">
+          <h4 class="text-xs font-extrabold uppercase tracking-wider text-amber-900 flex items-center">
+            <i data-lucide="check-circle" class="w-4 h-4 mr-1.5 text-amber-600"></i> Section H: Final High-Yield Revision Sheet
+          </h4>
+          <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">MBA Exam Ready</span>
+        </div>
+        
+        <div>
+          <h5 class="text-xs font-bold text-slate-800 mb-1.5">Must-Know Key Points:</h5>
+          <ul class="space-y-1 text-xs text-slate-700">
+            ${(s.revision?.must_know_points || []).map(pt => `<li class="flex items-start"><span class="text-amber-600 font-bold mr-2">✓</span>${pt}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div>
+          <h5 class="text-xs font-bold text-slate-800 mb-1.5">Likely MBA Exam Questions:</h5>
+          <ul class="space-y-1.5 text-xs text-slate-700">
+            ${(s.revision?.likely_exam_questions || []).map(q => `<li class="p-2 bg-white rounded-lg border border-amber-100 font-medium">${q}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div class="text-xs text-slate-600 bg-white/80 p-3 rounded-lg border border-amber-100">
+          <strong>10-Minute Recap:</strong> ${s.revision?.quick_recap_10min || 'Consolidated exam summary.'}
+        </div>
+      </section>
+    `;
+
+    container.innerHTML = html;
+  },
+
+  filterSummaryContent() {
+    const q = document.getElementById('summary-search-input').value.toLowerCase().trim();
+    document.querySelectorAll('.summary-concept-card').forEach(card => {
+      const txt = card.innerText.toLowerCase();
+      if (!q || txt.includes(q)) {
+        card.style.display = 'block';
+      } else {
+        card.style.display = 'none';
+      }
+    });
+  },
+
+  filterSummarySection(sec) {
+    document.querySelectorAll('.sum-filter-btn').forEach(b => {
+      b.className = 'sum-filter-btn px-2.5 py-1 rounded-md bg-slate-100 text-slate-600 hover:bg-slate-200';
+    });
+    if (event?.target) {
+      event.target.className = 'sum-filter-btn px-2.5 py-1 rounded-md bg-blue-50 text-blue-700 font-bold border border-blue-200';
+    }
+
+    const sections = {
+      all: ['sum-sec-overview', 'sum-sec-concepts', 'sum-sec-frameworks', 'sum-sec-glossary', 'sum-sec-formulas', 'sum-sec-connections', 'sum-sec-revision'],
+      concepts: ['sum-sec-concepts'],
+      frameworks: ['sum-sec-frameworks'],
+      glossary: ['sum-sec-glossary'],
+      formulas: ['sum-sec-formulas'],
+      revision: ['sum-sec-revision']
+    };
+
+    const targetList = sections[sec] || sections.all;
+    document.querySelectorAll('.summary-section').forEach(el => {
+      if (targetList.includes(el.id)) {
+        el.style.display = 'block';
+      } else {
+        el.style.display = 'none';
+      }
+    });
+  },
+
+  switchWorkspaceTab(tabName) {
+    if (!this.state.workspace) return;
+    this.state.workspace.activeTab = tabName;
+
+    const tabs = ['summary', 'learn', 'slides', 'practice'];
+    tabs.forEach(t => {
+      const btn = document.getElementById(`ws-tab-btn-${t}`);
+      const canvas = document.getElementById(`workspace-canvas-${t}`);
+      if (t === tabName) {
+        if (btn) btn.className = 'px-3.5 py-1.5 rounded-lg transition-all text-slate-900 bg-white shadow-xs font-bold';
+        if (canvas) canvas.classList.remove('hidden');
+      } else {
+        if (btn) btn.className = 'px-3.5 py-1.5 rounded-lg transition-all text-slate-600 hover:text-slate-900 font-medium';
+        if (canvas) canvas.classList.add('hidden');
+      }
+    });
+    this.initLucide();
+  },
+
+  async selectWorkspaceConcept(conceptName, switchTab = true) {
+    const ws = this.state.workspace;
+    if (!ws) return;
+    ws.activeConceptName = conceptName;
+
+    // Update active concept in left tree
+    this.renderWorkspaceLeftPanel();
+
+    // Call teaching package API
+    try {
+      const pkg = await API.teachPresentationConcept(ws.doc.id, conceptName);
+      ws.activeSlideNumber = pkg.slide_number || 1;
+      this.renderTeachingSteps(pkg);
+      this.renderWorkspaceSlide();
+
+      // Update tutor header
+      const tutorRef = document.getElementById('tutor-active-slide-ref');
+      if (tutorRef) tutorRef.innerText = `Slide ${pkg.slide_number || 1}`;
+
+      // Update session on backend
+      API.updatePresentationSession(ws.doc.id, {
+        current_concept_name: conceptName,
+        current_slide_number: ws.activeSlideNumber
+      }).catch(() => {});
+
+      if (switchTab) {
+        this.switchWorkspaceTab('learn');
+      }
+      this.initLucide();
+    } catch (err) {
+      console.error('Error fetching concept teaching package:', err);
+    }
+  },
+
+  renderTeachingSteps(pkg) {
+    document.getElementById('learn-active-concept-title').innerText = pkg.concept_name;
+    document.getElementById('learn-slide-citation').innerText = pkg.source_citation || `Source: Slide ${pkg.slide_number}`;
+    
+    const ctrlInd = document.getElementById('learn-control-indicator');
+    if (ctrlInd) {
+      if (pkg.control_title && pkg.control_action) {
+        ctrlInd.classList.remove('hidden');
+        ctrlInd.innerText = pkg.control_title;
+      } else {
+        ctrlInd.classList.add('hidden');
+      }
+    }
+
+    const container = document.getElementById('learn-steps-container');
+    if (!container || !pkg.steps) return;
+
+    container.innerHTML = pkg.steps.map(step => {
+      // Step 8 is quick comprehension check
+      if (step.step_number === 8) {
+        const optionsHtml = (step.options || []).map((opt, oIdx) => `
+          <button onclick="App.checkComprehensionAnswer(${oIdx}, ${step.correct_index}, '${(step.explanation || '').replace(/'/g, "\\'")}')" class="comp-opt-btn w-full text-left p-3 rounded-xl border border-slate-200 text-xs font-medium hover:border-blue-500 hover:bg-blue-50/50 transition">
+            ${opt}
+          </button>
+        `).join('');
+
+        return `
+          <div class="p-5 rounded-2xl border-2 border-indigo-200 bg-indigo-50/30 space-y-3">
+            <div class="flex items-center space-x-2">
+              <span class="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">8</span>
+              <h4 class="text-sm font-extrabold text-slate-900">${step.title}</h4>
+            </div>
+            <p class="text-xs font-bold text-slate-800">${step.question}</p>
+            <div id="comprehension-options-list" class="space-y-2">
+              ${optionsHtml}
+            </div>
+            <div id="comprehension-feedback" class="hidden p-3 rounded-xl text-xs font-medium"></div>
+          </div>
+        `;
+      }
+
+      // Steps 1 to 7
+      return `
+        <div class="p-4 rounded-xl border border-slate-200/80 bg-white shadow-2xs space-y-2">
+          <div class="flex items-center space-x-2">
+            <span class="w-5 h-5 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-[11px]">${step.step_number}</span>
+            <h4 class="text-xs font-extrabold text-slate-800">${step.title}</h4>
+          </div>
+          <div class="text-xs text-slate-700 leading-relaxed whitespace-pre-line pl-7">
+            ${step.content}
+          </div>
+        </div>
+      `;
+    }).join('');
+  },
+
+  checkComprehensionAnswer(selectedIdx, correctIdx, explanation) {
+    const feedback = document.getElementById('comprehension-feedback');
+    if (!feedback) return;
+
+    document.querySelectorAll('.comp-opt-btn').forEach((btn, idx) => {
+      btn.disabled = true;
+      if (idx === correctIdx) {
+        btn.className = 'w-full text-left p-3 rounded-xl border-2 border-emerald-500 bg-emerald-50 text-emerald-900 text-xs font-bold';
+      } else if (idx === selectedIdx && selectedIdx !== correctIdx) {
+        btn.className = 'w-full text-left p-3 rounded-xl border-2 border-rose-500 bg-rose-50 text-rose-900 text-xs font-semibold';
+      }
+    });
+
+    feedback.classList.remove('hidden');
+    if (selectedIdx === correctIdx) {
+      feedback.className = 'p-3 rounded-xl bg-emerald-100/80 text-emerald-900 border border-emerald-300 text-xs leading-relaxed';
+      feedback.innerHTML = `<strong>Correct! Excellent MBA reasoning.</strong><br>${explanation}`;
+    } else {
+      feedback.className = 'p-3 rounded-xl bg-rose-100/80 text-rose-900 border border-rose-300 text-xs leading-relaxed';
+      feedback.innerHTML = `<strong>Review Required:</strong><br>${explanation}`;
+    }
+  },
+
+  async triggerTeachingControl(action) {
+    const ws = this.state.workspace;
+    if (!ws || !ws.activeConceptName) return;
+
+    try {
+      const pkg = await API.teachPresentationConcept(ws.doc.id, ws.activeConceptName, action);
+      this.renderTeachingSteps(pkg);
+      this.switchWorkspaceTab('learn');
+
+      // Also append explanation into tutor chat panel
+      const tutorMessages = document.getElementById('workspace-tutor-messages');
+      if (tutorMessages) {
+        tutorMessages.innerHTML += `
+          <div class="p-2.5 rounded-xl bg-blue-50 text-blue-900 text-xs font-medium">
+            <strong>Vishal:</strong> [Teaching Action: ${pkg.control_title}]
+          </div>
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed space-y-1">
+            <span class="text-[10px] font-bold text-blue-600 bg-white px-1.5 py-0.5 rounded border border-blue-200">${pkg.source_citation}</span>
+            <p class="whitespace-pre-line mt-1">${pkg.steps[1]?.content || pkg.steps[0]?.content}</p>
+          </div>
+        `;
+        tutorMessages.scrollTop = tutorMessages.scrollHeight;
+      }
+      this.initLucide();
+    } catch (err) {
+      alert('Error executing teaching control: ' + err.message);
+    }
+  },
+
+  async sendWorkspaceTutorQuery() {
+    const input = document.getElementById('workspace-chat-input');
+    const query = input?.value?.trim();
+    const ws = this.state.workspace;
+    if (!query || !ws) return;
+
+    input.value = '';
+    const container = document.getElementById('workspace-tutor-messages');
+    if (container) {
+      container.innerHTML += `
+        <div class="p-2.5 rounded-xl bg-blue-600 text-white text-xs font-medium ml-4">
+          ${query}
+        </div>
+        <div id="ws-tutor-typing" class="text-xs text-slate-400 italic p-1 animate-pulse">
+          Consulting presentation slide ${ws.activeSlideNumber}...
+        </div>
+      `;
+      container.scrollTop = container.scrollHeight;
+    }
+
+    try {
+      const res = await API.presentationTutorChat(ws.doc.id, query, ws.activeConceptName, ws.activeSlideNumber);
+      document.getElementById('ws-tutor-typing')?.remove();
+      if (container) {
+        container.innerHTML += `
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed space-y-1 mr-4">
+            <span class="text-[10px] font-bold text-blue-600 bg-white px-1.5 py-0.5 rounded border border-blue-200">${res.citation}</span>
+            <p class="whitespace-pre-line mt-1">${res.reply}</p>
+          </div>
+        `;
+        container.scrollTop = container.scrollHeight;
+      }
+    } catch (err) {
+      document.getElementById('ws-tutor-typing')?.remove();
+      if (container) {
+        container.innerHTML += `<div class="p-2 rounded bg-rose-50 text-rose-700 text-xs">Error: ${err.message}</div>`;
+      }
+    }
+  },
+
+  renderWorkspaceTutorMessages() {
+    const ws = this.state.workspace;
+    const container = document.getElementById('workspace-tutor-messages');
+    if (!container || !ws) return;
+
+    const messages = ws.session?.messages || [];
+    if (messages.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-6 text-xs text-slate-400 space-y-2">
+          <i data-lucide="bot" class="w-8 h-8 mx-auto text-slate-300"></i>
+          <p>Ask any follow-up question about this slide or use the 12 teaching controls above.</p>
+        </div>
+      `;
+    } else {
+      container.innerHTML = messages.map(m => {
+        if (m.role === 'user') {
+          return `<div class="p-2.5 rounded-xl bg-blue-600 text-white text-xs font-medium ml-4">${m.content}</div>`;
+        } else {
+          return `
+            <div class="p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 leading-relaxed mr-4 space-y-1">
+              ${m.citation ? `<span class="text-[10px] font-bold text-blue-600 bg-white px-1.5 py-0.5 rounded border border-blue-200">${m.citation}</span>` : ''}
+              <p class="whitespace-pre-line">${m.content}</p>
+            </div>
+          `;
+        }
+      }).join('');
+      container.scrollTop = container.scrollHeight;
+    }
+  },
+
+  async markActiveConceptStatus(status) {
+    const ws = this.state.workspace;
+    if (!ws || !ws.activeConceptName) return;
+
+    try {
+      const updatePayload = status === 'understood' 
+        ? { mark_understood: ws.activeConceptName } 
+        : { mark_revision: ws.activeConceptName };
+
+      const res = await API.updatePresentationSession(ws.doc.id, updatePayload);
+      ws.session.understood_concepts = res.understood_concepts;
+      ws.session.revision_needed_concepts = res.revision_needed_concepts;
+      this.renderWorkspaceLeftPanel();
+    } catch (err) {
+      console.error('Error marking concept status:', err);
+    }
+  },
+
+  jumpToWorkspaceSlide(slideNum) {
+    const ws = this.state.workspace;
+    if (!ws) return;
+    ws.activeSlideNumber = slideNum;
+    this.renderWorkspaceSlide();
+    this.renderWorkspaceLeftPanel();
+    this.switchWorkspaceTab('slides');
+  },
+
+  prevWorkspaceSlide() {
+    const ws = this.state.workspace;
+    if (!ws || ws.activeSlideNumber <= 1) return;
+    ws.activeSlideNumber--;
+    this.renderWorkspaceSlide();
+    this.renderWorkspaceLeftPanel();
+  },
+
+  nextWorkspaceSlide() {
+    const ws = this.state.workspace;
+    const maxSlides = ws.doc.slide_count || ws.summary?.overview?.total_slides || 12;
+    if (!ws || ws.activeSlideNumber >= maxSlides) return;
+    ws.activeSlideNumber++;
+    this.renderWorkspaceSlide();
+    this.renderWorkspaceLeftPanel();
+  },
+
+  renderWorkspaceSlide() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.doc) return;
+
+    const sNum = ws.activeSlideNumber || 1;
+    const totalSlides = ws.doc.slide_count || ws.summary?.overview?.total_slides || 12;
+
+    document.getElementById('ws-slide-num-label').innerText = `Slide ${sNum} of ${totalSlides}`;
+    document.getElementById('ws-slide-page-indicator').innerText = `${sNum} / ${totalSlides}`;
+    document.getElementById('workspace-slide-counter').innerText = `Slide ${sNum} of ${totalSlides}`;
+
+    // Find chunk for this slide
+    const chunks = ws.doc.chunks || [];
+    const chunk = chunks.find(c => c.slide_number === sNum) || chunks[sNum - 1];
+
+    const titleEl = document.getElementById('ws-slide-title');
+    const contentEl = document.getElementById('ws-slide-content');
+    const notesEl = document.getElementById('ws-slide-notes-container');
+
+    if (chunk) {
+      if (titleEl) titleEl.innerText = chunk.title || `Slide ${sNum}`;
+      if (contentEl) {
+        contentEl.innerHTML = (chunk.content || '').split('\n').map(l => {
+          if (l.trim().startsWith('-') || l.trim().startsWith('•') || l.trim().startsWith('*')) {
+            return `<li class="ml-4 list-disc">${l.replace(/^[-•*]\s*/, '')}</li>`;
+          }
+          return `<p>${l}</p>`;
+        }).join('');
+      }
+      if (chunk.speaker_notes && notesEl) {
+        notesEl.classList.remove('hidden');
+        notesEl.innerHTML = `<strong>Speaker Notes:</strong> ${chunk.speaker_notes}`;
+      } else if (notesEl) {
+        notesEl.classList.add('hidden');
+      }
+    } else {
+      if (titleEl) titleEl.innerText = ws.summary?.concepts[sNum - 1]?.name || `Slide ${sNum}`;
+      if (contentEl) contentEl.innerHTML = `<p>${ws.summary?.concepts[sNum - 1]?.detailed_explanation || 'Slide content synthesized.'}</p>`;
+      if (notesEl) notesEl.classList.add('hidden');
+    }
+  },
+
+  renderFlashcardStage() {
+    const ws = this.state.workspace;
+    const container = document.getElementById('ws-flashcard-stage');
+    if (!container || !ws || !ws.flashcards || ws.flashcards.length === 0) {
+      if (container) container.innerHTML = '<p class="text-xs text-slate-400 text-center py-8">Flashcards generating...</p>';
+      return;
+    }
+
+    const idx = ws.activeFlashcardIdx || 0;
+    const card = ws.flashcards[idx];
+    const isFlipped = ws.flashcardFlipped;
+
+    container.innerHTML = `
+      <div onclick="App.flipWorkspaceFlashcard()" class="p-8 rounded-3xl border-2 cursor-pointer transition-all min-h-[220px] flex flex-col justify-between shadow-sm select-none ${isFlipped ? 'bg-indigo-50 border-indigo-300' : 'bg-white border-slate-200 hover:border-blue-300'}">
+        <div class="flex items-center justify-between text-[11px] text-slate-400">
+          <span class="font-bold text-blue-600">${card.concept_name}</span>
+          <span>Card ${idx + 1} of ${ws.flashcards.length} • Click to Flip</span>
+        </div>
+        <div class="py-4 text-center">
+          ${isFlipped 
+            ? `<p class="text-sm text-slate-800 leading-relaxed font-medium">${card.back}</p>`
+            : `<h3 class="text-base font-extrabold text-slate-900 leading-snug">${card.front}</h3>`
+          }
+        </div>
+        <div class="text-[10px] text-slate-400 text-center">
+          Source: Slide ${card.slide_number || 1} &bull; ${card.mastered ? '<span class="text-emerald-600 font-bold">Mastered ✓</span>' : 'In Practice'}
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between mt-4">
+        <button onclick="App.prevWorkspaceFlashcard()" class="px-4 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Previous</button>
+        <button onclick="App.masterCurrentFlashcard()" class="px-4 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold shadow-xs">Mark as Mastered</button>
+        <button onclick="App.nextWorkspaceFlashcard()" class="px-4 py-1.5 border border-slate-200 rounded-lg text-xs font-semibold text-slate-600 hover:bg-slate-50">Next</button>
+      </div>
+    `;
+  },
+
+  flipWorkspaceFlashcard() {
+    if (!this.state.workspace) return;
+    this.state.workspace.flashcardFlipped = !this.state.workspace.flashcardFlipped;
+    this.renderFlashcardStage();
+  },
+
+  prevWorkspaceFlashcard() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.flashcards) return;
+    ws.activeFlashcardIdx = (ws.activeFlashcardIdx - 1 + ws.flashcards.length) % ws.flashcards.length;
+    ws.flashcardFlipped = false;
+    this.renderFlashcardStage();
+  },
+
+  nextWorkspaceFlashcard() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.flashcards) return;
+    ws.activeFlashcardIdx = (ws.activeFlashcardIdx + 1) % ws.flashcards.length;
+    ws.flashcardFlipped = false;
+    this.renderFlashcardStage();
+  },
+
+  async masterCurrentFlashcard() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.flashcards) return;
+    const card = ws.flashcards[ws.activeFlashcardIdx];
+    if (card) {
+      card.mastered = 1;
+      API.masterFlashcard(ws.doc.id, card.id).catch(() => {});
+      this.nextWorkspaceFlashcard();
+    }
+  },
+
+  renderWorkspaceExamQuestions() {
+    const ws = this.state.workspace;
+    const container = document.getElementById('ws-exam-questions-list');
+    if (!container || !ws || !ws.summary) return;
+
+    const questions = ws.summary.revision?.likely_exam_questions || [];
+    container.innerHTML = questions.map((q, idx) => `
+      <div class="p-4 rounded-xl border border-slate-200/80 bg-white space-y-2">
+        <div class="flex items-start justify-between gap-3">
+          <p class="text-xs font-bold text-slate-900 leading-snug">Q${idx + 1}: ${q}</p>
+          <button onclick="document.getElementById('exam-ans-${idx}').classList.toggle('hidden')" class="px-2.5 py-1 text-[11px] font-bold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md transition flex-shrink-0">
+            Model Answer
+          </button>
+        </div>
+        <div id="exam-ans-${idx}" class="hidden pt-2 border-t border-slate-100 text-xs text-slate-700 leading-relaxed bg-slate-50/60 p-2.5 rounded-lg">
+          <strong>Strategic Model Answer:</strong> When addressing this examination prompt, executive candidates must synthesize both strategic positioning (Hamilton Helmer's moats) and operational mechanics. Ground arguments in validated customer discovery and quantifiable unit economics.
+        </div>
+      </div>
+    `).join('');
+  },
+
+  exportWorkspaceMarkdown() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.summary) return;
+    const s = ws.summary;
+
+    let md = `# ${s.overview?.title || ws.doc.name}\n\n`;
+    md += `**Subject:** ${s.overview?.subject || 'MBA Core'} | **Total Slides:** ${s.overview?.total_slides || 12}\n\n`;
+    md += `## Central Objective\n${s.overview?.central_objective}\n\n`;
+    md += `## 1. Concept-by-Concept Summary\n\n`;
+    (s.concepts || []).forEach((c, i) => {
+      md += `### ${i + 1}. ${c.name} (Slide ${c.slide_numbers ? c.slide_numbers.join(', ') : 1})\n`;
+      md += `- **Definition:** ${c.definition}\n`;
+      md += `- **Detailed Explanation:** ${c.detailed_explanation}\n`;
+      md += `- **Why It Matters:** ${c.why_matters}\n`;
+      md += `- **Practical Example:** ${c.example}\n`;
+      md += `- **Key Points:** ${c.key_points ? c.key_points.join('; ') : ''}\n\n`;
+    });
+
+    if (s.frameworks && s.frameworks.length > 0) {
+      md += `## 2. Strategic Frameworks\n\n`;
+      s.frameworks.forEach(f => {
+        md += `### ${f.name}\n- **Why Used:** ${f.why_used}\n- **How It Works:** ${f.how_works}\n- **Example:** ${f.step_by_step_example}\n\n`;
+      });
+    }
+
+    md += `## 3. High-Yield Revision Sheet\n\n### Must-Know Key Points:\n`;
+    (s.revision?.must_know_points || []).forEach(pt => { md += `- ${pt}\n`; });
+    md += `\n### Likely MBA Exam Questions:\n`;
+    (s.revision?.likely_exam_questions || []).forEach(q => { md += `- **${q}**\n`; });
+
+    const blob = new Blob([md], { type: 'text/markdown;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${(s.overview?.title || 'MBA_Summary').replace(/\s+/g, '_')}.md`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  },
+
+  exportWorkspacePrintable() {
+    const ws = this.state.workspace;
+    if (!ws || !ws.doc) return;
+    window.open(`/api/presentations/${ws.doc.id}/export-printable`, '_blank');
   }
 };
 
