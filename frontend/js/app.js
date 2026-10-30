@@ -73,6 +73,10 @@ export const App = {
     try {
       const auth = await API.getCurrentUser(token);
       if (auth && auth.authenticated && auth.user) {
+        if (auth.token && !localStorage.getItem('vishal_lms_token')) {
+          localStorage.setItem('vishal_lms_token', auth.token);
+        }
+        this.state.currentUser = auth.user;
         const nameEl = document.getElementById('header-user-name');
         if (nameEl) nameEl.innerText = auth.user.full_name || 'Vishal Singh';
       }
@@ -86,6 +90,23 @@ export const App = {
         this.navigate(e.state.pageId, e.state.options || {}, false);
       } else {
         this.navigate('dashboard', {}, false);
+      }
+    });
+
+    // Support keyboard arrow navigation for slide presentation viewer
+    window.addEventListener('keydown', (e) => {
+      if (this.state.currentPage === 'presentation-learn') {
+        if (e.target && ['input', 'textarea', 'select'].includes(e.target.tagName?.toLowerCase())) return;
+        const activeTab = document.getElementById('learn-tab-ppt-viewer');
+        if (activeTab && !activeTab.classList.contains('hidden')) {
+          if (e.key === 'ArrowLeft') {
+            e.preventDefault();
+            this.prevSlide();
+          } else if (e.key === 'ArrowRight') {
+            e.preventDefault();
+            this.nextSlide();
+          }
+        }
       }
     });
 
@@ -572,6 +593,28 @@ export const App = {
                   ${statusBadge}
 
                   <div class="flex items-center space-x-1">
+                    <a 
+                      href="/api/documents/${doc.id}/download" 
+                      download 
+                      class="p-1.5 text-slate-400 hover:text-cyan-400 rounded-lg hover:bg-white/5 transition"
+                      title="Download Original File"
+                    >
+                      <i data-lucide="download" class="w-3.5 h-3.5"></i>
+                    </a>
+                    <button 
+                      onclick="App.reprocessPresentation('${doc.id}')" 
+                      class="p-1.5 text-slate-400 hover:text-amber-400 rounded-lg hover:bg-white/5 transition"
+                      title="Reprocess Presentation"
+                    >
+                      <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                    </button>
+                    <button 
+                      onclick="App.openMoveDeckModal('${doc.id}')" 
+                      class="p-1.5 text-slate-400 hover:text-purple-400 rounded-lg hover:bg-white/5 transition"
+                      title="Move Presentation to Another Subject"
+                    >
+                      <i data-lucide="folder-symlink" class="w-3.5 h-3.5"></i>
+                    </button>
                     <button 
                       onclick="App.openRenamePresentationModal('${doc.id}', '${this.escapeHtml(doc.name)}')" 
                       class="p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition"
@@ -1475,6 +1518,16 @@ export const App = {
       notesText.innerText = slide.speaker_notes ? slide.speaker_notes : 'No speaker notes on this slide.';
     }
 
+    // Update Extracted Text Drawer
+    const textNum = document.getElementById('ppt-text-panel-slide-num');
+    const textContent = document.getElementById('ppt-extracted-text-content');
+    if (textNum) textNum.innerText = slide.slide_number;
+    if (textContent) {
+      const paras = (slide.paragraphs || []).join('\n\n');
+      const notes = slide.speaker_notes ? `\n\n[Speaker Notes]:\n${slide.speaker_notes}` : '';
+      textContent.innerText = (paras || slide.title || 'No extracted text on this slide.') + notes;
+    }
+
     // Update active thumbnail
     document.querySelectorAll('.ppt-thumb-item').forEach((el, idx) => {
       if (idx === curIdx) {
@@ -1618,12 +1671,119 @@ export const App = {
   },
 
   toggleViewerFullscreen() {
-    const stage = document.getElementById('ppt-viewer-stage');
+    const stage = document.getElementById('ppt-viewer-stage') || document.getElementById('learn-tab-ppt-viewer');
     if (!stage) return;
     if (!document.fullscreenElement) {
       stage.requestFullscreen().catch(err => console.warn('Fullscreen err:', err));
     } else {
       document.exitFullscreen().catch(err => console.warn('Exit fullscreen err:', err));
+    }
+  },
+
+  toggleExtractedTextPanel() {
+    const panel = document.getElementById('ppt-extracted-text-panel');
+    if (panel) {
+      panel.classList.toggle('hidden');
+      this.initLucide();
+    }
+  },
+
+  async handleInDeckSearch(query) {
+    const popover = document.getElementById('ppt-search-results-popover');
+    if (!popover) return;
+    const q = (query || '').trim().toLowerCase();
+    if (!q) {
+      popover.classList.add('hidden');
+      popover.innerHTML = '';
+      return;
+    }
+
+    const slides = this.state.slidesData.slides || [];
+    const matches = [];
+    slides.forEach(s => {
+      const text = ((s.title || '') + ' ' + (s.paragraphs || []).join(' ') + ' ' + (s.speaker_notes || '')).toLowerCase();
+      if (text.includes(q)) {
+        matches.push(s);
+      }
+    });
+
+    if (matches.length === 0) {
+      popover.innerHTML = `<div class="p-2.5 text-slate-400 italic text-center">No slides match "${this.escapeHtml(q)}"</div>`;
+      popover.classList.remove('hidden');
+      return;
+    }
+
+    popover.innerHTML = matches.map(m => `
+      <div 
+        onclick="App.jumpToSlideInViewer(${m.slide_number}); document.getElementById('ppt-search-results-popover').classList.add('hidden');" 
+        class="p-2 rounded-lg bg-white/5 hover:bg-blue-600/30 cursor-pointer transition border border-white/5 flex items-center justify-between text-left"
+      >
+        <span class="font-bold text-blue-400 text-xs flex-shrink-0">Slide ${m.slide_number}</span>
+        <span class="text-slate-300 truncate ml-2 text-[11px]">${this.escapeHtml(m.title || 'Slide ' + m.slide_number)}</span>
+      </div>
+    `).join('');
+    popover.classList.remove('hidden');
+  },
+
+  openMoveDeckModal(docId) {
+    const modal = document.getElementById('modal-move-deck');
+    const input = document.getElementById('modal-move-doc-id');
+    const select = document.getElementById('modal-move-subject-select');
+    if (input) input.value = docId;
+    if (select && this.state.subjects && this.state.subjects.length > 0) {
+      select.innerHTML = this.state.subjects.map(s => `
+        <option value="${s.id}" class="bg-[#131B2E] text-slate-100 py-1">${this.escapeHtml(s.name)}</option>
+      `).join('');
+    }
+    if (modal) modal.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  async submitMoveDeck() {
+    const docId = document.getElementById('modal-move-doc-id')?.value;
+    const newSubId = document.getElementById('modal-move-subject-select')?.value;
+    if (!docId || !newSubId) return;
+    try {
+      await API.updateDocument(docId, { subject_id: newSubId });
+      this.closeModals();
+      await this.loadSubjects();
+      if (this.state.currentPage === 'subject' && this.state.currentSubject) {
+        await this.loadSubject(this.state.currentSubject.id);
+      } else {
+        await this.loadDashboard();
+      }
+    } catch (e) {
+      alert('Failed to move presentation: ' + e.message);
+    }
+  },
+
+  async reprocessPresentation(docId) {
+    if (!confirm('Reprocess this presentation? This will re-extract all slides, text, and regenerate concepts.')) return;
+    try {
+      await API.retryDocumentProcessing(docId);
+      alert('Presentation reprocessed successfully!');
+      if (this.state.currentPage === 'presentation-learn') {
+        await this.loadPresentationLearning(docId);
+      } else if (this.state.currentSubject) {
+        await this.loadSubject(this.state.currentSubject.id);
+      }
+    } catch (e) {
+      alert('Failed to reprocess: ' + e.message);
+    }
+  },
+
+  async confirmDeleteSubject(subjectId) {
+    const subj = (this.state.subjects || []).find(s => s.id === subjectId) || this.state.currentSubject;
+    const name = subj ? subj.name : 'this subject';
+    if (!confirm(`⚠️ Warning: Are you sure you want to permanently delete "${name}"?\n\nThis will permanently delete the subject and ALL associated presentations, extracted slides, quizzes, and notes. This cannot be undone.`)) {
+      return;
+    }
+    try {
+      await API.deleteSubject(subjectId);
+      await this.loadSubjects();
+      await this.navigate('dashboard');
+    } catch (e) {
+      alert('Failed to delete subject: ' + e.message);
     }
   },
 
@@ -2578,7 +2738,7 @@ export const App = {
     const submitBtn = document.getElementById('modal-upload-submit-btn');
     if (submitBtn) {
       submitBtn.disabled = true;
-      submitBtn.innerHTML = `<span>Upload & Analyze</span>`;
+      submitBtn.innerHTML = `<span>Upload & Process Presentation</span>`;
     }
 
     const updateSelect = () => {
@@ -2586,10 +2746,10 @@ export const App = {
       if (select) {
         if (this.state.subjects && this.state.subjects.length > 0) {
           select.innerHTML = this.state.subjects.map(s => `
-            <option value="${s.id}" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
+            <option value="${s.id}" class="bg-[#131B2E] text-slate-100 py-1" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
           `).join('');
         } else {
-          select.innerHTML = `<option value="">MBA Core Curriculum</option>`;
+          select.innerHTML = `<option value="" disabled selected class="bg-[#131B2E] text-slate-400">No subjects available — Create a subject first</option>`;
         }
       }
     };
@@ -2911,12 +3071,24 @@ export const App = {
     }
   },
 
+  currentTutorAbortController: null,
+  lastTutorQuery: '',
+
+  stopTutorStream() {
+    if (this.currentTutorAbortController) {
+      this.currentTutorAbortController.abort();
+      this.currentTutorAbortController = null;
+      document.getElementById('tutor-stop-btn')?.classList.add('hidden');
+    }
+  },
+
   async handleTutorSend() {
     const input = document.getElementById('tutor-chat-input');
     if (!input) return;
     const query = input.value.trim();
     if (!query) return;
     input.value = '';
+    this.lastTutorQuery = query;
 
     const container = document.getElementById('tutor-messages-container');
     if (!container) return;
@@ -2934,77 +3106,117 @@ export const App = {
     `;
     container.insertAdjacentHTML('beforeend', userMsgHtml);
 
-    // Render Loading Placeholder
-    const loadingId = `tutor-loading-${Date.now()}`;
-    const loadingHtml = `
-      <div id="${loadingId}" class="flex items-start gap-3 animate-fade-in">
+    // Setup streaming AI bubble
+    const msgId = `tutor-stream-${Date.now()}`;
+    const aiMsgHtml = `
+      <div id="${msgId}" class="flex items-start gap-3 animate-fade-in">
         <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">
           AI
         </div>
-        <div class="bg-white/5 border border-white/10 rounded-2xl p-4 text-xs text-slate-400 flex items-center space-x-2">
-          <span class="w-2 h-2 rounded-full bg-blue-400 animate-ping"></span>
-          <span>Synthesizing response in ${this.currentTeachingMode} mode...</span>
+        <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200 leading-relaxed space-y-3 w-full">
+          <div class="tutor-content-stream prose prose-invert prose-sm max-w-none text-slate-200">
+            <span class="inline-block w-2 h-2 rounded-full bg-blue-400 animate-ping mr-2"></span>
+            <span class="text-slate-400 italic">Thinking and synthesizing from course materials...</span>
+          </div>
+          <div class="tutor-citations-container hidden pt-2 border-t border-white/10 text-[11px] text-slate-400 space-y-1"></div>
+          <div class="tutor-actions-bar hidden pt-2 border-t border-white/10 flex items-center space-x-2">
+            <button onclick="App.copyTutorMessage('${msgId}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] flex items-center space-x-1" title="Copy response">
+              <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+              <span>Copy</span>
+            </button>
+            <button onclick="App.regenerateTutorMessage()" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] flex items-center space-x-1" title="Regenerate">
+              <i data-lucide="rotate-ccw" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Regenerate</span>
+            </button>
+            <button onclick="App.speakTutorMessage('${msgId}')" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] flex items-center space-x-1" title="Read aloud">
+              <i data-lucide="volume-2" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>Listen</span>
+            </button>
+          </div>
         </div>
       </div>
     `;
-    container.insertAdjacentHTML('beforeend', loadingHtml);
+    container.insertAdjacentHTML('beforeend', aiMsgHtml);
+    this.initLucide();
     container.scrollTop = container.scrollHeight;
 
     const subId = document.getElementById('tutor-subject-select')?.value || null;
     const docId = document.getElementById('tutor-doc-select')?.value || null;
+    const scope = document.getElementById('tutor-scope-select')?.value || 'all';
 
-    try {
-      const res = await fetch('/api/tutor/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query,
-          teaching_mode: this.currentTeachingMode,
-          subject_id: subId,
-          document_id: docId
-        })
-      });
-      const data = await res.json();
-      document.getElementById(loadingId)?.remove();
+    const stopBtn = document.getElementById('tutor-stop-btn');
+    if (stopBtn) stopBtn.classList.remove('hidden');
 
-      const parsedContent = window.marked ? window.marked.parse(data.response || '') : this.escapeHtml(data.response || '');
-      const citationsHtml = (data.citations && data.citations.length > 0) ? `
-        <div class="pt-2 border-t border-white/10 text-[11px] text-slate-400 space-y-1">
-          <span class="font-bold text-blue-400">📚 Source Citations:</span>
-          <div class="flex flex-wrap gap-1.5">
-            ${data.citations.map(c => `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">${this.escapeHtml(c.document)} (Slide ${c.slide})</span>`).join('')}
-          </div>
-        </div>
-      ` : '';
+    this.currentTutorAbortController = new AbortController();
+    let accumulatedText = '';
+    const contentEl = document.querySelector(`#${msgId} .tutor-content-stream`);
+    const citationsEl = document.querySelector(`#${msgId} .tutor-citations-container`);
+    const actionsEl = document.querySelector(`#${msgId} .tutor-actions-bar`);
 
-      const aiMsgHtml = `
-        <div class="flex items-start gap-3 animate-fade-in">
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">
-            AI
-          </div>
-          <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200 leading-relaxed space-y-3">
-            <div class="prose prose-invert prose-sm max-w-none">${parsedContent}</div>
-            ${citationsHtml}
-            <div class="pt-2 flex items-center space-x-2">
-              <button onclick="App.speakText(decodeURIComponent('${encodeURIComponent(data.response || '')}'))" class="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white text-[11px] flex items-center space-x-1" title="Read Aloud">
-                <i data-lucide="volume-2" class="w-3.5 h-3.5 text-cyan-400"></i>
-                <span>Listen</span>
-              </button>
+    await API.streamTutorChat(
+      {
+        query,
+        mode: 'ask_materials',
+        teaching_mode: this.currentTeachingMode || 'MBA',
+        scope,
+        subject_id: subId,
+        document_id: docId
+      },
+      (chunk) => {
+        accumulatedText += chunk;
+        if (contentEl) {
+          contentEl.innerHTML = window.marked ? window.marked.parse(accumulatedText) : accumulatedText.replace(/\n/g, '<br>');
+        }
+        container.scrollTop = container.scrollHeight;
+      },
+      (citations) => {
+        if (stopBtn) stopBtn.classList.add('hidden');
+        this.currentTutorAbortController = null;
+        if (contentEl) {
+          contentEl.innerHTML = window.marked ? window.marked.parse(accumulatedText) : accumulatedText.replace(/\n/g, '<br>');
+        }
+        if (citationsEl && citations && citations.length > 0) {
+          citationsEl.innerHTML = `
+            <span class="font-bold text-blue-400">📚 Source Citations:</span>
+            <div class="flex flex-wrap gap-1.5">
+              ${citations.map(c => `<span class="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-300">${this.escapeHtml(c.document)} (Slide ${c.slide})</span>`).join('')}
             </div>
-          </div>
-        </div>
-      `;
-      container.insertAdjacentHTML('beforeend', aiMsgHtml);
-      this.initLucide();
-      container.scrollTop = container.scrollHeight;
-    } catch (e) {
-      document.getElementById(loadingId)?.remove();
-      container.insertAdjacentHTML('beforeend', `
-        <div class="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
-          Error: ${e.message}
-        </div>
-      `);
+          `;
+          citationsEl.classList.remove('hidden');
+        }
+        if (actionsEl) actionsEl.classList.remove('hidden');
+        this.initLucide();
+        container.scrollTop = container.scrollHeight;
+      },
+      (err) => {
+        if (stopBtn) stopBtn.classList.add('hidden');
+        this.currentTutorAbortController = null;
+        if (contentEl) {
+          contentEl.innerHTML = `<span class="text-rose-400">Error: ${this.escapeHtml(err.message)}</span>`;
+        }
+      },
+      this.currentTutorAbortController.signal
+    );
+  },
+
+  copyTutorMessage(msgId) {
+    const el = document.querySelector(`#${msgId} .tutor-content-stream`);
+    if (el) {
+      navigator.clipboard.writeText(el.innerText).then(() => alert('Copied response to clipboard!')).catch(() => {});
     }
+  },
+
+  regenerateTutorMessage() {
+    if (this.lastTutorQuery) {
+      const input = document.getElementById('tutor-chat-input');
+      if (input) input.value = this.lastTutorQuery;
+      this.handleTutorSend();
+    }
+  },
+
+  speakTutorMessage(msgId) {
+    const el = document.querySelector(`#${msgId} .tutor-content-stream`);
+    if (el) this.speakText(el.innerText);
   },
 
   sendQuickTutorPrompt(promptText) {
@@ -3015,17 +3227,22 @@ export const App = {
     }
   },
 
-  clearTutorChat() {
-    const container = document.getElementById('tutor-messages-container');
-    if (container) {
-      container.innerHTML = `
-        <div class="flex items-start gap-3 animate-fade-in">
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">AI</div>
-          <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200">
-            <p class="font-semibold text-white">Chat cleared. What topic shall we master next, Vishal?</p>
+  async clearTutorChat() {
+    if (confirm('Clear all chat messages and history?')) {
+      try {
+        await API.clearTutorHistory();
+      } catch (e) {}
+      const container = document.getElementById('tutor-messages-container');
+      if (container) {
+        container.innerHTML = `
+          <div class="flex items-start gap-3 animate-fade-in">
+            <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center font-bold text-xs text-white shadow-md flex-shrink-0">AI</div>
+            <div class="bg-white/5 border border-white/10 rounded-2xl p-4 max-w-2xl text-xs text-slate-200">
+              <p class="font-semibold text-white">Chat cleared. What topic shall we master next, Vishal?</p>
+            </div>
           </div>
-        </div>
-      `;
+        `;
+      }
     }
   },
 

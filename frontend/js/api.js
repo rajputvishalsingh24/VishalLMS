@@ -172,6 +172,78 @@ export const API = {
     return res.json();
   },
 
+  async searchDeckContent(docId, query) {
+    const res = await fetch(`/api/documents/${docId}/search?q=${encodeURIComponent(query)}`, {
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) return { results: [] };
+    return res.json();
+  },
+
+  // AI Tutor Streaming & Chat
+  async streamTutorChat(payload, onChunk, onDone, onError, signal) {
+    try {
+      const res = await fetch('/api/tutor/chat/stream', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify(payload),
+        signal
+      });
+      if (!res.ok) {
+        throw new Error(`Server returned status ${res.status}`);
+      }
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop();
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(5).trim());
+              if (parsed.text && onChunk) onChunk(parsed.text);
+              if (parsed.done && onDone) onDone(parsed.citations || []);
+            } catch (e) {
+              // ignore parse errors
+            }
+          }
+        }
+      }
+      if (onDone) onDone([]);
+    } catch (err) {
+      if (err.name === 'AbortError') {
+        if (onDone) onDone([]);
+      } else if (onError) {
+        onError(err);
+      }
+    }
+  },
+
+  async clearTutorHistory() {
+    const res = await fetch('/api/tutor/clear', {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    return res.json();
+  },
+
+  async gradeShortAnswer(payload) {
+    const res = await fetch('/api/quizzes/grade-short-answer', {
+      method: 'POST',
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(payload)
+    });
+    if (!res.ok) throw new Error('Grading failed');
+    return res.json();
+  },
+
   // AI Tutor
   async tutorChat(query, mode = 'ask_materials', subjectId = null, documentId = null, detailLevel = 'normal') {
     const res = await fetch('/api/tutor/chat', {

@@ -278,13 +278,24 @@
           </div>
         </div>
 
-        <button 
-          onclick="App.openUploadPptForCurrentSubject()" 
-          class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
-        >
-          <i data-lucide="upload" class="w-4 h-4"></i>
-          <span>+ Upload PPT</span>
-        </button>
+        <div class="flex items-center space-x-2">
+          <button 
+            onclick="App.confirmDeleteSubject(App.state.currentSubject ? App.state.currentSubject.id : null)" 
+            class="px-3.5 py-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 font-semibold text-xs transition flex items-center space-x-1.5"
+            title="Delete Subject and all contents"
+          >
+            <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+            <span class="hidden sm:inline">Delete Subject</span>
+          </button>
+
+          <button 
+            onclick="App.openUploadPptForCurrentSubject()" 
+            class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs sm:text-sm shadow-lg shadow-blue-600/30 transition flex items-center space-x-2"
+          >
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <span>+ Upload PPT</span>
+          </button>
+        </div>
       </div>
 
       <!-- Subject Presentations List -->
@@ -763,7 +774,27 @@
             </button>
           </div>
 
+          <div class="flex items-center space-x-2 flex-1 max-w-sm">
+            <div class="relative w-full">
+              <input 
+                type="text" 
+                id="ppt-in-deck-search" 
+                placeholder="Search text in deck..." 
+                oninput="App.handleInDeckSearch(this.value)" 
+                class="w-full px-3 py-1.5 pl-8 rounded-xl bg-white/5 border border-white/10 text-xs text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 transition"
+              >
+              <i data-lucide="search" class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5"></i>
+              <div id="ppt-search-results-popover" class="hidden absolute left-0 right-0 top-full mt-1.5 z-30 bg-[#0E1626] border border-white/15 rounded-xl shadow-2xl p-2 max-h-60 overflow-y-auto space-y-1 text-xs"></div>
+            </div>
+          </div>
+
           <div class="flex items-center space-x-2">
+            <!-- Text Panel toggle -->
+            <button onclick="App.toggleExtractedTextPanel()" id="btn-toggle-extracted-text" class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-xs font-semibold flex items-center space-x-1 transition" title="Toggle Extracted Text">
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span class="hidden sm:inline">Text Panel</span>
+            </button>
+
             <!-- Zoom controls -->
             <button onclick="App.zoomSlide(-0.1)" class="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10" title="Zoom Out">
               <i data-lucide="zoom-out" class="w-4 h-4"></i>
@@ -806,10 +837,24 @@
 
           <!-- Main 16:9 Canvas Stage -->
           <div class="lg:col-span-3 space-y-3 order-1 lg:order-2">
-            <div id="ppt-viewer-stage" class="ppt-viewer-canvas-wrapper">
+            <div id="ppt-viewer-stage" class="ppt-viewer-canvas-wrapper relative">
               <div id="ppt-slide-canvas-surface" class="ppt-slide-canvas">
                 <!-- Dynamically rendered slide elements -->
               </div>
+            </div>
+
+            <!-- Extracted Text Drawer (Collapsible) -->
+            <div id="ppt-extracted-text-panel" class="hidden glass-panel p-4 rounded-2xl text-xs space-y-2 border border-blue-500/30 animate-fade-in">
+              <div class="flex items-center justify-between pb-1 border-b border-white/10">
+                <span class="font-bold uppercase tracking-wider text-blue-400 flex items-center space-x-1.5 text-[11px]">
+                  <i data-lucide="file-text" class="w-3.5 h-3.5"></i>
+                  <span>Extracted Slide Text & Notes (Slide <span id="ppt-text-panel-slide-num">1</span>)</span>
+                </span>
+                <button onclick="App.toggleExtractedTextPanel()" class="text-slate-400 hover:text-white p-0.5">
+                  <i data-lucide="x" class="w-3.5 h-3.5"></i>
+                </button>
+              </div>
+              <div id="ppt-extracted-text-content" class="text-slate-200 leading-relaxed max-h-48 overflow-y-auto whitespace-pre-wrap text-[11px]"></div>
             </div>
 
             <!-- Speaker Notes Drawer -->
@@ -1857,9 +1902,37 @@
     </div>
   </div>
 
+  <!-- MOVE PRESENTATION MODAL -->
+  <div id="modal-move-deck" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-purple-500/20 text-purple-400 flex items-center justify-center">
+            <i data-lucide="folder-symlink" class="w-5 h-5"></i>
+          </div>
+          <h3 class="text-base font-bold text-white">Move Presentation</h3>
+        </div>
+        <button onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <input type="hidden" id="modal-move-doc-id">
+      <div>
+        <label class="block text-xs font-semibold text-slate-300 mb-1.5">Destination Subject *</label>
+        <select id="modal-move-subject-select" class="w-full px-4 py-2.5 bg-[#131B2E] border border-white/15 rounded-xl focus:bg-[#18233c] focus:border-blue-500 focus:outline-none text-slate-100 text-sm"></select>
+      </div>
+
+      <div class="flex items-center justify-end space-x-3 pt-2">
+        <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
+        <button onclick="App.submitMoveDeck()" class="px-5 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-semibold text-xs shadow-md transition">Move Presentation</button>
+      </div>
+    </div>
+  </div>
+
   <!-- 4. UPLOAD PPT MODAL (WITH 7-STAGE ANIMATED PROCESSING FLOW) -->
   <div id="modal-upload-ppt" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-fade-in">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-5 animate-fade-in custom-scrollbar">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2.5">
           <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
@@ -1878,7 +1951,7 @@
           <label class="block text-xs font-semibold text-slate-300 mb-1.5">Select Subject *</label>
           <select 
             id="modal-upload-subject-select"
-            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+            class="w-full px-4 py-2.5 bg-[#131B2E] border border-white/15 rounded-xl focus:bg-[#18233c] focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
           ></select>
         </div>
 
@@ -1921,7 +1994,7 @@
         <div class="flex items-center justify-end space-x-3 pt-2">
           <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
           <button id="modal-upload-submit-btn" disabled onclick="App.startUploadAndProcess()" class="px-5 py-2.5 rounded-xl bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-1.5">
-            <span>Upload & Analyze</span>
+            <span>Upload & Process Presentation</span>
           </button>
         </div>
       </div>

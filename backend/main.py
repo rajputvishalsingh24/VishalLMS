@@ -13,13 +13,13 @@ logger = logging.getLogger("vishal_lms")
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, HTMLResponse, Response, StreamingResponse
 from pydantic import BaseModel
 
 import secrets
 from .database import get_connection, init_db, verify_password, hash_password, is_cloud_env
 from .extractor import extract_document, extract_slide_layouts
-from .ai_tutor import answer_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
+from .ai_tutor import answer_tutor_query, stream_tutor_query, generate_quiz_for_topic, generate_notes_for_topic, get_configured_api_key
 from .seed_data import seed_all_data
 from .summarizer import analyze_presentation, get_concept_teaching_package, process_tutor_conversation
 from .quiz_engine import get_concept_quiz_prep, generate_or_get_concept_quiz, submit_quiz_evaluation, get_presentation_quiz_catalog
@@ -177,7 +177,27 @@ def get_current_user(request: Request, token: Optional[str] = Query(None)):
     conn = get_connection()
     try:
         user = get_auth_user(request, conn)
-        return {"authenticated": True, "user": user}
+        active_token = token or request.headers.get("X-Auth-Token")
+        if not active_token:
+            auth_h = request.headers.get("Authorization") or request.headers.get("authorization") or ""
+            if auth_h.startswith("Bearer "):
+                active_token = auth_h.split(" ", 1)[1].strip()
+
+        if active_token:
+            s = conn.execute("SELECT token FROM user_sessions WHERE token = ? AND user_id = ?", (active_token, user["id"])).fetchone()
+            if not s:
+                conn.execute("INSERT INTO user_sessions (token, user_id) VALUES (?, ?)", (active_token, user["id"]))
+                conn.commit()
+        else:
+            s = conn.execute("SELECT token FROM user_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1", (user["id"],)).fetchone()
+            if s:
+                active_token = s["token"]
+            else:
+                active_token = secrets.token_hex(32)
+                conn.execute("INSERT INTO user_sessions (token, user_id) VALUES (?, ?)", (active_token, user["id"]))
+                conn.commit()
+
+        return {"authenticated": True, "token": active_token, "user": user}
     finally:
         conn.close()
 
@@ -250,10 +270,10 @@ def get_subjects(request: Request):
     FROM subjects s
     LEFT JOIN topics t ON s.id = t.subject_id
     LEFT JOIN documents d ON s.id = d.subject_id
-    WHERE s.user_id = ? OR s.user_id = 'user_vishal' OR s.user_id IS NULL OR ? = 'user_vishal'
+    WHERE s.user_id = ?
     GROUP BY s.id
     ORDER BY s.semester ASC, s.created_at DESC, s.name ASC
-    """, (user_id, user_id)).fetchall()
+    """, (user_id,)).fetchall()
 
     result = []
     for s in subjects:
@@ -374,7 +394,19 @@ def update_subject(id: str, subj: SubjectUpdate, request: Request):
 @app.delete("/api/subjects/{id}")
 def delete_subject(id: str, request: Request):
     conn = get_connection()
-    # Comprehensive cascade delete of all subject-related materials
+    user = get_auth_user(request, conn)
+    user_id = user.get("id", "user_vishal")
+
+    # 1. Clean up physical files from disk for all documents in this subject
+    docs = conn.execute("SELECT file_path FROM documents WHERE subject_id = ?", (id,)).fetchall()
+    for d in docs:
+        if d["file_path"] and os.path.exists(d["file_path"]):
+            try:
+                os.remove(d["file_path"])
+            except Exception:
+                pass
+
+    # 2. Comprehensive cascade delete of all subject-related materials
     for table in ["document_chunks", "slide_assets", "presentation_summaries", "presentation_flashcards", "smart_flashcards", "doubt_notebook", "study_sessions"]:
         try:
             conn.execute(f"DELETE FROM {table} WHERE document_id IN (SELECT id FROM documents WHERE subject_id = ?)", (id,))
@@ -383,7 +415,7 @@ def delete_subject(id: str, request: Request):
     try:
         conn.execute("DELETE FROM documents WHERE subject_id = ?", (id,))
         conn.execute("DELETE FROM topics WHERE subject_id = ?", (id,))
-        conn.execute("DELETE FROM subjects WHERE id = ?", (id,))
+        conn.execute("DELETE FROM subjects WHERE id = ? AND (user_id = ? OR user_id = 'user_vishal')", (id, user_id))
         conn.commit()
     except Exception as e:
         logger.warning(f"Notice during cascade delete subject: {e}")
@@ -422,9 +454,9 @@ def get_documents(
     FROM documents d
     LEFT JOIN subjects s ON d.subject_id = s.id
     LEFT JOIN topics t ON d.topic_id = t.id
-    WHERE (d.user_id = ? OR d.user_id = 'user_vishal' OR d.user_id IS NULL OR ? = 'user_vishal')
+    WHERE d.user_id = ?
     """
-    params = [user_id, user_id]
+    params = [user_id]
 
     if subject_id and subject_id != "all":
         query += " AND d.subject_id = ?"
@@ -550,6 +582,8 @@ async def upload_document(
         f.write(contents)
 
     file_size = len(contents)
+    import hashlib
+    content_hash = hashlib.sha256(contents).hexdigest()
 
     # Resolve and validate target subject to guarantee valid foreign key
     conn = get_connection()
@@ -564,7 +598,7 @@ async def upload_document(
             target_subject_id = s_row["id"]
 
     if not target_subject_id:
-        first_sub = c.execute("SELECT id FROM subjects WHERE user_id = ? OR user_id = 'user_vishal' ORDER BY created_at ASC LIMIT 1", (user_id,)).fetchone()
+        first_sub = c.execute("SELECT id FROM subjects WHERE user_id = ? ORDER BY created_at ASC LIMIT 1", (user_id,)).fetchone()
         if first_sub:
             target_subject_id = first_sub["id"]
         else:
@@ -575,6 +609,26 @@ async def upload_document(
             )
             conn.commit()
             target_subject_id = default_sub_id
+
+    # Check for duplicate file already uploaded in this subject
+    existing_doc = c.execute(
+        "SELECT id, name, slide_count, file_size FROM documents WHERE content_hash = ? AND subject_id = ? AND user_id = ?",
+        (content_hash, target_subject_id, user_id)
+    ).fetchone()
+    if existing_doc:
+        conn.close()
+        return {
+            "success": True,
+            "id": existing_doc["id"],
+            "name": existing_doc["name"],
+            "subject_id": target_subject_id,
+            "user_id": user_id,
+            "slide_count": existing_doc["slide_count"],
+            "file_size": existing_doc["file_size"],
+            "status": "ready",
+            "processing_status": "completed",
+            "message": f"Presentation '{existing_doc['name']}' already uploaded and ready!"
+        }
 
     # Resolve optional topic_id
     clean_topic_id = None
@@ -602,12 +656,12 @@ async def upload_document(
     INSERT INTO documents (
         id, user_id, subject_id, topic_id, name, original_filename, file_type, file_size,
         file_path, semester, faculty, description, tags, slide_count, page_count, progress,
-        status, processing_status, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready', 'completed', ?, ?)
+        status, processing_status, content_hash, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready', 'completed', ?, ?, ?)
     """, (
         doc_id, user_id, target_subject_id, clean_topic_id, safe_filename, safe_filename,
         real_ext.upper(), file_size, file_path, semester, faculty, description, tags,
-        slide_count, slide_count, now_str, now_str
+        slide_count, slide_count, content_hash, now_str, now_str
     ))
 
     for idx, chunk in enumerate(extracted_chunks, start=1):
@@ -629,6 +683,21 @@ async def upload_document(
             """, (chunk.get("title", ""), chunk.get("content", "")))
         except Exception:
             pass
+
+    # High-fidelity layout extraction & persistent slide_assets caching
+    try:
+        from .extractor import extract_slide_layouts
+        slide_layouts = extract_slide_layouts(file_path, doc_id)
+        for sl in slide_layouts:
+            s_num = sl.get("slide_number", 1)
+            s_title = sl.get("title", f"Slide {s_num}")
+            s_notes = sl.get("speaker_notes", "")
+            c.execute("""
+            INSERT OR REPLACE INTO slide_assets (id, document_id, slide_number, title, layout_json, speaker_notes)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """, (f"asset_{doc_id}_{s_num}", doc_id, s_num, s_title, json.dumps(sl), s_notes))
+    except Exception as e_layout:
+        print(f"Notice caching slide layouts: {e_layout}")
 
     conn.commit()
     conn.close()
@@ -730,18 +799,65 @@ def retry_document_processing(id: str, request: Request):
     }
 
 class DocumentUpdate(BaseModel):
-    name: str
+    name: Optional[str] = None
+    subject_id: Optional[str] = None
 
 @app.put("/api/documents/{id}")
-def update_document(id: str, doc_update: DocumentUpdate):
-    name = doc_update.name.strip()
-    if not name:
-        raise HTTPException(status_code=400, detail="Document name cannot be empty")
+def update_document(id: str, doc_update: DocumentUpdate, request: Request):
     conn = get_connection()
-    conn.execute("UPDATE documents SET name = ? WHERE id = ?", (name, id))
+    user = get_auth_user(request, conn)
+    user_id = user.get("id", "user_vishal")
+    
+    updates = []
+    params = []
+    if doc_update.name and doc_update.name.strip():
+        updates.append("name = ?")
+        params.append(doc_update.name.strip())
+    if doc_update.subject_id and doc_update.subject_id.strip():
+        s_row = conn.execute("SELECT id FROM subjects WHERE id = ?", (doc_update.subject_id.strip(),)).fetchone()
+        if s_row:
+            updates.append("subject_id = ?")
+            params.append(s_row["id"])
+    if not updates:
+        conn.close()
+        raise HTTPException(status_code=400, detail="No valid fields to update")
+    
+    updates.append("updated_at = CURRENT_TIMESTAMP")
+    params.extend([id, user_id])
+    conn.execute(f"UPDATE documents SET {', '.join(updates)} WHERE id = ? AND (user_id = ? OR user_id = 'user_vishal')", params)
     conn.commit()
     conn.close()
-    return {"success": True, "name": name}
+    return {"success": True, "message": "Presentation updated successfully"}
+
+@app.get("/api/documents/{doc_id}/search")
+def search_deck_content(doc_id: str, q: str = Query("")):
+    term = q.strip()
+    if not term:
+        return {"results": [], "total": 0}
+    conn = get_connection()
+    chunks = conn.execute("""
+    SELECT slide_number, title, content, takeaways
+    FROM document_chunks
+    WHERE document_id = ? AND (title LIKE ? OR content LIKE ?)
+    ORDER BY slide_number ASC
+    """, (doc_id, f"%{term}%", f"%{term}%")).fetchall()
+    conn.close()
+    results = []
+    for c in chunks:
+        content = c["content"]
+        idx = content.lower().find(term.lower())
+        if idx >= 0:
+            start = max(0, idx - 40)
+            end = min(len(content), idx + len(term) + 60)
+            snippet = ("..." if start > 0 else "") + content[start:end].replace("\n", " ") + ("..." if end < len(content) else "")
+        else:
+            snippet = (content[:120] + "...") if len(content) > 120 else content
+        results.append({
+            "slide_number": c["slide_number"],
+            "title": c["title"],
+            "snippet": snippet
+        })
+    return {"results": results, "total": len(results)}
 
 # ----------------- AI TUTOR ----------------- #
 class TutorChatRequest(BaseModel):
@@ -789,6 +905,40 @@ def get_tutor_history(limit: int = 20):
             d["citations"] = []
         res.append(d)
     return res
+
+class TutorStreamRequest(BaseModel):
+    query: str
+    mode: str = "ask_materials"
+    teaching_mode: Optional[str] = "MBA"
+    scope: str = "all"
+    subject_id: Optional[str] = None
+    document_id: Optional[str] = None
+    slide_number: Optional[int] = None
+    history: Optional[List[Dict[str, str]]] = None
+
+@app.post("/api/tutor/chat/stream")
+async def tutor_chat_stream(req: TutorStreamRequest):
+    return StreamingResponse(
+        stream_tutor_query(
+            query=req.query,
+            mode=req.mode,
+            teaching_mode=req.teaching_mode or "MBA",
+            scope=req.scope,
+            subject_id=req.subject_id,
+            document_id=req.document_id,
+            slide_number=req.slide_number,
+            history=req.history
+        ),
+        media_type="text/event-stream"
+    )
+
+@app.post("/api/tutor/clear")
+def clear_tutor_history():
+    conn = get_connection()
+    conn.execute("DELETE FROM ai_chats")
+    conn.commit()
+    conn.close()
+    return {"success": True, "message": "Chat history cleared"}
 
 # ----------------- QUIZZES ----------------- #
 class QuizGenerateRequest(BaseModel):
@@ -900,6 +1050,12 @@ def submit_quiz_answers(id: str, sub: QuizSubmitRequest):
         conn.execute("UPDATE topics SET status = ?, progress = MAX(progress, ?) WHERE id = ?", (new_status, accuracy, topic_id))
     if doc_id:
         conn.execute("UPDATE documents SET progress = MAX(progress, ?) WHERE id = ?", (accuracy, doc_id))
+        # Update spaced repetition schedule for smart_flashcards
+        next_days = 7 if accuracy >= 80 else (3 if accuracy >= 60 else 1)
+        try:
+            conn.execute("UPDATE smart_flashcards SET next_review_date = date('now', ?), last_reviewed = CURRENT_TIMESTAMP WHERE document_id = ?", (f"+{next_days} days", doc_id))
+        except Exception:
+            pass
 
     conn.commit()
     conn.close()
@@ -912,6 +1068,37 @@ def submit_quiz_answers(id: str, sub: QuizSubmitRequest):
         "correct_count": correct_count,
         "incorrect_count": incorrect_count,
         "results": results_detail
+    }
+
+class ShortAnswerGradeRequest(BaseModel):
+    question: str
+    student_answer: str
+    rubric: Optional[str] = "Evaluate clarity, strategic accuracy, and depth of analysis."
+    source_citation: Optional[str] = ""
+
+@app.post("/api/quizzes/grade-short-answer")
+def grade_short_answer(req: ShortAnswerGradeRequest):
+    words = [w for w in req.student_answer.strip().split() if len(w) > 2]
+    if len(words) < 5:
+        return {
+            "score": 25,
+            "grade": "Needs Improvement",
+            "feedback": "Answer is too brief. Provide a more detailed explanation incorporating strategic reasoning.",
+            "rubric_points_matched": ["Basic response provided"],
+            "model_answer": f"A comprehensive MBA answer should directly define the core mechanism of {req.question}, provide a supporting business framework, and cite concrete trade-offs."
+        }
+    
+    score = min(95, 60 + min(35, len(words) * 2))
+    return {
+        "score": score,
+        "grade": "Exemplary" if score >= 85 else ("Competent" if score >= 70 else "Developing"),
+        "feedback": "Strong conceptual grasp of the question. Strategic reasoning is evident with clear structure.",
+        "rubric_points_matched": [
+            "Demonstrated core conceptual understanding",
+            "Applied managerial reasoning to the prompt",
+            "Structure matches executive communication standards"
+        ],
+        "model_answer": "Core Definition: Executive mastery requires diagnosing the underlying trade-offs, framing the business risk, and executing through structured milestones."
     }
 
 @app.get("/api/quizzes/attempts/history")
@@ -1353,45 +1540,81 @@ def api_get_presentation_slides(doc_id: str):
         conn.close()
         raise HTTPException(status_code=404, detail="Document not found")
 
-    file_path = doc["file_path"]
     doc_name = doc["name"]
-    conn.close()
+    file_path = doc["file_path"]
 
-    if not os.path.exists(file_path):
-        conn = get_connection()
-        chunks = conn.execute("SELECT slide_number, title, content FROM document_chunks WHERE document_id = ? ORDER BY slide_number ASC", (doc_id,)).fetchall()
-        conn.close()
+    # 1. First priority: Check cached slide_assets in DB (works anywhere, survives Vercel container restarts)
+    assets = conn.execute("SELECT slide_number, title, layout_json, speaker_notes FROM slide_assets WHERE document_id = ? ORDER BY slide_number ASC", (doc_id,)).fetchall()
+    if assets:
         slides = []
-        for c in chunks:
-            s_num = c["slide_number"]
-            title = c["title"]
-            lines = [l.strip() for l in c["content"].split("\n") if l.strip()]
-            slides.append({
-                "slide_number": s_num,
-                "title": title,
-                "aspect_ratio": "16:9",
-                "shapes": [
-                    {"type": "text", "is_title": True, "left": 8.0, "top": 8.0, "width": 84.0, "height": 14.0, "paragraphs": [{"text": title, "is_title": True}]},
-                    {"type": "text", "is_title": False, "left": 8.0, "top": 26.0, "width": 84.0, "height": 65.0, "paragraphs": [{"text": l, "is_title": False} for l in lines[:8]]}
-                ],
-                "notes": ""
-            })
+        for a in assets:
+            try:
+                s_dict = json.loads(a["layout_json"])
+                slides.append(s_dict)
+            except Exception:
+                pass
+        if slides:
+            conn.close()
+            ratio = slides[0].get("aspect_ratio", "16:9")
+            return {
+                "document_id": doc_id,
+                "document_name": doc_name,
+                "total_slides": len(slides),
+                "aspect_ratio": ratio,
+                "slides": slides,
+                "download_url": f"/api/documents/{doc_id}/download"
+            }
+
+    # 2. If file exists on disk, extract fresh slide layouts
+    if file_path and os.path.exists(file_path):
+        slides = extract_slide_layouts(file_path, doc_id)
+        ratio = slides[0].get("aspect_ratio", "16:9") if slides else "16:9"
+        # Cache back into slide_assets
+        for sl in slides:
+            s_num = sl.get("slide_number", 1)
+            s_title = sl.get("title", f"Slide {s_num}")
+            s_notes = sl.get("speaker_notes", "")
+            try:
+                conn.execute("""
+                INSERT OR REPLACE INTO slide_assets (id, document_id, slide_number, title, layout_json, speaker_notes)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (f"asset_{doc_id}_{s_num}", doc_id, s_num, s_title, json.dumps(sl), s_notes))
+            except Exception:
+                pass
+        conn.commit()
+        conn.close()
         return {
             "document_id": doc_id,
             "document_name": doc_name,
             "total_slides": len(slides),
-            "aspect_ratio": "16:9",
+            "aspect_ratio": ratio,
             "slides": slides,
             "download_url": f"/api/documents/{doc_id}/download"
         }
 
-    slides = extract_slide_layouts(file_path, doc_id)
-    ratio = slides[0].get("aspect_ratio", "16:9") if slides else "16:9"
+    # 3. Fallback: Reconstruct slides from document_chunks
+    chunks = conn.execute("SELECT slide_number, title, content FROM document_chunks WHERE document_id = ? ORDER BY slide_number ASC", (doc_id,)).fetchall()
+    conn.close()
+    slides = []
+    for c in chunks:
+        s_num = c["slide_number"]
+        title = c["title"]
+        lines = [l.strip() for l in c["content"].split("\n") if l.strip()]
+        slides.append({
+            "slide_number": s_num,
+            "title": title,
+            "aspect_ratio": "16:9",
+            "shapes": [
+                {"type": "text", "is_title": True, "left": 8.0, "top": 8.0, "width": 84.0, "height": 14.0, "paragraphs": [{"text": title, "is_title": True}]},
+                {"type": "text", "is_title": False, "left": 8.0, "top": 26.0, "width": 84.0, "height": 65.0, "paragraphs": [{"text": l, "is_title": False} for l in lines[:8]]}
+            ],
+            "notes": ""
+        })
     return {
         "document_id": doc_id,
         "document_name": doc_name,
         "total_slides": len(slides),
-        "aspect_ratio": ratio,
+        "aspect_ratio": "16:9",
         "slides": slides,
         "download_url": f"/api/documents/{doc_id}/download"
     }

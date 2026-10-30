@@ -705,6 +705,11 @@ def _run_safe_migrations(conn):
                 c.execute("UPDATE documents SET updated_at = created_at WHERE updated_at IS NULL")
             except Exception:
                 pass
+        if "content_hash" not in d_cols:
+            try:
+                c.execute("ALTER TABLE documents ADD COLUMN content_hash TEXT DEFAULT ''")
+            except Exception:
+                pass
     except Exception:
         pass
     conn.commit()

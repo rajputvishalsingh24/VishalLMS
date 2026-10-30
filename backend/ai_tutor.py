@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import asyncio
 from typing import List, Dict, Any, Optional
 from .database import get_connection
 
@@ -17,7 +18,7 @@ def get_configured_api_key() -> str:
         return row["value"]
     return ""
 
-def search_chunks(query: str, subject_id: Optional[str] = None, document_id: Optional[str] = None, limit: int = 6) -> List[Dict[str, Any]]:
+def search_chunks(query: str, subject_id: Optional[str] = None, document_id: Optional[str] = None, slide_number: Optional[int] = None, limit: int = 6) -> List[Dict[str, Any]]:
     """
     RAG Search: Full-Text search and ranking over document slides and pages.
     """
@@ -52,6 +53,9 @@ def search_chunks(query: str, subject_id: Optional[str] = None, document_id: Opt
             elif subject_id:
                 sql += " AND d.subject_id = ?"
                 params.append(subject_id)
+            if slide_number is not None:
+                sql += " AND dc.slide_number = ?"
+                params.append(slide_number)
             sql += f" LIMIT {limit}"
             
             rows = cursor.execute(sql, params).fetchall()
@@ -78,6 +82,9 @@ def search_chunks(query: str, subject_id: Optional[str] = None, document_id: Opt
         elif subject_id:
             like_sql += " AND d.subject_id = ?"
             params.append(subject_id)
+        if slide_number is not None:
+            like_sql += " AND dc.slide_number = ?"
+            params.append(slide_number)
             
         if words:
             like_clause = " OR ".join(["(dc.title LIKE ? OR dc.content LIKE ?)" for _ in words[:3]])
@@ -157,53 +164,78 @@ def answer_tutor_query(
 
     # Define mode-specific instructions
     mode_instructions = {
-        "Beginner": "Adopt an ELI5 (Explain Like I'm 5) pedagogical approach. Avoid heavy corporate jargon, use everyday metaphors (e.g. lemonade stands, smartphones, sports), and explain concepts from fundamental human intuition.",
+        "Simple": "Adopt an ELI5 (Explain Like I'm 5) pedagogical approach. Avoid heavy corporate jargon, use everyday metaphors (e.g. lemonade stands, smartphones, sports), and explain concepts from fundamental human intuition.",
+        "Beginner": "Adopt an ELI5 (Explain Like I'm 5) pedagogical approach. Avoid heavy corporate jargon, use everyday metaphors, and explain concepts from fundamental human intuition.",
         "MBA": "Adopt a top-tier MBA Professor persona. Emphasize strategic frameworks (Porter's 5 Forces, SWOT, Unit Economics, RICE), quantitative trade-offs, managerial decision-making, and market dynamics.",
-        "Exam": "Adopt a rigorous Exam Prep Tutor persona. Prioritize high-yield exam definitions, bullet-pointed summaries, structured marking-scheme criteria, common examiner trick questions, and concise memory mnemonics.",
-        "Expert": "Adopt a C-Suite Strategy & Principal Product Director persona. Focus on edge-case failure modes, first-principles unit economics, second-order consequences, organizational inertia, and counter-intuitive industry realpolitik."
+        "Exam Prep": "Adopt a rigorous Exam Prep Tutor persona. Prioritize high-yield exam definitions, bullet-pointed summaries, structured marking-scheme criteria, common examiner trick questions, and concise memory mnemonics.",
+        "Exam": "Adopt a rigorous Exam Prep Tutor persona. Prioritize high-yield exam definitions, bullet-pointed summaries, structured marking-scheme criteria, and exam questions.",
+        "Product Management": "Adopt a Senior Director of Product Management persona. Prioritize user discovery, PRDs, prioritization matrices (RICE, MoSCoW), North Star metrics, unit economics, go-to-market strategy, and cross-functional alignment.",
+        "Expert": "Adopt a C-Suite Strategy & Board Director persona. Focus on edge-case failure modes, first-principles unit economics, second-order consequences, organizational inertia, macroeconomics, and competitive game theory."
     }
     pedagogy_guide = mode_instructions.get(teaching_mode, mode_instructions["MBA"])
 
-    system_prompt = f"""You are the personal AI MBA Tutor for Vishal Singh on his platform 'VISHAL SINGH'.
-You are teaching Vishal using his uploaded MBA study materials.
-Pedagogy Style: {teaching_mode} Mode ({pedagogy_guide})
+    is_explain_query = mode in ["simple_explanation", "explain_topic"] or any(k in query.lower() for k in ["explain", "break down", "teach me", "overview of", "deep dive"])
 
-Guidelines:
-1. Always cite exact source documents and slide/page numbers when referencing uploaded materials.
-2. If the user's question cannot be answered from the materials, explicitly clarify that it is not in the uploaded documents, but offer general MBA context clearly marked as [General Knowledge].
-3. Format output cleanly in GitHub-flavored Markdown with bold headers, bullet points, and practical examples.
-4. Active learning mode: {mode}.
+    system_prompt = f"""You are the personal AI MBA Tutor for Vishal Singh on his platform 'VISHAL SINGH LMS'.
+You are teaching Vishal using his uploaded MBA study materials.
+Active Teaching Mode: {teaching_mode} ({pedagogy_guide})
+
+Strict Grounding Rules:
+1. Cite presentation name + slide number ONLY from the provided retrieved source chunks, format: `[Source: {doc_name}, Slide {slide_num}]`. Never invent fake slide numbers.
+2. Clearly separate content into:
+   ### 📖 From Your Course Slides
+   (Facts, metrics, and definitions directly present in the retrieved slides with exact citations)
+   ### 💡 Additional Strategic & MBA Analysis
+   (Broader managerial context, company cases, and strategic implications)
+3. If the user's question cannot be answered from the materials, or if no chunks match, explicitly begin with:
+   "> ⚠️ **Scope Notice:** This topic is not mentioned in your uploaded presentation slides. Below is comprehensive MBA analysis:"
+4. Format output cleanly in GitHub-flavored Markdown with bold headers and actionable bullet points.
 """
 
-    if mode == "simple_explanation":
-        prompt = f"""Provide a structured explanation for: "{query}".
-Context from Vishal's MBA materials:
+    if is_explain_query:
+        prompt = f"""Vishal requests a complete, structured explanation for: "{query}".
+Relevant source materials from his study library:
 {context_str}
 
-Please strictly provide the following 8 sections:
-### 1. What is it?
-(Clear, simple definition without unnecessary jargon)
+Please strictly provide the comprehensive 13-Part MBA Master Structure:
+### 1. Executive Summary & Core Definition
+(Concise, authoritative definition and core essence)
 
-### 2. Why is it important?
-(Strategic and managerial importance in business)
+### 2. Real-World Business Analogy
+(A vivid, memorable non-business or everyday analogy to build intuitive grasp)
 
-### 3. How does it work?
-(Step-by-step mechanism or framework breakdown)
+### 3. Detailed Theoretical Breakdown
+(Mechanism, moving parts, underlying models, and academic foundations)
 
-### 4. Practical Business Example
-(A real-world company case e.g., Apple, Netflix, Amazon, Starbucks)
+### 4. Strategic Importance & Executive "So What?"
+(Why C-level executives and PMs care; capital allocation and competitive moats)
 
-### 5. Product Management Application
-(How a Product Manager uses this in discovery, strategy, sprint, or roadmapping)
+### 5. Step-by-Step Practical Application Framework
+(5-step sequential execution guide for a business leader or PM)
 
-### 6. Key Points to Remember
-(3-4 high-yield bullet points for quick retention)
+### 6. Comprehensive Real-World Business Case Study
+(Detailed analysis of a major company e.g., Apple, Netflix, Amazon, Tesla, or Starbucks applying or failing at this)
 
-### 7. Common Mistakes & Misunderstandings
-(Where students or managers commonly get confused)
+### 7. Key Metrics, KPIs & Formulas
+(Mathematical equations, North Star metrics, operational KPIs, and benchmark thresholds)
 
-### 8. Three Questions to Check Understanding
-(1 conceptual question, 1 scenario question, 1 application question)
+### 8. Common Pitfalls, Biases & Strategic Mistakes
+(Where junior managers or founders fail; cognitive biases and unexamined assumptions)
+
+### 9. Cross-Functional Impact
+(Specific implications for Marketing, Finance, Product, and Operations)
+
+### 10. Industry Application Variations
+(Differences in application between B2B SaaS, Consumer Tech, and Traditional Heavy Industry)
+
+### 11. Model MBA Exam-Style Answer & Rubric Points
+(Exemplar 10-mark examination answer with 5 specific rubric marking points)
+
+### 12. Interview Scenario & Recommended Executive Answer
+(A difficult PM/Strategy interview question testing this concept with a model answer)
+
+### 13. Quick Spaced Repetition Flashcards & Self-Test Questions
+(3 targeted Q&A pairs for retention and exam readiness)
 """
     elif mode == "teach_step_by_step":
         prompt = f"""Vishal wants to learn step-by-step: "{query}".
@@ -212,7 +244,7 @@ Materials available:
 
 Break this into Lesson Step 1 of an interactive tutorial:
 1. Introduce the core intuition with a relatable real-life analogy.
-2. Explain key terminology clearly.
+2. Explain key terminology clearly with slide citations.
 3. Walk through the first fundamental concept.
 4. End with a single interactive question to check Vishal's understanding before moving to step 2.
 """
@@ -305,39 +337,97 @@ def generate_offline_mba_tutor_response(query: str, mode: str, chunks: List[Dict
     if not takeaways_list:
         takeaways_list = content_lines[:3]
 
-    if mode == "simple_explanation":
-        key_points_str = "\n".join([f"- **{l}**" for l in content_lines[:4]])
-        return f"""## 📘 Simple Explanation: {slide_title}
-**Source Document:** `{doc_name}` (Slide/Page {slide_num})
+    is_explain = mode in ["simple_explanation", "explain_topic"] or any(k in query.lower() for k in ["explain", "break down", "teach me", "what is", "overview"])
 
-### 1. What is it?
-**{slide_title}** is a core operational and strategic concept in management. Based on your uploaded materials, it focuses on:
-> *"{content_lines[0] if content_lines else slide_title}"*
+    if not chunks:
+        scope_notice = "> ⚠️ **Scope Notice:** This topic is not mentioned in your uploaded presentation slides. Below is general business analysis:\n\n"
+        slide_title = topic_name
+        doc_name = "General Curriculum"
+        slide_num = 1
+    else:
+        scope_notice = ""
 
-### 2. Why is it important?
-In managerial decision-making, mastering **{slide_title}** provides strategic leverage, eliminates operational friction, and ensures that cross-functional teams execute towards quantified business outcomes.
+    if is_explain:
+        key_points_str = "\n".join([f"- {l}" for l in content_lines[:4]])
+        return f"""{scope_notice}## 📘 MBA Master Explanation: {slide_title}
+*Cited Source:* `{doc_name}`, Slide {slide_num}
 
-### 3. How does it work?
-Your presentation outlines the following structural mechanism:
-{chr(10).join([f"{i+1}. **{line}**" for i, line in enumerate(content_lines[:4])])}
+### 📖 From Your Course Slides
+- **Primary Finding:** {content_lines[0] if content_lines else slide_title}
+- **Key Concepts Covered:** {', '.join(content_lines[:3]) if content_lines else slide_title}
+- **Direct Citation:** [Source: {doc_name}, Slide {slide_num}]
 
-### 4. Practical Business Example
-- **Real-World Application:** Leading firms apply this exact framework to mitigate risk, benchmark competitors, and ensure continuous customer value delivery during growth phases.
+---
 
-### 5. Product Management Application
-In modern product management, PMs leverage this concept during sprint roadmapping and discovery interviews to prioritize high-leverage initiatives over non-essential features.
+### 💡 Additional Strategic & MBA Analysis
 
-### 6. Key Points to Remember (From Your Slide)
-{key_points_str}
+### 1. Executive Summary & Core Definition
+**{slide_title}** represents the systematic management discipline of organizing capabilities, capital, and operations to deliver defensible value. In competitive markets, it serves as the linchpin between high-level executive vision and operational unit execution.
 
-### 7. Common Mistakes & Misunderstandings
-- Treating this concept as a one-time static document rather than an iterative managerial tool.
-- Confusing high-level strategic outcomes with day-to-day tactical outputs.
+### 2. Real-World Business Analogy
+Think of **{slide_title}** like an aircraft's fly-by-wire flight control system. The pilot (executive leadership) inputs the strategic heading, but the system continuously recalibrates individual control surfaces (cross-functional teams) to prevent stalling and maximize fuel efficiency across volatile turbulence.
 
-### 8. Check Your Understanding
-1. *Conceptual:* How does **{slide_title}** directly support the primary business goals stated in your materials?
-2. *Scenario:* If your team encounters unexpected market headwinds, how should this framework be adapted?
-3. *Application:* Based on Slide {slide_num}, what is the first operational step you would execute?{citation_text}
+### 3. Detailed Theoretical Breakdown
+The theoretical foundation relies on three interrelated pillars:
+1. **Resource Alignment:** Allocating constrained talent and capital to high-ROI bottlenecks.
+2. **Feedback Velocity:** Shortening cycle time between market signal and strategic adjustment.
+3. **Execution Rigor:** Translating qualitative goals into deterministic, measurable milestones.
+
+### 4. Strategic Importance & Executive "So What?"
+For C-Suite leadership and Product Executives, failing to master {slide_title} leads to margin erosion, strategic drift, and vulnerable market share. Mastering it builds operational defensibility and creates enduring competitive moats.
+
+### 5. Step-by-Step Practical Application Framework
+1. **Diagnosis:** Quantify the baseline problem and evaluate existing friction points.
+2. **Hypothesis Formulation:** Define what success looks like with clear guardrail metrics.
+3. **Prioritization:** Deploy structured scoring (e.g., RICE or Impact/Effort matrix) to sequence initiatives.
+4. **Execution Sprints:** Empower autonomous cross-functional squads to deliver iterative increments.
+5. **Retrospective & Review:** Benchmark results against projected ROI and refine the operating playbook.
+
+### 6. Comprehensive Real-World Business Case Study
+- **Exemplar Firm:** **Netflix's transition from DVD rentals to cloud streaming and original content production.**
+- **Application:** Netflix applied the principles of {slide_title} by cannibalizing their own high-margin core business to capture long-term platform scale, utilizing data analytics to de-risk greenlighting hundred-million-dollar original series.
+
+### 7. Key Metrics, KPIs & Formulas
+- **Return on Capital Invested (ROIC):** `Net Operating Profit After Tax / Invested Capital`
+- **Customer Lifetime Value to CAC Ratio:** `LTV / CAC ≥ 3.0x`
+- **Net Churn Rate:** `(Lost Customers - Expansion Customers) / Baseline Customers`
+- **Execution Efficiency Index:** Actual Milestone Throughput vs Projected Plan
+
+### 8. Common Pitfalls, Biases & Strategic Mistakes
+- **Sunk Cost Fallacy:** Doubling down on underperforming initiatives instead of pivoting rapidly.
+- **Metric Myopia:** Optimizing vanity metrics (e.g., raw page views) over economic value creation (e.g., recurring revenue).
+- **Executive Overreach:** Micromanaging tactical implementation instead of establishing clear autonomous boundaries.
+
+### 9. Cross-Functional Impact
+- **Marketing:** Tightens customer targeting and clarifies value proposition messaging.
+- **Finance:** De-risks cash flow forecasting and strengthens capital budget allocation.
+- **Product:** Clarifies sprint priorities and eliminates low-impact roadmap features.
+- **Operations:** Streamlines resource workflows and reduces cross-department handoff latency.
+
+### 10. Industry Application Variations
+- **B2B SaaS:** Emphasizes Net Revenue Retention (NRR), account expansion, and annual contract value (ACV).
+- **Consumer Tech:** Focuses on viral coefficient, daily active engagement (DAU/MAU), and micro-transaction friction.
+- **Traditional Manufacturing:** Prioritizes supply chain resilience, inventory turnover, and Lean Six Sigma yield.
+
+### 11. Model MBA Exam-Style Answer & Rubric Points
+**Question:** *Critically evaluate how a firm can leverage {slide_title} to protect gross margins during macroeconomic downturns.*
+**Model Answer Structure (10/10 Marks):**
+1. **Definition & Context (2 Marks):** Frame {slide_title} within competitive strategy theory.
+2. **Framework Application (3 Marks):** Apply unit economics and Porter's five forces to isolate pricing power.
+3. **Counter-factual Analysis (3 Marks):** Demonstrate the compounding costs of operational inaction.
+4. **Synthesis & Trade-offs (2 Marks):** Conclude with actionable risk-adjusted managerial recommendations.
+
+### 12. Interview Scenario & Recommended Executive Answer
+**Scenario:** *"You are the VP of Product at a Series C startup facing 20% increased churn. How do you deploy {slide_title} in your first 30 days?"*
+**Executive Answer:** *"I would first disaggregate cohort retention to isolate root causes. Next, I would institute a fast-feedback customer advisory loop to validate feature parity versus core utility. Finally, I would reallocate 40% of engineering bandwidth to high-frequency retention fixes while safeguarding our core differentiator."*
+
+### 13. Quick Spaced Repetition Flashcards & Self-Test Questions
+1. **Q:** What is the primary operational objective of {slide_title}?
+   **A:** To eliminate strategic drift and ensure resource allocation directly expands enterprise value.
+2. **Q:** Which metric best indicates successful implementation?
+   **A:** Sustained improvement in unit economic margins and milestone completion velocity.
+3. **Q:** How does {slide_title} differ from tactical project management?
+   **A:** Project management tracks task completion; {slide_title} optimizes strategic business impact and ROI.{citation_text}
 """
     elif mode == "teach_step_by_step":
         first_concept = content_lines[0] if content_lines else slide_title
@@ -615,3 +705,35 @@ $$\\text{EOQ} = \\sqrt{\\frac{2DS}{H}}$$
         "note_type": note_type,
         "content": content
     }
+
+async def stream_tutor_query(
+    query: str,
+    mode: str = "ask_materials",
+    teaching_mode: str = "MBA",
+    scope: str = "all",
+    subject_id: Optional[str] = None,
+    document_id: Optional[str] = None,
+    slide_number: Optional[int] = None,
+    history: Optional[List[Dict[str, str]]] = None
+):
+    target_doc = document_id if scope in ["presentation", "slide"] else None
+    target_sub = subject_id if scope == "subject" else None
+    target_slide = slide_number if scope == "slide" else None
+    
+    result = answer_tutor_query(
+        query=query,
+        mode=mode,
+        subject_id=target_sub,
+        document_id=target_doc,
+        teaching_mode=teaching_mode
+    )
+    full_text = result.get("response", "")
+    citations = result.get("citations", [])
+
+    chunk_size = 28
+    for i in range(0, len(full_text), chunk_size):
+        chunk = full_text[i:i+chunk_size]
+        yield f"data: {json.dumps({'text': chunk})}\n\n"
+        await asyncio.sleep(0.012)
+
+    yield f"data: {json.dumps({'done': True, 'citations': citations})}\n\n"
