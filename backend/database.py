@@ -241,14 +241,17 @@ def _run_init_script(conn):
     CREATE TABLE IF NOT EXISTS presentation_summaries (
         id TEXT PRIMARY KEY,
         document_id TEXT UNIQUE NOT NULL,
+        title TEXT DEFAULT '',
         overview_json TEXT NOT NULL,
         concepts_json TEXT NOT NULL,
         frameworks_json TEXT NOT NULL,
         glossary_json TEXT NOT NULL,
         formulas_json TEXT NOT NULL,
         connections_json TEXT NOT NULL,
-        slide_breakdown_json TEXT NOT NULL,
-        revision_sheet_json TEXT NOT NULL,
+        slide_summaries_json TEXT DEFAULT '[]',
+        revision_json TEXT DEFAULT '{}',
+        slide_breakdown_json TEXT DEFAULT '[]',
+        revision_sheet_json TEXT DEFAULT '{}',
         learning_path_json TEXT NOT NULL,
         total_slides INTEGER DEFAULT 0,
         concepts_count INTEGER DEFAULT 0,
@@ -278,6 +281,7 @@ def _run_init_script(conn):
         front TEXT NOT NULL,
         back TEXT NOT NULL,
         slide_number INTEGER DEFAULT 1,
+        mastered BOOLEAN DEFAULT 0,
         is_mastered BOOLEAN DEFAULT 0,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (document_id) REFERENCES documents(id) ON DELETE CASCADE
@@ -618,6 +622,34 @@ def _run_safe_migrations(conn):
                     c.execute(f"ALTER TABLE quiz_attempts ADD COLUMN {col_name} {col_type}")
                 except Exception:
                     pass
+
+        ps_cols = [r[1] for r in c.execute("PRAGMA table_info(presentation_summaries)").fetchall()]
+        for col_name, col_type in [
+            ("title", "TEXT DEFAULT ''"),
+            ("slide_summaries_json", "TEXT DEFAULT '[]'"),
+            ("revision_json", "TEXT DEFAULT '{}'"),
+            ("slide_breakdown_json", "TEXT DEFAULT '[]'"),
+            ("revision_sheet_json", "TEXT DEFAULT '{}'"),
+            ("total_slides", "INTEGER DEFAULT 0"),
+            ("concepts_count", "INTEGER DEFAULT 0")
+        ]:
+            if col_name not in ps_cols:
+                try:
+                    c.execute(f"ALTER TABLE presentation_summaries ADD COLUMN {col_name} {col_type}")
+                except Exception:
+                    pass
+
+        pf_cols = [r[1] for r in c.execute("PRAGMA table_info(presentation_flashcards)").fetchall()]
+        if "mastered" not in pf_cols:
+            try:
+                c.execute("ALTER TABLE presentation_flashcards ADD COLUMN mastered BOOLEAN DEFAULT 0")
+            except Exception:
+                pass
+        if "is_mastered" not in pf_cols:
+            try:
+                c.execute("ALTER TABLE presentation_flashcards ADD COLUMN is_mastered BOOLEAN DEFAULT 0")
+            except Exception:
+                pass
     except Exception:
         pass
     conn.commit()

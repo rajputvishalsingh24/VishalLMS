@@ -100,7 +100,7 @@ def search_chunks(query: str, subject_id: Optional[str] = None, document_id: Opt
     return results
 
 def call_gemini(prompt: str, system_instruction: str = "") -> Optional[str]:
-    """Call Google Gemini API via REST endpoint with zero extra binary dependencies."""
+    """Call Google Gemini API via REST endpoint with maxOutputTokens set to 8192 to prevent truncation."""
     api_key = get_configured_api_key()
     if not api_key:
         return None
@@ -108,11 +108,15 @@ def call_gemini(prompt: str, system_instruction: str = "") -> Optional[str]:
         import requests
         url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
         payload = {
-            "contents": [{"parts": [{"text": prompt}]}]
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "maxOutputTokens": 8192,
+                "temperature": 0.4
+            }
         }
         if system_instruction:
             payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
-        resp = requests.post(url, json=payload, timeout=30)
+        resp = requests.post(url, json=payload, timeout=45)
         if resp.status_code == 200:
             data = resp.json()
             candidates = data.get("candidates", [])

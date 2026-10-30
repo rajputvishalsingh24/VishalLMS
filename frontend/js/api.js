@@ -281,11 +281,11 @@ export const API = {
     return res.json();
   },
 
-  async teachPresentationConcept(docId, conceptName, controlAction = null) {
+  async teachPresentationConcept(docId, conceptName, controlAction = null, teachingMode = 'MBA') {
     const res = await fetch(`/api/presentations/${docId}/teach`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ concept_name: conceptName, control_action: controlAction })
+      body: JSON.stringify({ concept_name: conceptName, control_action: controlAction, teaching_mode: teachingMode })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

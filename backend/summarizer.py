@@ -466,16 +466,28 @@ def _generate_grounded_summary(doc: Dict[str, Any], chunks: List[Dict[str, Any]]
         "flashcards": flashcards
     }
 
-def get_concept_teaching_package(document_id: str, concept_name: str, control_action: Optional[str] = None) -> Dict[str, Any]:
+def get_concept_teaching_package(
+    document_id: str,
+    concept_name: str,
+    control_action: Optional[str] = None,
+    teaching_mode: str = "MBA"
+) -> Dict[str, Any]:
     """
-    Implements the 8-Step Pedagogical Teaching Approach and handles the 12 On-Screen Teaching Controls.
+    Implements the University-Grade 10-Section Pedagogical Teaching Engine (Sections A through J)
+    and supports the 4 Teaching Modes (Beginner, MBA, Exam, Expert) along with Interactive Teaching Controls.
     """
+    valid_modes = ["Beginner", "MBA", "Exam", "Expert"]
+    if teaching_mode not in valid_modes:
+        teaching_mode = "MBA"
+
     conn = get_connection()
+    doc_row = conn.execute("SELECT name FROM documents WHERE id = ?", (document_id,)).fetchone()
+    doc_name = doc_row["name"] if doc_row else "Presentation"
+
     row = conn.execute("SELECT concepts_json, slide_summaries_json FROM presentation_summaries WHERE document_id = ?", (document_id,)).fetchone()
     conn.close()
 
     if not row:
-        # Generate summary if not created yet
         summary_data = analyze_presentation(document_id)
         concepts = summary_data.get("concepts", [])
     else:
@@ -512,102 +524,468 @@ def get_concept_teaching_package(document_id: str, concept_name: str, control_ac
         slide_num = target.get("slide_numbers", [1])[0]
 
     c_name = target["name"]
-    definition = target.get("definition", "")
-    explanation = target.get("detailed_explanation", "")
-    why_matters = target.get("why_matters", "")
-    example = target.get("example", "")
-    applications = target.get("applications", "")
-    components = target.get("components", ["Strategy alignment", "Execution focus", "Metric evaluation"])
-    key_points = target.get("key_points", [f"Master {c_name} fundamentals", "Track key performance indicators"])
+    base_definition = target.get("definition", f"{c_name} is a foundational strategic principle in {doc_name}.")
+    base_explanation = target.get("detailed_explanation", "")
+    why_matters = target.get("why_matters", f"Essential for strategic decision-making and sustainable enterprise value.")
+    base_example = target.get("example", f"Leading enterprise organizations implement {c_name} to systematically reduce execution risk.")
+    base_applications = target.get("applications", f"Strategic planning, product discovery, resource prioritization, and performance management.")
+    components = target.get("components", ["Core Principle Formulation", "Cross-Functional Alignment", "Quantitative Feedback Loop"])
+    key_points = target.get("key_points", [f"Master {c_name} fundamentals", "Align strategic vision with operational execution", "Track validated customer retention"])
 
-    # Customize content based on control action
-    control_title = "Standard Explanation"
-    if control_action == "simpler_english":
-        control_title = "Simpler English Explanation"
-        explanation = f"In very simple words: {c_name} is like a blueprint that ensures you solve the real customer problem before spending money building something nobody wants. Instead of guessing, you ask questions and check the facts first."
-    elif control_action == "more_detail":
-        control_title = "Deep-Dive Strategic Analysis"
-        explanation = f"{explanation}\n\nAdvanced Strategic Context: When examined under Porter's Five Forces and modern unit economics, {c_name} prevents margin compression by establishing asymmetric information advantages. Leaders who master this can systematically de-risk capital deployment and forecast customer lifetime value with 90%+ confidence intervals."
-    elif control_action == "another_example":
-        control_title = "Alternative Business Case Study"
-        example = f"Case Study: Consider how Spotify leveraged {c_name} when pivoting from music downloads to streaming. By focusing on customer discovery rather than incumbent music label assumptions, they created the Discover Weekly recommendation moat that drove 40%+ retention lift."
-    elif control_action == "analogy":
-        control_title = "Intuitive Real-Life Analogy"
-        explanation = f"Think of {c_name} like an architect testing the soil before constructing a skyscraper. If the foundation is built on loose sand without testing the bedrock, even the most luxurious building will crack and collapse. {c_name} is your soil test before building."
-    elif control_action == "step_by_step":
-        control_title = "Step-by-Step Implementation Guide"
-        explanation = f"1. Phase 1 (Discovery): Interview 10-15 target users asking about actual past behaviors.\n2. Phase 2 (Hypothesis): Formulate a testable value proposition for {c_name}.\n3. Phase 3 (Validation): Deploy a minimal viable test to verify willingness to pay.\n4. Phase 4 (Scale): Institutionalize operational playbooks and monitor compounding retention."
-    elif control_action == "real_business":
-        control_title = "Enterprise Business Application"
-        applications = f"Enterprise leaders deploy {c_name} during annual budget cycles to eliminate 'zombie projects' that consume engineering headcount without driving measurable ARR growth. It transforms executive discussions from emotional debates into evidence-based decisions."
-    elif control_action == "compare":
-        related = concepts[(target_idx + 1) % len(concepts)]["name"] if len(concepts) > 1 else "Traditional Management"
-        control_title = f"Comparative Analysis: {c_name} vs {related}"
-        explanation = f"While {c_name} emphasizes continuous customer validation and rapid discovery loops, {related} focuses on downstream execution efficiency and milestone delivery. In a mature MBA strategy, {c_name} dictates WHAT to build, whereas {related} dictates HOW FAST to deliver it."
-    elif control_action == "framework":
-        control_title = "Executive Framework Matrix"
-        explanation = f"Structured Framework Matrix for **{c_name}**:\n\n1. **Diagnostic Gateway**: Audit current market friction, customer retention metrics, and competitive moats.\n2. **Prioritization Grid**: Map alternatives onto a 2x2 Impact-Effort quadrant to isolate high-leverage quick wins.\n3. **Execution Guardrails**: Define measurable OKRs and track leading operational indicators.\n4. **Feedback Architecture**: Run bi-weekly agile retrospectives to incorporate direct empirical customer data."
-    elif control_action == "differently":
-        control_title = "Alternative Perspective (Investor's View)"
-        explanation = f"Looking at **{c_name}** from an investor and board member lens: When evaluating enterprise valuation, capital allocators scrutinize whether you have validated **{c_name}** through customer cohort behaviors and sustainable unit economics. Demonstrating mastery of {c_name} de-risks execution and commands premium valuation multiples."
-    elif control_action == "in_hinglish":
-        control_title = "Conversational Hinglish Explanation"
-        explanation = f"Bhai simple shabdon me samjho: **{c_name}** ka basic matlab ye hai ki bina ground reality check kiye seedha paise aur time invest mat karo. Pehle target customers se baat karo, unki actual problem samjho, aur validation milne ke baad hi business ya product ko scale karo. Ye strategy loss hone se bachati hai aur market me defensible competitive moat banati hai."
-    elif control_action == "test_me":
-        control_title = "Concept Practice Challenge"
+    # Pull actual slide chunk text for grounding
+    conn = get_connection()
+    chunk_row = conn.execute(
+        "SELECT title, content FROM document_chunks WHERE document_id = ? AND slide_number = ? LIMIT 1",
+        (document_id, slide_num)
+    ).fetchone()
+    conn.close()
 
-    # Search web for authoritative external citations
+    slide_title = chunk_row["title"] if chunk_row else f"Slide {slide_num}"
+    slide_content = chunk_row["content"] if chunk_row else base_explanation
+
+    # Search web for external citations (Source B)
     external_sources = search_reliable_web(c_name, max_results=3)
 
-    # 8 Pedagogical Steps
+    # Try Gemini generation for hyper-deep custom explanation if API key is present
+    api_key = get_configured_api_key()
+    gemini_sections = None
+
+    if api_key:
+        prompt = f"""You are the master MBA Professor and Executive Tutor for Vishal Singh.
+Teach the following concept from his uploaded class presentation:
+Document: {doc_name}
+Slide {slide_num}: {slide_title}
+Concept Name: {c_name}
+Slide Content:
+{slide_content}
+
+Teaching Mode: {teaching_mode} Mode
+Control Action: {control_action or 'Standard Masterclass'}
+
+Generate an extensive, university-caliber, multi-page lecture formatted strictly as a JSON object with these 10 mandatory sections (A through J):
+{{
+  "section_a": {{
+    "title": "A. Topic Introduction",
+    "definition": "Precise, complete definition tailored to {teaching_mode} mode",
+    "core_idea": "Core conceptual intuition in simple English",
+    "importance": "Why this is critical for business strategy and enterprise value"
+  }},
+  "section_b": {{
+    "title": "B. Detailed Explanation",
+    "explanation": "Comprehensive multi-paragraph breakdown explaining every single component, theoretical foundation, and operational mechanism in detail",
+    "components": ["Component 1 with thorough detail", "Component 2 with thorough detail", "Component 3 with thorough detail"]
+  }},
+  "section_c": {{
+    "title": "C. Simple Example & Relatable Analogy",
+    "analogy": "An everyday, non-business analogy (e.g. architecture, cooking, sports, smartphones) that makes the concept instantly crystal clear",
+    "intuition": "How this analogy maps directly back to {c_name}"
+  }},
+  "section_d": {{
+    "title": "D. Real-World Business Example",
+    "company": "Company Name (e.g. Netflix, Apple, Amazon, Spotify, Tesla, Starbucks)",
+    "case_study": "Detailed real-world case study with background, decision made, strategic trade-offs, and measurable business metrics"
+  }},
+  "section_e": {{
+    "title": "E. How It Works & Process Mechanism",
+    "steps": ["Step 1: Diagnostic & Baseline Analysis", "Step 2: Hypothesis & Framework Formulation", "Step 3: Controlled Execution & Measurement", "Step 4: Iterative Scaling & Governance"],
+    "formula": "Relevant mathematical formula, metric, or calculation model (e.g. Unit Economics, ROI, Prioritization ratio)",
+    "worked_calculation": "Concrete numerical worked example showing step-by-step arithmetic"
+  }},
+  "section_f": {{
+    "title": "F. When to Use It",
+    "decision_triggers": ["Strategic condition 1", "Strategic condition 2", "Strategic condition 3"],
+    "problems_solved": "Specific organizational and market failures this methodology eliminates",
+    "boundary_conditions": "When NOT to apply this framework and why"
+  }},
+  "section_g": {{
+    "title": "G. Advantages and Limitations",
+    "advantages": ["Major strategic advantage 1", "Major strategic advantage 2", "Competitive moat creation"],
+    "limitations": ["Organizational cost or constraint 1", "Potential vulnerability or downside 2"],
+    "common_pitfalls": ["Misconception 1 made by junior leaders", "Execution trap 2"]
+  }},
+  "section_h": {{
+    "title": "H. Practical Application for MBA Students & Product Managers",
+    "actionable_playbook": "Step-by-step instructions for what to do on Monday morning in a corporate or startup role",
+    "key_deliverables": "Tangible artifacts to produce (e.g. PRD, 2x2 matrix, cohort retention sheet, board presentation)",
+    "cross_functional_alignment": "How to align Engineering, Design, Marketing, and Finance around this principle"
+  }},
+  "section_i": {{
+    "title": "I. Key Takeaways",
+    "takeaways": ["High-yield takeaway 1", "High-yield takeaway 2", "High-yield takeaway 3", "High-yield takeaway 4"]
+  }},
+  "section_j": {{
+    "title": "J. Understanding Check (Practice)",
+    "questions": [
+      {{
+        "id": 1,
+        "type": "Conceptual Understanding",
+        "question": "Clear conceptual question testing understanding of {c_name}",
+        "options": ["Plausible distractor A", "Correct answer", "Plausible distractor C", "Plausible distractor D"],
+        "correct_index": 1,
+        "explanation": "Detailed explanation of why this answer is correct and why other options are inaccurate"
+      }},
+      {{
+        "id": 2,
+        "type": "Executive Decision Scenario",
+        "question": "Scenario-based question placing the learner as an executive leader facing a trade-off",
+        "options": ["Suboptimal approach A", "Suboptimal approach B", "Strategic optimal approach", "Flawed approach D"],
+        "correct_index": 2,
+        "explanation": "In-depth managerial rationale grounded in MBA strategy"
+      }}
+    ]
+  }}
+}}
+IMPORTANT: Return ONLY valid JSON, no markdown formatting or backticks.
+"""
+        response_text = call_gemini(prompt)
+        if response_text:
+            try:
+                clean_json = re.sub(r'^```json\s*', '', response_text.strip(), flags=re.MULTILINE)
+                clean_json = re.sub(r'```$', '', clean_json.strip())
+                gemini_sections = json.loads(clean_json)
+            except Exception as e:
+                print(f"Error parsing Gemini concept teaching JSON: {e}")
+
+    # Build rich pedagogical sections (using Gemini if available, or rich grounded heuristic)
+    control_title = "Standard MBA Masterclass"
+    if control_action == "simpler_english":
+        control_title = "Simpler English Explanation"
+    elif control_action == "more_detail":
+        control_title = "Deep-Dive Strategic Analysis"
+    elif control_action == "another_example":
+        control_title = "Alternative Corporate Case Study"
+    elif control_action == "analogy":
+        control_title = "Intuitive Real-Life Analogy"
+    elif control_action == "step_by_step":
+        control_title = "Step-by-Step Implementation Guide"
+    elif control_action == "test_me":
+        control_title = "Comprehension & Case Challenge"
+    elif control_action == "in_hinglish":
+        control_title = "Conversational Hinglish Explanation"
+    elif control_action == "compare":
+        control_title = "Comparative Trade-off Analysis"
+    elif control_action == "framework":
+        control_title = "2x2 Strategic Matrix Formulation"
+    elif control_action == "differently":
+        control_title = "Alternative Investor / Board View"
+
+    # Fallback / Grounded Synthesis of 10 Sections
+    if not (gemini_sections and "section_a" in gemini_sections and "section_b" in gemini_sections):
+        # Tailor based on Teaching Mode
+        if teaching_mode == "Beginner":
+            sec_a_def = f"In simple words, **{c_name}** is a practical method to make sure you solve the right customer problem before spending time and money building something nobody wants."
+            sec_a_core = f"Instead of guessing what people like, you test your assumptions with real humans and verify if it truly makes their life easier."
+            sec_a_imp = f"It saves companies from wasting millions of dollars and helps students understand how successful products are actually born."
+            
+            sec_b_exp = f"**Understanding {c_name} from the ground up:**\n\nWhen companies start, they often fall in love with their own ideas. They think: 'If we build it, people will come.' But in reality, most new initiatives fail because customers simply don't care.\n\n{c_name} introduces a disciplined reality check. It breaks down the problem into three simple questions:\n1. Who specifically has this painful problem?\n2. Does our proposed solution solve it 10x better than existing alternatives?\n3. Are customers willing to pay for it or use it regularly?\n\nBy following this structure, teams avoid building useless features and focus entirely on creating true delight."
+            
+            sec_c_ana = f"Think of {c_name} like cooking a meal for guests. Instead of spending 5 hours preparing a complicated dish that your guests might be allergic to, you first ask what they enjoy eating, let them taste a small spoonful to check the salt, and only then cook the full dinner. {c_name} is your 'spoonful taste test' before the feast."
+            sec_c_int = f"In business, the taste test is talking to real customers and showing them an early draft or prototype."
+
+            sec_d_comp = "Spotify"
+            sec_d_case = f"When Spotify launched its 'Discover Weekly' playlist, they didn't know if users would trust an algorithm to pick their music. Instead of spending a year redesigning their whole app, they ran a small pilot test with internal employees and a small user cohort. When they saw that users listened to the recommended songs on repeat, they knew they had validated **{c_name}**. Today, Discover Weekly has over 50 million active weekly listeners."
+
+            sec_e_steps = [
+                "Step 1: Talk to 5 real people who face the problem daily",
+                "Step 2: Create a simple paper sketch or one-page summary of your idea",
+                "Step 3: Ask them: 'If this existed today, how would it change your week?'",
+                "Step 4: Only build the solution once 4 out of 5 people eagerly ask: 'When can I use this?'"
+            ]
+            sec_e_formula = "Product Satisfaction = (Perceived Benefit - Effort Required)"
+            sec_e_calc = "If a customer gains 90 points of convenience and only expends 10 points of effort, Net Satisfaction = +80 (High Delight)."
+
+            sec_f_triggers = ["When starting a new project", "When customer complaints increase", "Before spending any marketing budget"]
+            sec_f_probs = "Eliminates confusion, reduces wasted effort, and aligns the whole team on what matters most."
+            sec_f_boundary = "Do not over-analyze simple administrative tasks that don't directly affect customer satisfaction."
+
+            sec_g_adv = ["Prevents building things nobody wants", "Builds deep empathy with real users", "Keeps budgets lean and focused"]
+            sec_g_lim = ["Takes patience to listen to feedback without being defensive", "Requires willingness to admit your first idea was wrong"]
+            sec_g_pitfalls = ["Assuming your friends and family represent the whole market", "Confusing polite compliments with real intent to buy"]
+
+            sec_h_playbook = "Start your next assignment or product meeting by sharing 3 direct quotes from real target users rather than your own personal opinions."
+            sec_h_artifacts = "User Journey Map, 1-Page Problem Statement, Feature Prioritization Checklist"
+            sec_h_align = "Share user interview recordings with engineers and designers so everyone hears customer friction directly."
+
+            sec_i_takeaways = [
+                f"{c_name} is about validating truth before scaling effort.",
+                "Customer actions and habits speak louder than polite compliments.",
+                "Simplicity and speed of learning always beat complicated guesses.",
+                f"Source Document: {doc_name} (Slide {slide_num})"
+            ]
+
+        elif teaching_mode == "Exam":
+            sec_a_def = f"**{c_name}** is formally defined in {doc_name} as the structured managerial methodology for optimizing strategic resource allocation, evaluating competitive barriers, and aligning operational execution with core performance metrics."
+            sec_a_core = f"Core Exam Formulation: Systematic framework to evaluate whether strategic inputs deliver defensible business outcomes."
+            sec_a_imp = f"High-yield exam topic testing a student's ability to critically evaluate business trade-offs, financial sustainability, and risk mitigation."
+
+            sec_b_exp = f"**Academic Breakdown & Marking Criteria:**\n\nIn university examinations, answers on **{c_name}** are evaluated on three distinct analytical dimensions:\n\n1. **Theoretical Formulation:** Candidates must state the underlying theoretical paradigm (e.g. Porter's Structural Attractiveness, Barney's VRIO Resource-Based View, or Christensen's Disruption Theory). In this presentation (Slide {slide_num}), {c_name} serves as the primary mechanism for establishing operational efficiency.\n\n2. **Mechanistic Interdependence:** Examiners look for step-by-step linkages between strategic diagnosis, initiative prioritization, and measurable KPIs (e.g. EBITDA margins, Net Retention, CAC Payback).\n\n3. **Critical Synthesis:** Top-tier answers contrast {c_name} against traditional unstructured approaches, noting how it protects enterprise capital during economic downturns."
+
+            sec_c_ana = f"Analogy for Exam Recall: Think of {c_name} like the balance sheet equation (Assets = Liabilities + Equity). Every tactical feature or initiative (asset) must be financed by a validated strategic conviction and justified by measurable customer utility."
+            sec_c_int = f"On examination papers, illustrate this relationship using a structured 2x2 matrix or a closed-loop feedback diagram."
+
+            sec_d_comp = "Apple Inc. (Services Ecosystem)"
+            sec_d_case = f"Case Study for Essay Questions: Apple's strategic expansion from hardware into Services (iCloud, Apple Music, Apple Pay) provides an textbook illustration of **{c_name}**. Facing smartphone market saturation, Apple leveraged its active installed base of 1.2+ billion devices to drive recurring, high-margin revenue. Gross margins on Services exceed 70%, compared to ~35% on hardware, demonstrating how {c_name} directly mitigates margin compression."
+
+            sec_e_steps = [
+                "Phase 1 (Diagnosis): Perform empirical audit of market demand and unit cost structures",
+                "Phase 2 (Formulation): Construct hypothesis matrix with defined threshold acceptance criteria",
+                "Phase 3 (Empirical Testing): Deploy targeted micro-initiatives to test willingness to pay",
+                "Phase 4 (Governance & Scale): Formalize operational OKRs and review variance against forecasts"
+            ]
+            sec_e_formula = "Return on Invested Capital (ROIC) = NOPAT / (Total Debt + Equity - Cash)"
+            sec_e_calc = "Given NOPAT = $120M, Total Capital = $600M, Cash = $100M: Invested Capital = $500M. ROIC = 120 / 500 = 24.0% (Exceeds typical WACC of 9%)."
+
+            sec_f_triggers = ["Exam Essay Questions on Competitive Strategy", "Case Analysis on Stagnant Growth", "M&A Strategic Due Diligence"]
+            sec_f_probs = "Resolves capital misallocation, strategic drift, and cross-functional silos."
+            sec_f_boundary = "Not applicable in purely commodity markets governed strictly by lowest-cost bidding contracts."
+
+            sec_g_adv = ["Provides defensible quantitative logic for exam evaluations", "Systematically eliminates ungrounded assumptions", "Establishes clear accountability"]
+            sec_g_lim = ["Risk of 'analysis paralysis' if threshold criteria are overly rigid", "Requires high-integrity data inputs"]
+            sec_g_pitfalls = ["Failing to cite specific numerical metrics in case analyses", "Confusing top-line revenue growth with sustainable operating cash flow"]
+
+            sec_h_playbook = "Structure examination essays using the Introduction -> Theoretical Framework -> Empirical Corporate Case -> Strategic Limitations -> Final Recommendation framework."
+            sec_h_artifacts = "Marking-Scheme Rubric, 2x2 Strategic Quadrant, Dupont Decomposition Model"
+            sec_h_align = "Frame recommendations to demonstrate fluency across both Financial controllership and Go-To-Market leadership."
+
+            sec_i_takeaways = [
+                f"Core Definition of {c_name} must be stated verbatim in question 1.",
+                "Always support strategic recommendations with calculated unit economics or margin metrics.",
+                "Highlight both advantages AND boundary conditions to score top marks on critical evaluation.",
+                f"Source Citation: {doc_name}, Slide {slide_num} ({slide_title})"
+            ]
+
+        elif teaching_mode == "Expert":
+            sec_a_def = f"**{c_name}** represents the governance architecture through which principal business strategists eliminate non-linear operational drag and protect enterprise unit economics against structural commoditization."
+            sec_a_core = f"First-principles thesis: Organizations that treat {c_name} as a checkbox fail; organizations that treat it as a continuous asymmetric moat generate compounding economic rents."
+            sec_a_imp = f"Serves as the structural difference between low-margin service providers and high-multiple software/platform monopolies."
+
+            sec_b_exp = f"**Executive Deep-Dive & Second-Order Systems Analysis:**\n\nAt an executive and Board level, **{c_name}** is not merely an operational framework—it is an economic risk mitigation mechanism. In mature industries, enterprise margins inevitably decay due to competitive parity, copycat features, and rising customer acquisition costs.\n\nMastering {c_name} allows executive teams to decouple revenue growth from headcount and capital expenditures. By institutionalizing rigorous discovery loops and strategic prioritization, leadership creates **structural asymmetric advantages**:\n- **Information Asymmetry:** Understanding customer cohort retention curves better than the competition.\n- **Capital Efficiency:** Eliminating 60-70% of candidate initiatives before they consume engineering capacity.\n- **Defensible Moats:** Transforming one-off product transactions into sticky, high-switching-cost ecosystems."
+
+            sec_c_ana = f"First-Principles Analogy: In fluid dynamics, laminar flow minimizes drag while turbulent flow dissipates kinetic energy into useless heat. Uncoordinated business teams create organizational turbulence; {c_name} re-engineers company workflows into smooth, frictionless laminar execution."
+            sec_c_int = f"Every non-validated product feature is organizational turbulence that bleeds capital."
+
+            sec_d_comp = "Amazon (AWS Division & Flywheel Governance)"
+            sec_d_case = f"Strategic Enterprise Case: Amazon's creation of AWS began not as an external product, but as an internal implementation of **{c_name}**. In the early 2000s, Amazon's engineering teams were bottlenecked by monolithic infrastructure and tangled dependencies. Jeff Bezos issued the famous 'API Mandate', requiring every team to decouple their systems and expose functionality through well-defined service contracts. By applying {c_name} to internal infrastructure, Amazon eliminated cross-team coordination tax, compressed deployment cycles, and created a cloud business that now delivers $100B+ annual run-rate operating income."
+
+            sec_e_steps = [
+                "Stage 1: Conduct cohort-based unit economic audits (LTV, CAC, Gross Margin, Net Churn)",
+                "Stage 2: Isolate high-retention user behaviors and identify their leading indicators",
+                "Stage 3: Restructure organizational incentives to reward capital velocity and validated outcomes over vanity delivery",
+                "Stage 4: Establish continuous automated telemetry to monitor margin decay and competitive incursions"
+            ]
+            sec_e_formula = "Customer Lifetime Value (LTV) / Customer Acquisition Cost (CAC) = (ARPU * Gross Margin % / Churn Rate) / CAC"
+            sec_e_calc = "Given ARPU = $200/mo, Gross Margin = 80%, Monthly Churn = 2.5%, CAC = $1,600: LTV = ($200 * 0.80) / 0.025 = $6,400. Ratio = $6,400 / $1,600 = 4.0x (Target: > 3.0x)."
+
+            sec_f_triggers = ["Board-level Portfolio Reallocation", "Post-Merger Integration", "SaaS Gross Margin Contraction"]
+            sec_f_probs = "Overcomes organizational inertia, eliminates political pet projects, and accelerates free cash flow conversion."
+            sec_f_boundary = "When operating in deep existential crisis where immediate liquidity survival overrides strategic repositioning."
+
+            sec_g_adv = ["Compounds organizational learning velocity", "Creates defensible switching costs and pricing power", "Increases valuation multiples by 2-3x"]
+            sec_g_lim = ["Causes political friction with mid-level managers who protect legacy empires", "Requires high-conviction executive sponsorship"]
+            sec_g_pitfalls = ["Confusing top-line vanity metrics (GMV, registered users) with true economic profit", "Prematurely scaling sales & marketing before retention curves flatten"]
+
+            sec_h_playbook = "Present a 1-page memo to the Executive Committee showing the net present value (NPV) and opportunity cost of killing the bottom 25% of unvalidated initiatives."
+            sec_h_artifacts = "Cohort Retention Matrix, LTV/CAC Decomposition Dashboard, Executive Decision Memo"
+            sec_h_align = "Tie executive bonuses and squad incentives directly to cohort retention and capital efficiency rather than delivery dates."
+
+            sec_i_takeaways = [
+                f"{c_name} is the primary mechanism to protect gross margins and operating leverage.",
+                "Strategy is as much about deciding what NOT to do as what to fund.",
+                "Cohort retention is the only non-fungible proof of true value creation.",
+                f"Source Citation: {doc_name}, Slide {slide_num}"
+            ]
+
+        else: # MBA Mode (Default)
+            sec_a_def = f"**{c_name}** is a core strategic framework presented in {doc_name} (Slide {slide_num}) that enables executive leadership to systematically evaluate, structure, and optimize operational initiatives against measurable business returns."
+            sec_a_core = f"The central thesis of {c_name} is that sustainable competitive advantage requires continuous alignment between customer value delivery, disciplined prioritization, and capital efficiency."
+            sec_a_imp = f"In modern MBA business strategy, mastering {c_name} equips leaders to avoid margin compression, de-risk multi-million dollar investments, and build enduring enterprise value."
+
+            sec_b_exp = f"**Executive MBA Strategic Breakdown:**\n\nWhen implemented across cross-functional organizations, **{c_name}** bridges high-level vision with disciplined day-to-day execution. It operates through three interconnected pillars:\n\n1. **Diagnostic Grounding:** Rather than relying on subjective intuition or internal consensus, management establishes an empirical baseline of customer pain points, unit economics, and competitive alternatives.\n\n2. **Prioritization & Resource Allocation:** Using rigorous decision models, squads evaluate competing opportunities on risk-adjusted ROI. Initiatives that fail to meet minimum threshold criteria are systematically deprioritized before engineering capital is consumed.\n\n3. **Closed-Loop Feedback Governance:** Progress is tracked using leading indicators rather than trailing financial reports, allowing leadership to pivot or double down with maximum agility."
+
+            sec_c_ana = f"Intuitive Analogy: Imagine an architect constructing a commercial skyscraper. Before pouring millions of dollars into concrete, the engineering team drills core soil samples to inspect the bedrock. If the foundation is unstable, adding more steel simply accelerates structural collapse. {c_name} is the structural bedrock test of business strategy."
+            sec_c_int = f"Testing assumptions early preserves capital and ensures that every sprint built compounds into lasting enterprise strength."
+
+            sec_d_comp = "Netflix"
+            sec_d_case = f"Case Study: In 2011, Netflix faced an existential strategic crossroads: whether to continue milking its lucrative DVD-by-mail business or aggressively cannibalize itself by investing in broadband video streaming. By applying the principles of **{c_name}**, Reed Hastings recognized that customer problem-spaces were shifting toward instant gratification and algorithmic personalization. Despite short-term subscriber backlash and a 75% stock plunge, Netflix's commitment to validating {c_name} created the recommendation engine and original content moat that today commands 260+ million paid global subscribers and $30B+ in annual revenue."
+
+            sec_e_steps = [
+                "Step 1: Baseline Audit — Quantify current market friction, customer retention metrics, and unit costs",
+                "Step 2: Hypothesis Formulation — Define clear, testable value propositions and acceptance criteria",
+                "Step 3: Controlled Validation — Deploy pilot sprints and measure validated customer engagement",
+                "Step 4: Scale & Moat Deepening — Formalize playbooks, expand distribution, and monitor compounding margins"
+            ]
+            sec_e_formula = "Net Present Value (NPV) = Sum( Cash Flow_t / (1 + r)^t ) - Initial Investment"
+            sec_e_calc = "For an initiative requiring $250K investment generating $100K/yr for 4 years at a 10% discount rate: NPV = $100K*(3.170) - $250K = +$67,000 (Positive NPV -> Fund Initiative)."
+
+            sec_f_triggers = ["Quarterly strategic reviews", "Product roadmap prioritization", "Entering new market segments"]
+            sec_f_probs = "Eliminates wasted capital, bridges the gap between strategy and execution, and establishes clear accountability."
+            sec_f_boundary = "Avoid when addressing statutory compliance or legal mandates where economic optimization is secondary."
+
+            sec_g_adv = ["Disciplined risk mitigation", "Stronger cross-functional alignment", "Protects gross margin and free cash flow"]
+            sec_g_lim = ["Requires rigorous data hygiene", "Can encounter organizational resistance from legacy teams"]
+            sec_g_pitfalls = ["Confusing customer wishes with validated willingness to pay", "Failing to establish clear kill-criteria for underperforming initiatives"]
+
+            sec_h_playbook = "Lead your next cross-functional quarterly planning session by requiring every proposed initiative to include a 1-page validation memo detailing customer evidence and expected unit economics."
+            sec_h_artifacts = "Executive Business Case, 2x2 Impact-Effort Matrix, Unit Economics Decomposition Sheet"
+            sec_h_align = "Align Product, Engineering, and Finance squads around shared OKRs anchored in customer retention rather than output velocity."
+
+            sec_i_takeaways = [
+                f"{c_name} is the primary operational link between strategic vision and execution.",
+                "Customer retention and validated willingness to pay are the ultimate arbiters of value.",
+                "Rigorous prioritization protects constrained capital and maximizes ROI.",
+                f"Source Citation: {doc_name}, Slide {slide_num} ({slide_title})"
+            ]
+
+        # Interactive practice questions for Section J
+        sec_j_questions = [
+            {
+                "id": 1,
+                "type": "Conceptual Understanding",
+                "question": f"In the context of {c_name} (Slide {slide_num}), what is the primary indicator that a strategic initiative has achieved true product-market validation?",
+                "options": [
+                    "A sustained, flattening customer cohort retention curve accompanied by willingness to pay",
+                    "Completing all scheduled engineering deliverables on time and under budget",
+                    "A rapid spike in top-line website traffic generated through paid advertising campaigns",
+                    "Unanimous executive consensus during internal quarterly review meetings"
+                ],
+                "correct_index": 0,
+                "explanation": "Cohort retention and proven willingness to pay are empirical, non-falsifiable proof of value creation. Feature delivery, marketing spikes, and internal opinions do not validate customer demand."
+            },
+            {
+                "id": 2,
+                "type": "Executive Decision Scenario",
+                "question": f"As a Director of Product evaluating two competing initiatives under {c_name}: Initiative A has high customer demand but negative unit economics; Initiative B has moderate demand but a 4x LTV:CAC ratio and 80% gross margin. How should you allocate capital?",
+                "options": [
+                    "Fund Initiative A fully because high volume will automatically fix broken unit economics over time",
+                    "Prioritize Initiative B to ensure sustainable margins, while redesigning Initiative A's cost structure before scaling",
+                    "Split the budget evenly between both initiatives to avoid making difficult trade-offs",
+                    "Cancel both initiatives and wait for macroeconomic interest rates to drop"
+                ],
+                "correct_index": 1,
+                "explanation": "High volume with negative unit economics simply accelerates cash burn. Initiative B delivers sustainable compounding cash flow, while Initiative A requires business model surgery before scaling."
+            }
+        ]
+
+        sections = {
+            "section_a": {
+                "title": "A. Topic Introduction",
+                "definition": sec_a_def,
+                "core_idea": sec_a_core,
+                "importance": sec_a_imp
+            },
+            "section_b": {
+                "title": "B. Detailed Explanation",
+                "explanation": sec_b_exp,
+                "components": components
+            },
+            "section_c": {
+                "title": "C. Simple Example & Relatable Analogy",
+                "analogy": sec_c_ana,
+                "intuition": sec_c_int
+            },
+            "section_d": {
+                "title": "D. Real-World Business Example",
+                "company": sec_d_comp,
+                "case_study": sec_d_case
+            },
+            "section_e": {
+                "title": "E. How It Works & Process Mechanism",
+                "steps": sec_e_steps,
+                "formula": sec_e_formula,
+                "worked_calculation": sec_e_calc
+            },
+            "section_f": {
+                "title": "F. When to Use It",
+                "decision_triggers": sec_f_triggers,
+                "problems_solved": sec_f_probs,
+                "boundary_conditions": sec_f_boundary
+            },
+            "section_g": {
+                "title": "G. Advantages and Limitations",
+                "advantages": sec_g_adv,
+                "limitations": sec_g_lim,
+                "common_pitfalls": sec_g_pitfalls
+            },
+            "section_h": {
+                "title": "H. Practical Application for MBA & Product Managers",
+                "actionable_playbook": sec_h_playbook,
+                "key_deliverables": sec_h_artifacts,
+                "cross_functional_alignment": sec_h_align
+            },
+            "section_i": {
+                "title": "I. Key Takeaways",
+                "takeaways": sec_i_takeaways
+            },
+            "section_j": {
+                "title": "J. Understanding Check (Practice)",
+                "questions": sec_j_questions
+            }
+        }
+    else:
+        sections = gemini_sections
+
+    # Format the 10 pedagogical steps array for frontend backward compatibility & rich rendering
     steps = [
         {
+            "step_letter": "A",
             "step_number": 1,
-            "title": "Introduction & Purpose",
-            "content": f"**{c_name}**\n\n{definition}\n\n*Why it matters:* {why_matters}"
+            "title": "Topic Introduction",
+            "content": f"### Definition\n{sections['section_a']['definition']}\n\n### Core Idea\n{sections['section_a'].get('core_idea', '')}\n\n### Strategic Importance\n{sections['section_a'].get('importance', '')}"
         },
         {
+            "step_letter": "B",
             "step_number": 2,
-            "title": "Core Strategic Explanation",
-            "content": f"{explanation}\n\n**Key Components:**\n" + "\n".join([f"• {comp}" for comp in components])
+            "title": "Detailed Explanation",
+            "content": f"{sections['section_b']['explanation']}\n\n**Core Components:**\n" + "\n".join([f"• {c}" for c in sections['section_b'].get('components', [])])
         },
         {
+            "step_letter": "C",
             "step_number": 3,
-            "title": "Real-World Business Example",
-            "content": f"{example}\n\n*Strategic Context:* Observed in leading digital and enterprise transformations."
+            "title": "Simple Example & Everyday Analogy",
+            "content": f"**Intuitive Everyday Analogy:**\n{sections['section_c'].get('analogy', '')}\n\n**How This Connects:**\n{sections['section_c'].get('intuition', '')}"
         },
         {
+            "step_letter": "D",
             "step_number": 4,
-            "title": "Intuitive Analogy",
-            "content": f"Imagine navigating an uncharted ocean: {c_name} acts as your marine compass. Without it, rowing harder (adding engineering hours) simply takes you faster in the wrong direction."
+            "title": "Real-World Business Example",
+            "content": f"**Company Case Study: {sections['section_d'].get('company', 'Enterprise Benchmark')}**\n\n{sections['section_d'].get('case_study', '')}"
         },
         {
+            "step_letter": "E",
             "step_number": 5,
-            "title": "How to Apply in Business",
-            "content": f"**Executive Application Protocol:**\n{applications}\n\nDeploy this during sprint planning, resource reviews, and board presentations."
+            "title": "How It Works & Process Mechanism",
+            "content": "**Step-by-Step Execution Workflow:**\n" + "\n".join([f"{i+1}. {st}" for i, st in enumerate(sections['section_e'].get('steps', []))]) + f"\n\n**Strategic Formula / Metric:**\n`{sections['section_e'].get('formula', '')}`\n\n**Worked Calculation:**\n{sections['section_e'].get('worked_calculation', '')}"
         },
         {
+            "step_letter": "F",
             "step_number": 6,
-            "title": "Common Mistakes to Avoid",
-            "content": f"1. Confusing customer 'wishes' with genuine 'willingness to pay'.\n2. Over-optimizing technical architecture before validating {c_name}.\n3. Relying on vanity metrics rather than cohort retention."
+            "title": "When to Use It",
+            "content": "**Strategic Decision Triggers:**\n" + "\n".join([f"• {dt}" for dt in sections['section_f'].get('decision_triggers', [])]) + f"\n\n**Problems Solved:**\n{sections['section_f'].get('problems_solved', '')}\n\n**Boundary Conditions (When NOT to use):**\n{sections['section_f'].get('boundary_conditions', '')}"
         },
         {
+            "step_letter": "G",
             "step_number": 7,
-            "title": "Key Takeaways (High-Impact)",
-            "content": "\n".join([f"✓ {pt}" for pt in key_points])
+            "title": "Advantages and Limitations",
+            "content": "**Key Strategic Advantages:**\n" + "\n".join([f"✓ {adv}" for adv in sections['section_g'].get('advantages', [])]) + "\n\n**Core Limitations & Trade-offs:**\n" + "\n".join([f"⚠️ {lim}" for lim in sections['section_g'].get('limitations', [])]) + "\n\n**Common Mistakes & Pitfalls:**\n" + "\n".join([f"❌ {pf}" for pf in sections['section_g'].get('common_pitfalls', [])])
         },
         {
+            "step_letter": "H",
             "step_number": 8,
-            "title": "Quick Comprehension Check",
-            "question": f"When applying {c_name} in an enterprise, what is the most critical primary indicator of success?",
-            "options": [
-                f"Sustained customer retention and validated willingness to pay (Correct)",
-                "Building all features listed in the initial project scope",
-                "Increasing the total volume of daily internal team meetings",
-                "Expanding marketing spend without validating unit economics"
-            ],
-            "correct_index": 0,
-            "explanation": f"Validated willingness to pay and cohort retention provide undeniable empirical proof that {c_name} has been achieved (Source: Slide {slide_num})."
+            "title": "Practical Application for MBA & Product Managers",
+            "content": f"**Actionable Execution Playbook:**\n{sections['section_h'].get('actionable_playbook', '')}\n\n**Tangible Deliverables to Produce:**\n{sections['section_h'].get('key_deliverables', '')}\n\n**Cross-Functional Squad Alignment:**\n{sections['section_h'].get('cross_functional_alignment', '')}"
+        },
+        {
+            "step_letter": "I",
+            "step_number": 9,
+            "title": "Key Takeaways (High-Impact)",
+            "content": "\n".join([f"📌 {tk}" for tk in sections['section_i'].get('takeaways', [])])
+        },
+        {
+            "step_letter": "J",
+            "step_number": 10,
+            "title": "Understanding Check (Practice)",
+            "content": "Interactive multiple-choice practice questions with detailed rationale.",
+            "questions": sections['section_j'].get('questions', [])
         }
     ]
 
@@ -616,10 +994,13 @@ def get_concept_teaching_package(document_id: str, concept_name: str, control_ac
         "concept_index": target_idx,
         "total_concepts": len(concepts),
         "slide_number": slide_num,
+        "slide_title": slide_title,
+        "teaching_mode": teaching_mode,
         "control_action": control_action,
         "control_title": control_title,
+        "sections": sections,
         "steps": steps,
-        "source_citation": f"Source: Slide {slide_num}",
+        "source_citation": f"Source: Slide {slide_num} ({slide_title})",
         "external_sources": external_sources
     }
 

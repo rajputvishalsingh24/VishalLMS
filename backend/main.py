@@ -406,42 +406,99 @@ async def upload_document(
     description: str = Form(""),
     tags: str = Form("[]")
 ):
-    ext = os.path.splitext(file.filename)[1].lower().replace(".", "")
-    if ext not in ["ppt", "pptx", "pdf", "docx", "txt", "md"]:
-        raise HTTPException(status_code=400, detail=f"Unsupported format .{ext}. Supported formats: PPT, PPTX, PDF, DOCX, TXT, MD")
+    safe_filename = os.path.basename(file.filename or "presentation.pptx")
+    ext = os.path.splitext(safe_filename)[1].lower().replace(".", "")
+
+    # Reject dangerous executable formats
+    if ext in ["exe", "bat", "sh", "cmd", "vbs", "ps1", "dll", "so", "bin"]:
+        raise HTTPException(status_code=400, detail="Executable files are not permitted for security reasons.")
+
+    contents = await file.read()
+    if not contents or len(contents) == 0:
+        raise HTTPException(status_code=400, detail="The uploaded file is empty. Please select a valid PowerPoint or PDF file.")
+
+    if len(contents) > 50 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File size exceeds the 50 MB limit. Please upload a smaller presentation.")
+
+    # Detect actual file signature from header bytes
+    from .extractor import detect_file_signature
+    real_ext = ext
+    if contents.startswith(b"PK\x03\x04"):
+        real_ext = "pptx"
+    elif contents.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+        real_ext = "ppt"
+    elif contents.startswith(b"%PDF-"):
+        real_ext = "pdf"
+
+    if real_ext not in ["ppt", "pptx", "pdf", "docx", "txt", "md"]:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported format .{ext}. Supported presentation formats: Microsoft PowerPoint (.ppt, .pptx) and PDF (.pdf)"
+        )
 
     doc_id = f"doc_{uuid.uuid4().hex[:10]}"
-    saved_filename = f"{doc_id}_{file.filename}"
+    saved_filename = f"{doc_id}_{safe_filename}"
     file_path = os.path.join(get_upload_dir(), saved_filename)
 
-    # Save file contents
-    contents = await file.read()
     with open(file_path, "wb") as f:
         f.write(contents)
 
     file_size = len(contents)
-    
+
+    # Resolve and validate target subject to guarantee valid foreign key
+    conn = get_connection()
+    c = conn.cursor()
+
+    target_subject_id = None
+    if subject_id and str(subject_id).strip() not in ("", "null", "undefined", "None"):
+        s_row = c.execute("SELECT id FROM subjects WHERE id = ?", (str(subject_id).strip(),)).fetchone()
+        if s_row:
+            target_subject_id = s_row["id"]
+
+    if not target_subject_id:
+        first_sub = c.execute("SELECT id FROM subjects ORDER BY created_at ASC LIMIT 1").fetchone()
+        if first_sub:
+            target_subject_id = first_sub["id"]
+        else:
+            default_sub_id = f"sub_{uuid.uuid4().hex[:8]}"
+            c.execute(
+                "INSERT INTO subjects (id, name, description) VALUES (?, 'MBA Core Curriculum', 'Default subject for uploaded class presentations and study materials')",
+                (default_sub_id,)
+            )
+            conn.commit()
+            target_subject_id = default_sub_id
+
+    # Resolve optional topic_id
+    clean_topic_id = None
+    if topic_id and str(topic_id).strip() not in ("", "null", "undefined", "None"):
+        t_row = c.execute("SELECT id FROM topics WHERE id = ?", (str(topic_id).strip(),)).fetchone()
+        if t_row:
+            clean_topic_id = t_row["id"]
+
     # Extract text & slides
     try:
-        extracted_chunks = extract_document(file_path, ext)
+        extracted_chunks = extract_document(file_path, real_ext)
     except Exception as e:
         extracted_chunks = [{
             "slide_number": 1,
             "page_number": 1,
-            "title": file.filename,
-            "content": f"Document uploaded. Text extraction notice: {str(e)}",
-            "takeaways": ["Review document manually"]
+            "title": safe_filename,
+            "content": f"Document uploaded. Text extraction note: {str(e)}",
+            "takeaways": ["Review presentation manually"]
         }]
 
-    slide_count = len(extracted_chunks)
-    
-    conn = get_connection()
-    c = conn.cursor()
+    slide_count = max(1, len(extracted_chunks))
 
     c.execute("""
-    INSERT INTO documents (id, subject_id, topic_id, name, original_filename, file_type, file_size, file_path, semester, faculty, description, tags, slide_count, page_count, progress)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
-    """, (doc_id, subject_id, topic_id, file.filename, file.filename, ext.upper(), file_size, file_path, semester, faculty, description, tags, slide_count, slide_count))
+    INSERT INTO documents (
+        id, subject_id, topic_id, name, original_filename, file_type, file_size,
+        file_path, semester, faculty, description, tags, slide_count, page_count, progress
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+    """, (
+        doc_id, target_subject_id, clean_topic_id, safe_filename, safe_filename,
+        real_ext.upper(), file_size, file_path, semester, faculty, description, tags,
+        slide_count, slide_count
+    ))
 
     for idx, chunk in enumerate(extracted_chunks, start=1):
         chunk_id = str(uuid.uuid4())
@@ -449,25 +506,37 @@ async def upload_document(
         c.execute("""
         INSERT INTO document_chunks (id, document_id, chunk_index, slide_number, page_number, title, content, takeaways)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        """, (chunk_id, doc_id, idx, chunk.get("slide_number", idx), chunk.get("page_number", idx), chunk.get("title", f"Slide {idx}"), chunk.get("content", ""), takeaways_json))
+        """, (
+            chunk_id, doc_id, idx, chunk.get("slide_number", idx),
+            chunk.get("page_number", idx), chunk.get("title", f"Slide {idx}"),
+            chunk.get("content", ""), takeaways_json
+        ))
 
         try:
             c.execute("""
-            INSERT INTO document_chunks_fts (chunk_id, document_id, title, content)
-            VALUES (?, ?, ?, ?)
-            """, (chunk_id, doc_id, chunk.get("title", ""), chunk.get("content", "")))
+            INSERT INTO document_chunks_fts (title, content)
+            VALUES (?, ?)
+            """, (chunk.get("title", ""), chunk.get("content", "")))
         except Exception:
             pass
 
     conn.commit()
     conn.close()
 
+    # Pre-generate presentation summary & concepts immediately so learning view is ready instantly
+    try:
+        analyze_presentation(doc_id)
+    except Exception as e:
+        print(f"Notice auto-analyzing presentation: {e}")
+
     return {
         "success": True,
         "id": doc_id,
-        "name": file.filename,
+        "name": safe_filename,
+        "subject_id": target_subject_id,
         "slide_count": slide_count,
-        "message": f"Successfully extracted and indexed {slide_count} slides/pages!"
+        "file_size": file_size,
+        "message": f"Successfully uploaded and processed {slide_count} slides!"
     }
 
 @app.delete("/api/documents/{id}")
@@ -964,11 +1033,13 @@ def api_update_presentation_session(doc_id: str, req: SessionUpdateRequest):
 class TeachRequest(BaseModel):
     concept_name: str
     control_action: Optional[str] = None
+    teaching_mode: Optional[str] = "MBA"
 
 @app.post("/api/presentations/{doc_id}/teach")
 def api_teach_presentation_concept(doc_id: str, req: TeachRequest):
     try:
-        pkg = get_concept_teaching_package(doc_id, req.concept_name, req.control_action)
+        teaching_mode = req.teaching_mode or "MBA"
+        pkg = get_concept_teaching_package(doc_id, req.concept_name, req.control_action, teaching_mode)
         return pkg
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -1,6 +1,8 @@
 import os
 import re
 import tempfile
+import struct
+import zipfile
 from typing import List, Dict, Any, Tuple
 from pptx import Presentation
 import docx
@@ -14,11 +16,141 @@ def clean_text(text: str) -> str:
     text = re.sub(r'[ \t]+', ' ', text)
     return text.strip()
 
+def detect_file_signature(file_path: str) -> str:
+    """
+    Detect real file format by checking magic bytes rather than trusting file extension alone.
+    """
+    try:
+        with open(file_path, "rb") as f:
+            header = f.read(32)
+        if header.startswith(b"PK\x03\x04"):
+            # ZIP container - check if PPTX or DOCX
+            try:
+                with zipfile.ZipFile(file_path, 'r') as z:
+                    names = z.namelist()
+                    if any(n.startswith("ppt/") for n in names):
+                        return "pptx"
+                    if any(n.startswith("word/") for n in names):
+                        return "docx"
+            except Exception:
+                pass
+            return "pptx"
+        elif header.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
+            # OLE2 Compound File - legacy binary PPT or DOC
+            return "ppt"
+        elif header.startswith(b"%PDF-"):
+            return "pdf"
+        elif header.isascii() or header.startswith(b"\xef\xbb\xbf"):
+            return "txt"
+    except Exception:
+        pass
+    ext = os.path.splitext(file_path)[1].lower().replace(".", "")
+    return ext or "pptx"
+
+def extract_binary_ppt(file_path: str) -> List[Dict[str, Any]]:
+    """
+    Extract legacy Microsoft PowerPoint 97-2003 binary (.ppt) presentations.
+    Parses PowerPoint document records:
+    - RT_Slide (0x03EE)
+    - RT_TextCharsAtom (0x0FA8, UTF-16LE)
+    - RT_TextBytesAtom (0x0FA0, Latin1/ASCII)
+    - CString (0x0FBA)
+    """
+    slides_data = []
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+
+        slides_texts = [[]]
+        offset = 0
+        total_len = len(data)
+
+        while offset < total_len - 8:
+            try:
+                rec_type = struct.unpack('<H', data[offset+2:offset+4])[0]
+                rec_len = struct.unpack('<I', data[offset+4:offset+8])[0]
+
+                if rec_len > total_len - offset - 8 or rec_len <= 0:
+                    offset += 1
+                    continue
+
+                if rec_type == 0x03EE:  # RT_Slide boundary
+                    if slides_texts[-1]:
+                        slides_texts.append([])
+                elif rec_type == 0x0FA8:  # RT_TextCharsAtom (UTF-16LE)
+                    txt = data[offset+8:offset+8+rec_len].decode('utf-16le', errors='ignore')
+                    cleaned = clean_text(txt)
+                    if len(cleaned) > 1 and not cleaned.isspace():
+                        slides_texts[-1].append(cleaned)
+                elif rec_type in (0x0FA0, 0x0FBA):  # RT_TextBytesAtom / CString
+                    txt = data[offset+8:offset+8+rec_len].decode('latin1', errors='ignore')
+                    cleaned = clean_text(txt)
+                    if len(cleaned) > 1 and not cleaned.isspace() and any(c.isalnum() for c in cleaned):
+                        slides_texts[-1].append(cleaned)
+
+                offset += 8 + rec_len
+            except Exception:
+                offset += 1
+
+        # Filter out empty slide buckets
+        valid_slides = [s for s in slides_texts if s]
+
+        if not valid_slides:
+            # Fallback regex extraction of printable unicode and ascii text sequences
+            raw_strings = re.findall(r'(?:[\x20-\x7E]{4,})|(?:(?:[\x20-\x7E]\x00){4,})', data.decode('latin1', errors='ignore'))
+            cleaned_strings = []
+            for s in raw_strings:
+                cs = clean_text(s.replace('\x00', ''))
+                if len(cs) >= 4 and any(c.isalnum() for c in cs):
+                    cleaned_strings.append(cs)
+
+            # Chunk into simulated slides of 4-6 text items
+            chunk_size = 5
+            for i in range(0, len(cleaned_strings), chunk_size):
+                group = cleaned_strings[i:i+chunk_size]
+                if group:
+                    valid_slides.append(group)
+
+        if not valid_slides:
+            valid_slides = [[f"Presentation: {os.path.basename(file_path)}", "Contains visual diagram or binary data"]]
+
+        for idx, texts in enumerate(valid_slides, start=1):
+            title = texts[0][:80] if texts else f"Slide {idx}"
+            content = "\n".join(texts)
+            takeaways = [t for t in texts[1:5] if len(t) > 10][:3]
+            if not takeaways:
+                takeaways = [f"Key concepts on {title}"]
+
+            slides_data.append({
+                "slide_number": idx,
+                "page_number": idx,
+                "title": title,
+                "content": content,
+                "takeaways": takeaways
+            })
+
+    except Exception as e:
+        print(f"Error in extract_binary_ppt for {file_path}: {e}")
+        slides_data.append({
+            "slide_number": 1,
+            "page_number": 1,
+            "title": os.path.basename(file_path),
+            "content": f"PowerPoint presentation uploaded. Text extraction notice: {str(e)}",
+            "takeaways": ["Review presentation slides"]
+        })
+
+    return slides_data
+
 def extract_pptx(file_path: str) -> List[Dict[str, Any]]:
     """
     Extract PPTX slide-by-slide preserving slide numbers, titles,
     shapes, tables, and notes.
     """
+    # If the file is actually an older binary PPT, route to binary extractor
+    sig = detect_file_signature(file_path)
+    if sig == "ppt":
+        return extract_binary_ppt(file_path)
+
     slides_data = []
     try:
         prs = Presentation(file_path)
@@ -76,8 +208,13 @@ def extract_pptx(file_path: str) -> List[Dict[str, Any]]:
                 "takeaways": bullet_points
             })
     except Exception as e:
-        print(f"Error parsing PPTX {file_path}: {e}")
-        # Graceful fallback chunk
+        print(f"Error parsing PPTX {file_path}, attempting binary extraction: {e}")
+        # Try binary extractor before giving up
+        try:
+            return extract_binary_ppt(file_path)
+        except Exception:
+            pass
+
         slides_data.append({
             "slide_number": 1,
             "page_number": 1,
@@ -228,18 +365,30 @@ def extract_document(file_path: str, file_type: str) -> List[Dict[str, Any]]:
     """
     Master dispatcher for document extraction.
     Supports PPT, PPTX, PDF, DOCX, TXT, MD.
+    Detects true signature so misnamed files (.ppt that is actually .pptx or vice versa) parse accurately.
     """
+    sig = detect_file_signature(file_path)
     ft = file_type.lower().replace(".", "")
-    if ft in ["ppt", "pptx"]:
+
+    # Prefer actual file signature if confident
+    if sig == "pptx":
         return extract_pptx(file_path)
-    elif ft == "pdf":
+    elif sig == "ppt":
+        return extract_binary_ppt(file_path)
+    elif sig == "pdf" or ft == "pdf":
         return extract_pdf(file_path)
-    elif ft in ["doc", "docx"]:
+    elif sig == "docx" or ft in ["doc", "docx"]:
         return extract_docx(file_path)
-    elif ft in ["txt", "md", "markdown"]:
+    elif ft in ["ppt", "pptx"]:
+        return extract_pptx(file_path)
+    elif ft in ["txt", "md", "markdown"] or sig == "txt":
         return extract_text_file(file_path)
     else:
-        raise ValueError(f"Unsupported file format: {file_type}. Supported: PPT, PPTX, PDF, DOCX, TXT, MD")
+        # Default try PPTX then text
+        try:
+            return extract_pptx(file_path)
+        except Exception:
+            return extract_text_file(file_path)
 
 def extract_slide_layouts(file_path: str, doc_id: str = "") -> List[Dict[str, Any]]:
     """

@@ -15,6 +15,7 @@ export const App = {
     currentSession: null,
     activeConceptIndex: 0,
     activeConceptName: '',
+    teachingMode: 'MBA',
     selectedUploadFile: null,
     uploadTargetSubjectId: null,
     newUploadedDocId: null,
@@ -741,6 +742,53 @@ export const App = {
     await this.fetchAndRenderConceptPackage(conceptName, null);
   },
 
+  async setTeachingMode(mode) {
+    this.state.teachingMode = mode;
+    document.querySelectorAll('.teaching-mode-pill').forEach(pill => {
+      pill.className = 'teaching-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-slate-400 hover:text-white hover:bg-white/5';
+    });
+    const activeBtn = document.getElementById(`mode-btn-${mode}`);
+    if (activeBtn) {
+      activeBtn.className = 'teaching-mode-pill active px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-white bg-blue-600 shadow-sm';
+    }
+    const modeBadge = document.getElementById('concept-mode-badge');
+    if (modeBadge) {
+      modeBadge.innerText = `${mode} Mode`;
+    }
+    if (this.state.activeConceptName) {
+      await this.fetchAndRenderConceptPackage(this.state.activeConceptName, null);
+    }
+  },
+
+  async markCurrentConceptUnderstood() {
+    if (!this.state.currentDocId || !this.state.activeConceptName) return;
+    try {
+      const resp = await API.updatePresentationSession(this.state.currentDocId, {
+        mark_understood: this.state.activeConceptName
+      });
+      await API.updateConceptStatus(this.state.currentDocId, this.state.activeConceptName, 'Understood');
+      if (this.state.currentSession) {
+        this.state.currentSession.understood_concepts = resp.understood_concepts || [];
+      }
+      this.updateMarkUnderstoodButton(true);
+    } catch (e) {
+      console.error('Error marking concept understood:', e);
+    }
+  },
+
+  updateMarkUnderstoodButton(isUnderstood) {
+    const btn = document.getElementById('mark-understood-btn');
+    const txt = document.getElementById('mark-understood-btn-text');
+    if (!btn || !txt) return;
+    if (isUnderstood) {
+      btn.className = 'px-3.5 py-1.5 rounded-xl bg-emerald-600 text-white font-bold text-xs transition flex items-center space-x-1.5 shadow-md shadow-emerald-500/20';
+      txt.innerText = 'Understood ✓';
+    } else {
+      btn.className = 'px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-semibold text-xs transition flex items-center space-x-1.5 shadow-sm';
+      txt.innerText = 'Mark as Understood';
+    }
+  },
+
   async triggerTeachingControl(controlAction) {
     if (controlAction === 'prev_concept' || controlAction === 'next_concept') {
       const concepts = (this.state.currentSummary && this.state.currentSummary.concepts) || [];
@@ -762,46 +810,35 @@ export const App = {
 
   async fetchAndRenderConceptPackage(conceptName, controlAction) {
     try {
-      const pkg = await API.teachPresentationConcept(this.state.currentDocId, conceptName, controlAction);
+      const mode = this.state.teachingMode || 'MBA';
+      const pkg = await API.teachPresentationConcept(this.state.currentDocId, conceptName, controlAction, mode);
       
       this.state.currentSlideNumber = pkg.slide_number || 1;
 
       const titleDisplay = document.getElementById('concept-title-display');
       const controlBadge = document.getElementById('concept-control-badge');
+      const modeBadge = document.getElementById('concept-mode-badge');
       const slideBadge = document.getElementById('concept-slide-badge');
       const citationText = document.getElementById('concept-slide-citation-text');
       const counterIndicator = document.getElementById('concept-counter-indicator');
 
       if (titleDisplay) titleDisplay.innerText = pkg.concept_name;
-      if (controlBadge) controlBadge.innerText = pkg.control_title || 'Standard Explanation';
+      if (controlBadge) controlBadge.innerText = pkg.control_title || 'Standard MBA Masterclass';
+      if (modeBadge) modeBadge.innerText = `${pkg.teaching_mode || mode} Mode`;
       if (slideBadge) slideBadge.innerText = `Slide ${pkg.slide_number}`;
       if (citationText) citationText.innerText = `Source: Slide ${pkg.slide_number}`;
       if (counterIndicator) counterIndicator.innerText = `${(pkg.concept_index || 0) + 1} of ${pkg.total_concepts || 1}`;
+
+      // Update understood button state
+      const isUnderstood = (this.state.currentSession?.understood_concepts || []).includes(pkg.concept_name);
+      this.updateMarkUnderstoodButton(isUnderstood);
 
       await API.updatePresentationSession(this.state.currentDocId, {
         current_concept_name: pkg.concept_name,
         current_slide_number: pkg.slide_number
       });
 
-      const stepsContainer = document.getElementById('concept-steps-container');
-      if (stepsContainer && pkg.steps) {
-        const stepsToRender = pkg.steps.filter(s => s.step_number < 8);
-        stepsContainer.innerHTML = stepsToRender.map(s => `
-          <div class="space-y-1.5 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-            <h4 class="text-xs font-bold uppercase tracking-wider text-blue-400">
-              Step ${s.step_number}: ${this.escapeHtml(s.title)}
-            </h4>
-            <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
-              ${this.escapeHtml(s.content)}
-            </div>
-          </div>
-        `).join('');
-
-        const step8 = pkg.steps.find(s => s.step_number === 8);
-        if (step8) {
-          this.renderComprehensionCheck(step8);
-        }
-      }
+      this.render10PedagogicalSections(pkg);
 
       const sourcesBox = document.getElementById('concept-sources-list');
       if (sourcesBox) {
@@ -820,8 +857,9 @@ export const App = {
           `).join('');
         } else {
           sourcesBox.innerHTML = `
-            <a href="https://hbr.org" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-cyan-900/30 text-cyan-300 text-xs">
-              Harvard Business Review Case Studies
+            <a href="https://hbr.org" target="_blank" rel="noopener noreferrer" class="px-3 py-1.5 rounded-xl bg-cyan-900/30 text-cyan-300 text-xs flex items-center space-x-1">
+              <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+              <span>Harvard Business Review Case Studies</span>
             </a>
           `;
         }
@@ -833,65 +871,267 @@ export const App = {
     }
   },
 
-  renderComprehensionCheck(step8) {
-    const qText = document.getElementById('comprehension-question-text');
-    const optionsContainer = document.getElementById('comprehension-options-container');
-    const feedbackBox = document.getElementById('comprehension-feedback');
+  render10PedagogicalSections(pkg) {
+    const container = document.getElementById('concept-sections-container') || document.getElementById('concept-steps-container');
+    if (!container) return;
 
-    if (qText) qText.innerText = step8.question;
-    if (feedbackBox) {
-      feedbackBox.className = 'hidden text-xs p-3 rounded-xl';
-      feedbackBox.innerText = '';
-    }
+    const sec = pkg.sections || {};
+    const secA = sec.section_a || {};
+    const secB = sec.section_b || {};
+    const secC = sec.section_c || {};
+    const secD = sec.section_d || {};
+    const secE = sec.section_e || {};
+    const secF = sec.section_f || {};
+    const secG = sec.section_g || {};
+    const secH = sec.section_h || {};
+    const secI = sec.section_i || {};
+    const secJ = sec.section_j || {};
 
-    if (optionsContainer && step8.options) {
-      optionsContainer.innerHTML = step8.options.map((opt, idx) => `
-        <button 
-          onclick="App.handleComprehensionAnswer(${idx}, ${step8.correct_index || 0}, '${this.escapeHtml(step8.explanation || '')}')"
-          class="comprehension-option-btn w-full text-left px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-blue-500/40 text-xs sm:text-sm text-slate-200 transition"
-        >
-          ${this.escapeHtml(opt.replace(/\(Correct\)/i, ''))}
-        </button>
-      `).join('');
-    }
+    let html = `
+      <!-- SECTION A: TOPIC INTRODUCTION -->
+      <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">A</span>
+          <span>Topic Introduction</span>
+        </div>
+        <div class="space-y-2 text-xs sm:text-sm text-slate-200">
+          <p class="leading-relaxed"><strong class="text-white">Definition:</strong> ${this.escapeHtml(secA.definition || '')}</p>
+          ${secA.core_idea ? `<p class="leading-relaxed"><strong class="text-cyan-300">Core Idea:</strong> ${this.escapeHtml(secA.core_idea)}</p>` : ''}
+          ${secA.importance ? `<p class="leading-relaxed text-slate-300"><strong class="text-amber-300">Strategic Importance:</strong> ${this.escapeHtml(secA.importance)}</p>` : ''}
+        </div>
+      </div>
+
+      <!-- SECTION B: DETAILED EXPLANATION -->
+      <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">B</span>
+          <span>Detailed Explanation & Mechanisms</span>
+        </div>
+        <div class="space-y-3 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+          ${this.escapeHtml(secB.explanation || '')}
+        </div>
+        ${secB.components && secB.components.length ? `
+          <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-300">Key Moving Parts & Components:</span>
+            <ul class="space-y-1.5 text-xs text-slate-300">
+              ${secB.components.map(c => `<li class="flex items-start space-x-2"><i data-lucide="check" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(c)}</span></li>`).join('')}
+            </ul>
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- SECTION C: SIMPLE EXAMPLE & RELATABLE ANALOGY -->
+      <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3 bg-amber-500/[0.02]">
+        <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">C</span>
+          <span>Simple Example & Everyday Analogy</span>
+        </div>
+        <div class="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-100/90 leading-relaxed space-y-2">
+          <p>💡 ${this.escapeHtml(secC.analogy || '')}</p>
+          ${secC.intuition ? `<p class="text-xs text-amber-200/80 pt-2 border-t border-amber-500/20 font-medium"><strong>How this maps back:</strong> ${this.escapeHtml(secC.intuition)}</p>` : ''}
+        </div>
+      </div>
+
+      <!-- SECTION D: REAL-WORLD BUSINESS EXAMPLE -->
+      <div class="glass-panel p-6 rounded-2xl border border-emerald-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-extrabold text-xs">D</span>
+          <span>Real-World Business Example</span>
+        </div>
+        <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed space-y-2">
+          <div class="flex items-center space-x-2 text-emerald-300 font-bold text-xs">
+            <i data-lucide="briefcase" class="w-4 h-4"></i>
+            <span>Case Study: ${this.escapeHtml(secD.company || 'Enterprise Benchmark')}</span>
+          </div>
+          <p class="text-slate-300">${this.escapeHtml(secD.case_study || '')}</p>
+        </div>
+      </div>
+
+      <!-- SECTION E: HOW IT WORKS & PROCESS MECHANISM -->
+      <div class="glass-panel p-6 rounded-2xl border border-purple-500/20 space-y-4">
+        <div class="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-extrabold text-xs">E</span>
+          <span>How It Works & Process Mechanism</span>
+        </div>
+        ${secE.steps && secE.steps.length ? `
+          <div class="space-y-2">
+            ${secE.steps.map((st, i) => `
+              <div class="flex items-start space-x-2.5 text-xs sm:text-sm text-slate-200">
+                <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">${i+1}</span>
+                <span>${this.escapeHtml(st)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+        ${secE.formula ? `
+          <div class="p-4 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-purple-300">Strategic Formula / Metric:</span>
+            <p class="font-mono text-purple-200 bg-black/40 p-2.5 rounded-lg border border-purple-500/20">${this.escapeHtml(secE.formula)}</p>
+            ${secE.worked_calculation ? `<p class="text-slate-300 pt-1"><strong>Worked Calculation:</strong> ${this.escapeHtml(secE.worked_calculation)}</p>` : ''}
+          </div>
+        ` : ''}
+      </div>
+
+      <!-- SECTION F: WHEN TO USE IT -->
+      <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">F</span>
+          <span>When to Use It (Decision Criteria)</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs sm:text-sm text-slate-200">
+          <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300">Strategic Decision Triggers:</span>
+            <ul class="space-y-1.5 text-slate-300">
+              ${(secF.decision_triggers || []).map(dt => `<li class="flex items-start space-x-2"><i data-lucide="arrow-right" class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(dt)}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300">Problems Solved:</span>
+            <p class="text-slate-300 leading-relaxed">${this.escapeHtml(secF.problems_solved || '')}</p>
+            ${secF.boundary_conditions ? `<p class="text-[11px] text-slate-400 pt-2 border-t border-white/5"><strong>When NOT to use:</strong> ${this.escapeHtml(secF.boundary_conditions)}</p>` : ''}
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION G: ADVANTAGES AND LIMITATIONS -->
+      <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center font-extrabold text-xs">G</span>
+          <span>Advantages, Limitations & Common Pitfalls</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+          <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Strategic Advantages:</span>
+            <ul class="space-y-1.5 text-slate-300">
+              ${(secG.advantages || []).map(a => `<li class="flex items-start space-x-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(a)}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Core Limitations:</span>
+            <ul class="space-y-1.5 text-slate-300">
+              ${(secG.limitations || []).map(l => `<li class="flex items-start space-x-1.5"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(l)}</span></li>`).join('')}
+            </ul>
+          </div>
+          <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/20 space-y-2">
+            <span class="text-[11px] font-bold uppercase tracking-wider text-rose-300">Common Pitfalls:</span>
+            <ul class="space-y-1.5 text-slate-300">
+              ${(secG.common_pitfalls || []).map(p => `<li class="flex items-start space-x-1.5"><i data-lucide="x" class="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(p)}</span></li>`).join('')}
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION H: PRACTICAL APPLICATION FOR MBA & PRODUCT MANAGERS -->
+      <div class="glass-panel p-6 rounded-2xl border border-teal-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-teal-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-extrabold text-xs">H</span>
+          <span>Practical Application for MBA & Product Managers</span>
+        </div>
+        <div class="space-y-2 text-xs sm:text-sm text-slate-200">
+          <p class="leading-relaxed"><strong class="text-white">Actionable Playbook:</strong> ${this.escapeHtml(secH.actionable_playbook || '')}</p>
+          ${secH.key_deliverables ? `<p class="leading-relaxed text-slate-300"><strong class="text-teal-300">Key Deliverables:</strong> ${this.escapeHtml(secH.key_deliverables)}</p>` : ''}
+          ${secH.cross_functional_alignment ? `<p class="leading-relaxed text-slate-300"><strong class="text-teal-300">Squad Alignment:</strong> ${this.escapeHtml(secH.cross_functional_alignment)}</p>` : ''}
+        </div>
+      </div>
+
+      <!-- SECTION I: HIGH-YIELD KEY TAKEAWAYS -->
+      <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+        <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+          <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">I</span>
+          <span>High-Yield Key Takeaways</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+          ${(secI.takeaways || []).map(tk => `
+            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-start space-x-2 text-slate-200">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5"></i>
+              <span>${this.escapeHtml(tk)}</span>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+
+      <!-- SECTION J: UNDERSTANDING CHECK (INTERACTIVE PRACTICE) -->
+      <div class="glass-panel p-6 sm:p-8 rounded-2xl border border-amber-500/30 space-y-5 bg-amber-500/[0.01]">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">J</span>
+            <span>Understanding Check (Interactive Practice)</span>
+          </div>
+          <span class="text-xs text-slate-400">${(secJ.questions || []).length} Practice Challenge Questions</span>
+        </div>
+
+        <div class="space-y-5">
+          ${(secJ.questions || []).map((q, qIdx) => `
+            <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-3" id="practice-card-${qIdx}">
+              <div class="flex items-center space-x-2 text-xs text-amber-300 font-semibold">
+                <span>Question ${qIdx + 1}:</span>
+                <span class="text-slate-400 font-normal">(${this.escapeHtml(q.type || 'Practice')})</span>
+              </div>
+              <p class="text-xs sm:text-sm font-semibold text-white leading-relaxed">${this.escapeHtml(q.question)}</p>
+              <div class="space-y-2">
+                ${(q.options || []).map((opt, optIdx) => `
+                  <button 
+                    onclick="App.handlePracticeQuestionAnswer(${qIdx}, ${optIdx}, ${q.correct_index || 0}, '${this.escapeHtml(q.explanation || '')}')"
+                    class="practice-opt-btn-${qIdx} w-full text-left px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-sm text-slate-200 transition flex items-start space-x-2"
+                  >
+                    <span class="w-5 h-5 rounded-full bg-white/10 text-slate-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">${String.fromCharCode(65 + optIdx)}</span>
+                    <span>${this.escapeHtml(opt)}</span>
+                  </button>
+                `).join('')}
+              </div>
+              <div id="practice-feedback-${qIdx}" class="hidden text-xs p-3.5 rounded-xl"></div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = html;
   },
 
-  async handleComprehensionAnswer(selectedIdx, correctIdx, explanation) {
-    const feedbackBox = document.getElementById('comprehension-feedback');
-    const btns = document.querySelectorAll('.comprehension-option-btn');
+  async handlePracticeQuestionAnswer(qIdx, selectedOptIdx, correctIdx, explanation) {
+    const feedbackBox = document.getElementById(`practice-feedback-${qIdx}`);
+    const btns = document.querySelectorAll(`.practice-opt-btn-${qIdx}`);
 
-    if (selectedIdx === correctIdx) {
+    btns.forEach(b => b.disabled = true);
+
+    if (selectedOptIdx === correctIdx) {
+      if (btns[selectedOptIdx]) {
+        btns[selectedOptIdx].classList.add('bg-emerald-600/30', 'border-emerald-500', 'text-emerald-200');
+      }
       if (feedbackBox) {
         feedbackBox.className = 'text-xs p-3.5 rounded-xl bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 flex items-start space-x-2';
         feedbackBox.innerHTML = `
-          <i data-lucide="check-circle-2" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <i data-lucide="check-circle-2" class="w-4 h-4 flex-shrink-0 mt-0.5 text-emerald-400"></i>
           <div>
             <strong>Correct! Mastered this concept.</strong><br>
             ${this.escapeHtml(explanation)}
           </div>
         `;
       }
-      btns[selectedIdx].classList.add('bg-emerald-600/30', 'border-emerald-500');
-
       if (this.state.currentDocId && this.state.activeConceptName) {
-        await API.updatePresentationSession(this.state.currentDocId, {
-          mark_understood: this.state.activeConceptName
-        });
-        await API.updateConceptStatus(this.state.currentDocId, this.state.activeConceptName, 'Understood');
+        await this.markCurrentConceptUnderstood();
       }
     } else {
+      if (btns[selectedOptIdx]) {
+        btns[selectedOptIdx].classList.add('bg-rose-600/30', 'border-rose-500', 'text-rose-200');
+      }
+      if (btns[correctIdx]) {
+        btns[correctIdx].classList.add('bg-emerald-600/20', 'border-emerald-500/50', 'text-emerald-300');
+      }
       if (feedbackBox) {
         feedbackBox.className = 'text-xs p-3.5 rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/30 flex items-start space-x-2';
         feedbackBox.innerHTML = `
-          <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0 mt-0.5"></i>
+          <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0 mt-0.5 text-rose-400"></i>
           <div>
-            <strong>Not quite. Review the explanation above.</strong><br>
+            <strong>Not quite. Review the explanation:</strong><br>
             ${this.escapeHtml(explanation)}
           </div>
         `;
       }
-      btns[selectedIdx].classList.add('bg-rose-600/30', 'border-rose-500');
     }
+    this.initLucide();
+  },
     this.initLucide();
   },
 
@@ -2048,11 +2288,61 @@ export const App = {
     this.openUploadPptModal(currentId);
   },
 
+  handleDragOver(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropzone = document.getElementById('upload-dropzone');
+    if (dropzone) {
+      dropzone.classList.add('border-blue-500', 'bg-blue-500/10');
+    }
+  },
+
+  handleDragLeave(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropzone = document.getElementById('upload-dropzone');
+    if (dropzone) {
+      dropzone.classList.remove('border-blue-500', 'bg-blue-500/10');
+    }
+  },
+
+  handleFileDrop(e) {
+    e.preventDefault();
+    e.stopPropagation();
+    const dropzone = document.getElementById('upload-dropzone');
+    if (dropzone) {
+      dropzone.classList.remove('border-blue-500', 'bg-blue-500/10');
+    }
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      this.handleFileSelected(e.dataTransfer.files[0]);
+    }
+  },
+
   handleFileSelected(file) {
     if (!file) return;
+    const errorBox = document.getElementById('modal-upload-error-box');
+    const errorText = document.getElementById('modal-upload-error');
+    if (errorBox) errorBox.classList.add('hidden');
+    if (errorText) errorText.innerText = '';
+
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!['ppt', 'pptx'].includes(ext)) {
-      alert('Please select a valid PowerPoint presentation (.ppt or .pptx)');
+    if (!['ppt', 'pptx', 'pdf'].includes(ext)) {
+      if (errorBox && errorText) {
+        errorText.innerText = 'Please select a valid PowerPoint presentation (.ppt, .pptx) or PDF (.pdf).';
+        errorBox.classList.remove('hidden');
+      } else {
+        alert('Please select a valid PowerPoint presentation (.ppt, .pptx) or PDF (.pdf).');
+      }
+      return;
+    }
+
+    if (file.size > 50 * 1024 * 1024) {
+      if (errorBox && errorText) {
+        errorText.innerText = 'File size exceeds the 50 MB limit. Please select a smaller file.';
+        errorBox.classList.remove('hidden');
+      } else {
+        alert('File size exceeds the 50 MB limit. Please select a smaller file.');
+      }
       return;
     }
 
@@ -2070,6 +2360,9 @@ export const App = {
     const file = this.state.selectedUploadFile;
     if (!file) return;
 
+    const submitBtn = document.getElementById('modal-upload-submit-btn');
+    if (submitBtn) submitBtn.disabled = true;
+
     const select = document.getElementById('modal-upload-subject-select');
     const subjectId = select ? select.value : (this.state.currentSubject?.id || null);
 
@@ -2080,12 +2373,13 @@ export const App = {
     const filenameDisplay = document.getElementById('upload-processing-filename');
     if (filenameDisplay) filenameDisplay.innerText = file.name;
 
-    const activateStage = async (stageNum, durationMs = 600) => {
+    const activateStage = async (stageNum, durationMs = 500) => {
       for (let i = 1; i < stageNum; i++) {
         const el = document.getElementById(`stage-step-${i}`);
         if (el) {
           el.className = 'stage-item completed';
-          el.querySelector('.stage-indicator').innerHTML = '✓';
+          const ind = el.querySelector('.stage-indicator');
+          if (ind) ind.innerHTML = '✓';
         }
       }
       const cur = document.getElementById(`stage-step-${stageNum}`);
@@ -2120,11 +2414,19 @@ export const App = {
         const el = document.getElementById(`stage-step-${i}`);
         if (el) {
           el.className = 'stage-item completed';
-          el.querySelector('.stage-indicator').innerHTML = '✓';
+          const ind = el.querySelector('.stage-indicator');
+          if (ind) ind.innerHTML = '✓';
         }
       }
 
       await new Promise(r => setTimeout(r, 400));
+
+      // Refresh data immediately
+      await this.loadSubjects();
+      await this.loadDashboard();
+      if (subjectId) {
+        await this.loadSubject(subjectId);
+      }
 
       document.getElementById('upload-stage-processing')?.classList.add('hidden');
       document.getElementById('upload-stage-success')?.classList.remove('hidden');
@@ -2134,8 +2436,20 @@ export const App = {
       if (meta) meta.innerText = `Processed ${uploadResp.slide_count || 1} slides into structured concepts.`;
 
     } catch (err) {
-      alert(`Upload notice: ${err.message || 'Processing failed'}`);
-      this.closeModals();
+      console.error('Upload error:', err);
+      document.getElementById('upload-stage-processing')?.classList.add('hidden');
+      document.getElementById('upload-stage-form')?.classList.remove('hidden');
+      document.getElementById('upload-modal-close-btn')?.classList.remove('hidden');
+      if (submitBtn) submitBtn.disabled = false;
+
+      const errorBox = document.getElementById('modal-upload-error-box');
+      const errorText = document.getElementById('modal-upload-error');
+      if (errorBox && errorText) {
+        errorText.innerText = `Upload notice: ${err.message || 'Processing failed. Please try again.'}`;
+        errorBox.classList.remove('hidden');
+      } else {
+        alert(`Upload notice: ${err.message || 'Processing failed'}`);
+      }
     }
   },
 

@@ -337,6 +337,7 @@
       </div>
 
       <!-- Navigation Tabs: 6 Primary Tabs -->
+      <!-- PRESENTATION WORKSPACE TABS (1: Overview, 2: Quick Summary, 3: Detailed Learning, 4: Original PPT, 5: Ask AI, 6: Quiz) -->
       <div class="flex items-center space-x-2 border-b border-white/10 overflow-x-auto pb-1">
         <button 
           onclick="App.switchLearnTab('overview')" 
@@ -352,8 +353,8 @@
           id="tab-btn-summary" 
           class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5 flex-shrink-0"
         >
-          <i data-lucide="file-text" class="w-4 h-4"></i>
-          <span>2. Detailed Summary</span>
+          <i data-lucide="file-text" class="w-4 h-4 text-emerald-400"></i>
+          <span>2. Quick Summary</span>
         </button>
 
         <button 
@@ -362,16 +363,7 @@
           class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5 flex-shrink-0"
         >
           <i data-lucide="sparkles" class="w-4 h-4 text-cyan-400"></i>
-          <span>3. Learn with AI</span>
-        </button>
-
-        <button 
-          onclick="App.switchLearnTab('ask-ai')" 
-          id="tab-btn-ask-ai" 
-          class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5 flex-shrink-0"
-        >
-          <i data-lucide="bot" class="w-4 h-4 text-emerald-400"></i>
-          <span>4. Ask AI (Q&A)</span>
+          <span>3. Detailed Learning</span>
         </button>
 
         <button 
@@ -380,7 +372,16 @@
           class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5 flex-shrink-0"
         >
           <i data-lucide="monitor" class="w-4 h-4 text-amber-400"></i>
-          <span>5. Original PPT</span>
+          <span>4. Original PPT</span>
+        </button>
+
+        <button 
+          onclick="App.switchLearnTab('ask-ai')" 
+          id="tab-btn-ask-ai" 
+          class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5 flex-shrink-0"
+        >
+          <i data-lucide="bot" class="w-4 h-4 text-indigo-400"></i>
+          <span>5. Ask AI</span>
         </button>
 
         <button 
@@ -389,7 +390,7 @@
           class="learn-tab-btn px-4 py-2.5 rounded-xl text-xs sm:text-sm font-medium transition flex items-center space-x-2 text-slate-400 hover:text-white hover:bg-white/5 flex-shrink-0"
         >
           <i data-lucide="help-circle" class="w-4 h-4 text-rose-400"></i>
-          <span>6. Quiz & Practice</span>
+          <span>6. Quiz</span>
         </button>
       </div>
 
@@ -460,10 +461,11 @@
         <div id="detailed-summary-container" class="space-y-6"></div>
       </div>
 
-      <!-- TAB 3 CONTENT: LEARN WITH AI (STEP-BY-STEP TEACHING) -->
+      <!-- TAB 3 CONTENT: DETAILED LEARNING (10-SECTION MBA LECTURE & 4 TEACHING MODES) -->
       <div id="learn-tab-tutor-teaching" class="learn-tab-content hidden space-y-6 animate-fade-in">
+        <!-- Top Navigation & Controls Bar -->
         <div class="glass-panel p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center space-x-3">
+          <div class="flex items-center space-x-3 flex-wrap gap-y-2">
             <span class="text-xs font-bold text-blue-400 uppercase tracking-wider">Concept:</span>
             <select 
               id="concept-selector-dropdown" 
@@ -501,13 +503,113 @@
           </div>
         </div>
 
+        <!-- 4 TEACHING MODE SELECTOR PILLS -->
+        <div class="glass-panel p-3 rounded-2xl flex items-center justify-between flex-wrap gap-2">
+          <div class="flex items-center space-x-2">
+            <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1">
+              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Teaching Mode:</span>
+            </span>
+          </div>
+          <div class="flex items-center space-x-1.5 flex-wrap gap-y-1">
+            <button 
+              id="mode-btn-Beginner" 
+              onclick="App.setTeachingMode('Beginner')" 
+              class="teaching-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-slate-400 hover:text-white hover:bg-white/5"
+            >
+              <span>🟢</span>
+              <span>Beginner</span>
+            </button>
+            <button 
+              id="mode-btn-MBA" 
+              onclick="App.setTeachingMode('MBA')" 
+              class="teaching-mode-pill active px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-white bg-blue-600 shadow-sm"
+            >
+              <span>🎓</span>
+              <span>MBA</span>
+            </button>
+            <button 
+              id="mode-btn-Exam" 
+              onclick="App.setTeachingMode('Exam')" 
+              class="teaching-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-slate-400 hover:text-white hover:bg-white/5"
+            >
+              <span>📝</span>
+              <span>Exam</span>
+            </button>
+            <button 
+              id="mode-btn-Expert" 
+              onclick="App.setTeachingMode('Expert')" 
+              class="teaching-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-slate-400 hover:text-white hover:bg-white/5"
+            >
+              <span>⚡</span>
+              <span>Expert</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- QUICK INTERACTIVE ACTIONS ON CONCEPT -->
+        <div class="flex items-center justify-between flex-wrap gap-2 px-1">
+          <div class="flex items-center space-x-2 flex-wrap gap-y-1">
+            <button 
+              onclick="App.triggerTeachingControl('standard')" 
+              class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-blue-400"></i>
+              <span>Explain Again</span>
+            </button>
+            <button 
+              onclick="App.triggerTeachingControl('another_example')" 
+              class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="briefcase" class="w-3.5 h-3.5 text-emerald-400"></i>
+              <span>Give Another Example</span>
+            </button>
+            <button 
+              onclick="App.triggerTeachingControl('simpler_english')" 
+              class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+              <span>Simpler English</span>
+            </button>
+            <button 
+              onclick="App.triggerTeachingControl('more_detail')" 
+              class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="file-text" class="w-3.5 h-3.5 text-indigo-400"></i>
+              <span>More Detail</span>
+            </button>
+            <button 
+              onclick="App.triggerTeachingControl('test_me')" 
+              class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium text-slate-300 hover:text-white transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="target" class="w-3.5 h-3.5 text-rose-400"></i>
+              <span>Test Understanding</span>
+            </button>
+          </div>
+
+          <!-- Mark As Understood Toggle -->
+          <button 
+            id="mark-understood-btn" 
+            onclick="App.markCurrentConceptUnderstood()" 
+            class="px-3.5 py-1.5 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 font-semibold text-xs transition flex items-center space-x-1.5 shadow-sm"
+          >
+            <i data-lucide="check" class="w-4 h-4"></i>
+            <span id="mark-understood-btn-text">Mark as Understood</span>
+          </button>
+        </div>
+
         <!-- Concept Teaching Display Card -->
         <div id="concept-card-main" class="glass-panel-elevated p-6 sm:p-8 rounded-3xl border border-blue-500/30 space-y-6 shadow-2xl relative overflow-hidden">
           <div class="flex items-center justify-between border-b border-white/10 pb-4">
             <div>
-              <span id="concept-control-badge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
-                Standard Explanation
-              </span>
+              <div class="flex items-center space-x-2">
+                <span id="concept-control-badge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                  Standard MBA Masterclass
+                </span>
+                <span id="concept-mode-badge" class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                  MBA Mode
+                </span>
+              </div>
               <h2 id="concept-title-display" class="text-2xl sm:text-3xl font-extrabold text-white mt-1">Product-Market Fit</h2>
             </div>
             
@@ -522,49 +624,26 @@
             </div>
           </div>
 
-          <!-- 8 Step Pedagogical Explanation Area -->
-          <div id="concept-steps-container" class="space-y-5 text-sm sm:text-base leading-relaxed text-slate-200"></div>
-
-          <!-- Interactive Comprehension Check -->
-          <div id="concept-comprehension-box" class="p-6 rounded-2xl bg-white/[0.03] border border-white/10 space-y-4">
-            <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-              <i data-lucide="help-circle" class="w-4 h-4"></i>
-              <span>Comprehension Check</span>
-            </div>
-            <p id="comprehension-question-text" class="text-sm font-semibold text-white">When applying this concept, what is the primary indicator of success?</p>
-            <div id="comprehension-options-container" class="space-y-2"></div>
-            <div id="comprehension-feedback" class="hidden text-xs p-3 rounded-xl"></div>
-          </div>
+          <!-- 10 SECTIONS PEDAGOGICAL CONTAINER (A through J) -->
+          <div id="concept-sections-container" class="space-y-6 text-sm sm:text-base leading-relaxed text-slate-200"></div>
 
           <!-- Authoritative External Sources (Dual Knowledge) -->
           <div id="concept-external-sources-box" class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/20 space-y-2">
             <span class="text-[10px] font-bold uppercase tracking-wider text-cyan-400 flex items-center space-x-1.5">
               <i data-lucide="globe" class="w-3.5 h-3.5"></i>
-              <span>Authoritative External References (Clickable)</span>
+              <span>Authoritative External References & Academic Citations</span>
             </span>
             <div id="concept-sources-list" class="flex flex-wrap gap-2 text-xs"></div>
           </div>
 
-          <!-- 10 Teaching Controls -->
+          <!-- Adaptive Teaching Controls Grid -->
           <div class="border-t border-white/10 pt-5 space-y-3">
             <span class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center space-x-1.5">
               <i data-lucide="sliders" class="w-3.5 h-3.5 text-blue-400"></i>
-              <span>Teaching Controls (Click to Adapt Instantly)</span>
+              <span>Adaptive Perspectives & Specialized Explanations</span>
             </span>
             
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-              <button onclick="App.triggerTeachingControl('simpler_english')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
-                <i data-lucide="sparkles" class="w-3.5 h-3.5 text-blue-400"></i>
-                <span>Simpler English</span>
-              </button>
-              <button onclick="App.triggerTeachingControl('more_detail')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
-                <i data-lucide="file-text" class="w-3.5 h-3.5 text-indigo-400"></i>
-                <span>In Detail</span>
-              </button>
-              <button onclick="App.triggerTeachingControl('another_example')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
-                <i data-lucide="briefcase" class="w-3.5 h-3.5 text-emerald-400"></i>
-                <span>Real Example</span>
-              </button>
               <button onclick="App.triggerTeachingControl('step_by_step')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
                 <i data-lucide="list-ordered" class="w-3.5 h-3.5 text-amber-400"></i>
                 <span>Step by Step</span>
@@ -581,15 +660,11 @@
                 <i data-lucide="lightbulb" class="w-3.5 h-3.5 text-yellow-400"></i>
                 <span>Use Analogy</span>
               </button>
-              <button onclick="App.triggerTeachingControl('test_me')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
-                <i data-lucide="check-circle" class="w-3.5 h-3.5 text-rose-400"></i>
-                <span>Test Me</span>
-              </button>
               <button onclick="App.triggerTeachingControl('differently')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white flex items-center space-x-1.5">
                 <i data-lucide="refresh-cw" class="w-3.5 h-3.5 text-teal-400"></i>
-                <span>Differently</span>
+                <span>Investor Lens</span>
               </button>
-              <button onclick="App.triggerTeachingControl('in_hinglish')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-500/10 border-amber-500/30 flex items-center space-x-1.5">
+              <button onclick="App.triggerTeachingControl('in_hinglish')" class="teaching-control-btn px-3 py-2 rounded-xl text-xs font-medium text-amber-300 hover:text-amber-200 bg-amber-500/10 border-amber-500/30 flex items-center space-x-1.5 col-span-2 sm:col-span-1">
                 <i data-lucide="message-circle" class="w-3.5 h-3.5 text-amber-400"></i>
                 <span>In Hinglish</span>
               </button>
@@ -1600,12 +1675,15 @@
         <div 
           id="upload-dropzone" 
           onclick="document.getElementById('modal-ppt-file-input').click()"
-          class="border-2 border-dashed border-white/20 hover:border-blue-500/60 rounded-2xl p-8 text-center cursor-pointer transition bg-white/[0.02] hover:bg-white/[0.04]"
+          ondragover="App.handleDragOver(event)"
+          ondragleave="App.handleDragLeave(event)"
+          ondrop="App.handleFileDrop(event)"
+          class="border-2 border-dashed border-white/20 hover:border-blue-500/60 rounded-2xl p-8 text-center cursor-pointer transition bg-white/[0.02] hover:bg-white/[0.04] relative"
         >
           <input 
             type="file" 
             id="modal-ppt-file-input" 
-            accept=".ppt,.pptx" 
+            accept=".ppt,.pptx,.pdf" 
             class="hidden"
             onchange="App.handleFileSelected(this.files[0])"
           >
@@ -1613,10 +1691,13 @@
             <i data-lucide="file-up" class="w-7 h-7"></i>
           </div>
           <p id="dropzone-text-title" class="text-sm font-semibold text-white">Click to browse or drag and drop presentation</p>
-          <p id="dropzone-text-subtitle" class="text-xs text-slate-400 mt-1">Accepts Microsoft PowerPoint (.ppt, .pptx)</p>
+          <p id="dropzone-text-subtitle" class="text-xs text-slate-400 mt-1">Accepts PowerPoint (.ppt, .pptx) & PDF presentations (Max 50 MB)</p>
         </div>
 
-        <p id="modal-upload-error" class="hidden text-rose-400 text-xs"></p>
+        <div id="modal-upload-error-box" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-2">
+          <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5"></i>
+          <span id="modal-upload-error"></span>
+        </div>
 
         <div class="flex items-center justify-end space-x-3 pt-2">
           <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
