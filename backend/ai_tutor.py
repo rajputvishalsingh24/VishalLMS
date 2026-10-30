@@ -116,7 +116,7 @@ def call_gemini(prompt: str, system_instruction: str = "") -> Optional[str]:
         }
         if system_instruction:
             payload["systemInstruction"] = {"parts": [{"text": system_instruction}]}
-        resp = requests.post(url, json=payload, timeout=45)
+        resp = requests.post(url, json=payload, timeout=12)
         if resp.status_code == 200:
             data = resp.json()
             candidates = data.get("candidates", [])

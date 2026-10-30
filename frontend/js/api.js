@@ -275,7 +275,10 @@ export const API = {
 
   // Presentation Summarization & Interactive Learning
   async analyzePresentation(docId) {
-    const res = await fetch(`/api/presentations/${docId}/analyze`, { method: 'POST' });
+    const res = await fetch(`/api/presentations/${docId}/analyze`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
       throw new Error(err.detail || 'Presentation analysis failed');
@@ -284,7 +287,9 @@ export const API = {
   },
 
   async getPresentationSummary(docId) {
-    const res = await fetch(`/api/presentations/${docId}/summary`);
+    const res = await fetch(`/api/presentations/${docId}/summary`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to fetch presentation summary');
     return res.json();
   },

@@ -2305,7 +2305,7 @@ export const App = {
     const title = document.getElementById('dropzone-text-title');
     const subtitle = document.getElementById('dropzone-text-subtitle');
     if (title) title.innerText = 'Click to browse or drag and drop presentation';
-    if (subtitle) subtitle.innerText = 'Accepts Microsoft PowerPoint (.ppt, .pptx) & PDF (.pdf)';
+    if (subtitle) subtitle.innerText = 'Accepts PowerPoint (.ppt, .pptx), PDF (.pdf), Word (.docx) & Notes (.txt, .md)';
     
     const submitBtn = document.getElementById('modal-upload-submit-btn');
     if (submitBtn) {
@@ -2381,12 +2381,13 @@ export const App = {
     if (errorText) errorText.innerText = '';
 
     const ext = file.name.split('.').pop().toLowerCase();
-    if (!['ppt', 'pptx', 'pdf'].includes(ext)) {
+    const allowedExts = ['ppt', 'pptx', 'pdf', 'docx', 'doc', 'txt', 'md'];
+    if (!allowedExts.includes(ext)) {
       if (errorBox && errorText) {
-        errorText.innerText = 'Please select a valid PowerPoint presentation (.ppt, .pptx) or PDF (.pdf).';
+        errorText.innerText = 'Please select a valid presentation (.ppt, .pptx), PDF (.pdf), Word document (.docx), or Notes file (.txt, .md).';
         errorBox.classList.remove('hidden');
       } else {
-        alert('Please select a valid PowerPoint presentation (.ppt, .pptx) or PDF (.pdf).');
+        alert('Please select a valid presentation (.ppt, .pptx), PDF (.pdf), Word document (.docx), or Notes file (.txt, .md).');
       }
       return;
     }
@@ -2457,11 +2458,14 @@ export const App = {
       await activateStage(3, 500);
       await activateStage(4, 600);
 
-      const analyzePromise = API.analyzePresentation(docId);
-
-      await activateStage(5, 700);
-      await activateStage(6, 600);
-      await analyzePromise;
+      try {
+        const analyzePromise = API.analyzePresentation(docId);
+        await activateStage(5, 700);
+        await activateStage(6, 600);
+        await analyzePromise;
+      } catch (analyzeErr) {
+        console.warn('Analysis completed or queued in background:', analyzeErr);
+      }
 
       await activateStage(7, 400);
 

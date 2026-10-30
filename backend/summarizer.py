@@ -15,6 +15,26 @@ def analyze_presentation(document_id: str) -> Dict[str, Any]:
     grounded heuristic fallback when offline.
     """
     conn = get_connection()
+
+    # Fast return if summary already generated and cached
+    existing_sum = conn.execute("SELECT * FROM presentation_summaries WHERE document_id = ?", (document_id,)).fetchone()
+    if existing_sum and existing_sum["concepts_json"]:
+        conn.close()
+        try:
+            return {
+                "overview": json.loads(existing_sum["overview_json"]),
+                "concepts": json.loads(existing_sum["concepts_json"]),
+                "frameworks": json.loads(existing_sum["frameworks_json"] or "[]"),
+                "glossary": json.loads(existing_sum["glossary_json"] or "[]"),
+                "formulas": json.loads(existing_sum["formulas_json"] or "[]"),
+                "connections": json.loads(existing_sum["connections_json"] or "{}"),
+                "slide_summaries": json.loads(existing_sum["slide_summaries_json"] or "[]"),
+                "revision": json.loads(existing_sum["revision_json"] or "{}"),
+                "learning_path": json.loads(existing_sum["learning_path_json"] or "[]")
+            }
+        except Exception:
+            conn = get_connection()
+
     doc_row = conn.execute("SELECT * FROM documents WHERE id = ?", (document_id,)).fetchone()
     if not doc_row:
         conn.close()

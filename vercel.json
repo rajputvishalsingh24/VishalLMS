@@ -1,7 +1,9 @@
 {
   "functions": {
     "api/index.py": {
-      "includeFiles": "{frontend/**,data/**}"
+      "includeFiles": "{frontend/**,data/**}",
+      "maxDuration": 60,
+      "memory": 1024
     }
   },
   "rewrites": [

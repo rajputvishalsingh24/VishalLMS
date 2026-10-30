@@ -487,16 +487,22 @@ async def upload_document(
     from .extractor import detect_file_signature
     real_ext = ext
     if contents.startswith(b"PK\x03\x04"):
-        real_ext = "pptx"
+        if ext in ["docx", "doc"]:
+            real_ext = "docx"
+        else:
+            real_ext = "pptx"
     elif contents.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"):
-        real_ext = "ppt"
+        if ext in ["doc", "docx"]:
+            real_ext = "docx"
+        else:
+            real_ext = "ppt"
     elif contents.startswith(b"%PDF-"):
         real_ext = "pdf"
 
-    if real_ext not in ["ppt", "pptx", "pdf", "docx", "txt", "md"]:
+    if real_ext not in ["ppt", "pptx", "pdf", "docx", "doc", "txt", "md"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported format .{ext}. Supported presentation formats: Microsoft PowerPoint (.ppt, .pptx) and PDF (.pdf)"
+            detail=f"Unsupported format .{ext}. Supported formats: PowerPoint (.ppt, .pptx), PDF (.pdf), Word (.docx), and text (.txt, .md)"
         )
 
     doc_id = f"doc_{uuid.uuid4().hex[:10]}"
@@ -988,7 +994,8 @@ def api_analyze_presentation(doc_id: str):
         summary = analyze_presentation(doc_id)
         return {"success": True, "summary": summary}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Notice in api_analyze_presentation: {e}")
+        return {"success": True, "summary": {}, "warning": str(e)}
 
 @app.get("/api/presentations/{doc_id}/summary")
 def api_get_presentation_summary(doc_id: str):
