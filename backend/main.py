@@ -720,7 +720,12 @@ def retry_document_processing(id: str, request: Request):
     except Exception as e:
         print(f"Notice auto-analyzing on retry: {e}")
 
-    return {"success": True, "message": "Presentation re-processed successfully"}
+    return {
+        "success": True,
+        "processing_status": "completed",
+        "slide_count": slide_count,
+        "message": "Presentation re-processed successfully"
+    }
 
 class DocumentUpdate(BaseModel):
     name: str

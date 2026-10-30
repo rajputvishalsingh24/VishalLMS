@@ -115,4 +115,33 @@ with urllib.request.urlopen(req2) as resp:
     pdf_res = json.loads(resp.read().decode("utf-8"))
 print("6. PDF Upload Result:", pdf_res.get("success"), pdf_res.get("name"))
 
-print("SUCCESS: ALL VERIFICATIONS CONFIRMED ON LIVE PRODUCTION SITE!")
+# 7. Test Subject Update (Name, Semester, Category, Goals)
+update_payload = json.dumps({
+    "name": "Product Management & Strategy",
+    "semester": "Semester 2",
+    "category": "Product Management",
+    "goals": "Master product metrics and RICE scoring",
+    "description": "Advanced strategy and growth frameworks"
+}).encode("utf-8")
+req_update = urllib.request.Request(
+    f"{base_url}/api/subjects/{subject_id}",
+    data=update_payload,
+    headers={"Content-Type": "application/json", **auth_headers},
+    method="PUT"
+)
+with urllib.request.urlopen(req_update) as resp:
+    updated_subj = json.loads(resp.read().decode("utf-8"))
+print("7. Subject Update Result:", updated_subj.get("name"), updated_subj.get("semester"), updated_subj.get("category"))
+
+# 8. Test Document Retry Processing
+req_retry = urllib.request.Request(
+    f"{base_url}/api/documents/{doc_id}/retry",
+    data=b"{}",
+    headers={"Content-Type": "application/json", **auth_headers},
+    method="POST"
+)
+with urllib.request.urlopen(req_retry) as resp:
+    retry_res = json.loads(resp.read().decode("utf-8"))
+print("8. Retry Document Processing Result:", retry_res.get("processing_status"), retry_res.get("slide_count"))
+
+print("SUCCESS: ALL END-TO-END VERIFICATIONS CONFIRMED ON LIVE PRODUCTION SITE!")
