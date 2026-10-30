@@ -686,11 +686,13 @@ def retry_document_processing(id: str, request: Request):
     
     file_path = doc["file_path"]
     file_type = doc["file_type"].lower()
+    slide_count = doc["slide_count"] if doc["slide_count"] else 1
     
     try:
         from .extractor import extract_document
-        chunks = extract_document(file_path, file_type) if os.path.exists(file_path) else []
-        slide_count = max(1, len(chunks))
+        chunks = extract_document(file_path, file_type) if file_path and os.path.exists(file_path) else []
+        if chunks:
+            slide_count = max(1, len(chunks))
         
         if chunks:
             conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (id,))
