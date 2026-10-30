@@ -266,7 +266,9 @@ def get_subjects(request: Request):
     SELECT s.*, 
            COUNT(DISTINCT t.id) as topic_count,
            COUNT(DISTINCT d.id) as document_count,
-           COALESCE(AVG(t.progress), 0) as avg_progress
+           COALESCE(AVG(t.progress), 0) as avg_progress,
+           (SELECT COUNT(*) FROM document_chunks dc JOIN documents d2 ON dc.document_id = d2.id WHERE d2.subject_id = s.id) as concepts_count,
+           (SELECT COUNT(*) FROM concept_progress cp JOIN documents d3 ON cp.document_id = d3.id WHERE d3.subject_id = s.id) as studied_count
     FROM subjects s
     LEFT JOIN topics t ON s.id = t.subject_id
     LEFT JOIN documents d ON s.id = d.subject_id

@@ -340,20 +340,123 @@ export const App = {
     }
   },
 
-  // ==================== 1. MAIN DASHBOARD ====================
+  // ==================== 1. MAIN DASHBOARD: INTERACTIVE SOLAR SYSTEM UNIVERSE ====================
   activeSemesterFilter: 'All',
   subjectSearchQuery: '',
+  subjectViewMode: 'solar', // 'solar' | 'list'
+  isSolarAnimationPaused: false,
+  solarAnimationId: null,
+  solarPlanets: [],
+  solarStars: [],
+  hoveredSolarPlanet: null,
+  selectedSolarPlanet: null,
+  solarCanvasInitialized: false,
+
+  planetArchetypes: [
+    {
+      name: 'Mercury',
+      radius: 18,
+      colors: ['#F59E0B', '#B45309', '#78350F'],
+      glowColor: 'rgba(245, 158, 11, 0.45)',
+      hasRings: false
+    },
+    {
+      name: 'Venus',
+      radius: 21,
+      colors: ['#FBBF24', '#D97706', '#92400E'],
+      glowColor: 'rgba(251, 191, 36, 0.45)',
+      hasRings: false
+    },
+    {
+      name: 'Earth',
+      radius: 23,
+      colors: ['#38BDF8', '#0284C7', '#0369A1'],
+      glowColor: 'rgba(56, 189, 248, 0.55)',
+      hasRings: false
+    },
+    {
+      name: 'Mars',
+      radius: 19,
+      colors: ['#F87171', '#DC2626', '#991B1B'],
+      glowColor: 'rgba(239, 68, 68, 0.5)',
+      hasRings: false
+    },
+    {
+      name: 'Jupiter',
+      radius: 28,
+      colors: ['#FDE68A', '#D97706', '#78350F'],
+      glowColor: 'rgba(245, 158, 11, 0.4)',
+      hasRings: false
+    },
+    {
+      name: 'Saturn',
+      radius: 25,
+      colors: ['#FDE047', '#EAB308', '#A16207'],
+      glowColor: 'rgba(250, 204, 21, 0.45)',
+      hasRings: true,
+      ringColor: 'rgba(250, 204, 21, 0.7)'
+    },
+    {
+      name: 'Uranus',
+      radius: 22,
+      colors: ['#67E8F9', '#06B6D4', '#0E7490'],
+      glowColor: 'rgba(34, 211, 238, 0.5)',
+      hasRings: true,
+      ringColor: 'rgba(34, 211, 238, 0.55)'
+    },
+    {
+      name: 'Neptune',
+      radius: 22,
+      colors: ['#60A5FA', '#2563EB', '#1E3A8A'],
+      glowColor: 'rgba(59, 130, 246, 0.55)',
+      hasRings: false
+    }
+  ],
+
+  setSubjectViewMode(mode) {
+    this.subjectViewMode = mode;
+    const btnSolar = document.getElementById('btn-view-solar');
+    const btnList = document.getElementById('btn-view-list');
+
+    if (mode === 'solar') {
+      if (btnSolar) btnSolar.className = 'px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center space-x-1.5 text-white bg-blue-600 shadow-sm';
+      if (btnList) btnList.className = 'px-2.5 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 text-slate-400 hover:text-white';
+    } else {
+      if (btnSolar) btnSolar.className = 'px-2.5 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 text-slate-400 hover:text-white';
+      if (btnList) btnList.className = 'px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center space-x-1.5 text-white bg-blue-600 shadow-sm';
+    }
+
+    this.renderSubjectCards();
+  },
+
+  toggleSolarAnimation() {
+    this.isSolarAnimationPaused = !this.isSolarAnimationPaused;
+    const icon = document.getElementById('solar-play-icon');
+    const text = document.getElementById('solar-play-text');
+
+    if (this.isSolarAnimationPaused) {
+      if (icon) icon.setAttribute('data-lucide', 'play');
+      if (text) text.innerText = 'Resume';
+    } else {
+      if (icon) icon.setAttribute('data-lucide', 'pause');
+      if (text) text.innerText = 'Pause';
+    }
+    this.initLucide();
+  },
 
   filterSubjectsBySemester(semester) {
     this.activeSemesterFilter = semester;
     document.querySelectorAll('.subject-filter-btn').forEach(btn => {
       const sem = btn.getAttribute('data-semester-filter');
       if (sem === semester) {
-        btn.className = 'subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition';
+        btn.className = 'subject-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 transition flex items-center space-x-1.5 flex-shrink-0';
       } else {
-        btn.className = 'subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition';
+        btn.className = 'subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0';
       }
     });
+
+    // Close any open inspector during transition
+    this.closeSolarInspector();
     this.renderSubjectCards();
   },
 
@@ -363,17 +466,24 @@ export const App = {
   },
 
   renderSubjectCards() {
-    const container = document.getElementById('subjects-container');
-    const emptyState = document.getElementById('dashboard-empty-state');
-    if (!container) return;
+    const allSubjects = this.state.subjects || [];
+    const countBadge = document.getElementById('subject-count-badge');
+    if (countBadge) countBadge.innerText = `${allSubjects.length} ${allSubjects.length === 1 ? 'Planet' : 'Planets'}`;
 
-    if (!this.state.subjects || this.state.subjects.length === 0) {
-      container.innerHTML = '';
-      if (emptyState) emptyState.classList.remove('hidden');
-      return;
+    // Update semester badge counts
+    const badgeAll = document.getElementById('sem-badge-all');
+    if (badgeAll) badgeAll.innerText = allSubjects.length;
+
+    for (let semNum = 1; semNum <= 6; semNum++) {
+      const bEl = document.getElementById(`sem-badge-${semNum}`);
+      if (bEl) {
+        const c = allSubjects.filter(s => (s.semester || 'Semester 1') === `Semester ${semNum}`).length;
+        bEl.innerText = c;
+      }
     }
 
-    let filtered = this.state.subjects;
+    // Filter subjects
+    let filtered = allSubjects;
     if (this.activeSemesterFilter && this.activeSemesterFilter !== 'All') {
       filtered = filtered.filter(s => (s.semester || 'Semester 1') === this.activeSemesterFilter);
     }
@@ -387,23 +497,74 @@ export const App = {
       );
     }
 
+    // Update Sun aggregate stats from real database data
+    let totalDocs = 0;
+    let totalConcepts = 0;
+    let totalProg = 0;
+    allSubjects.forEach(s => {
+      totalDocs += (s.document_count || (s.documents ? s.documents.length : 0));
+      totalConcepts += (s.concepts_count || s.studied_count || 0);
+      totalProg += (s.avg_progress || 0);
+    });
+    const avgProg = allSubjects.length > 0 ? Math.round(totalProg / allSubjects.length) : 0;
+
+    const sunHeadline = document.getElementById('sun-stats-headline');
+    const sunDocs = document.getElementById('sun-stat-docs');
+    const sunConcepts = document.getElementById('sun-stat-concepts');
+    const sunProg = document.getElementById('sun-stat-prog');
+
+    if (sunHeadline) sunHeadline.innerText = `${allSubjects.length} SUBJECTS`;
+    if (sunDocs) sunDocs.innerText = `${totalDocs} Decks`;
+    if (sunConcepts) sunConcepts.innerText = `${totalConcepts} Concepts`;
+    if (sunProg) sunProg.innerText = `${avgProg}% Mastery`;
+
+    const solarWrapper = document.getElementById('solar-system-wrapper');
+    const listContainer = document.getElementById('subjects-container');
+    const emptyUniverse = document.getElementById('solar-empty-universe');
+
+    // 1. SOLAR SYSTEM VIEW
+    if (this.subjectViewMode === 'solar') {
+      if (solarWrapper) solarWrapper.classList.remove('hidden');
+      if (listContainer) listContainer.classList.add('hidden');
+
+      if (filtered.length === 0) {
+        this.solarPlanets = [];
+        if (emptyUniverse) emptyUniverse.classList.remove('hidden');
+        if (this.solarAnimationId) {
+          cancelAnimationFrame(this.solarAnimationId);
+          this.solarAnimationId = null;
+        }
+      } else {
+        if (emptyUniverse) emptyUniverse.classList.add('hidden');
+        this.startSolarSystemEngine(filtered);
+      }
+      return;
+    }
+
+    // 2. LIST / GRID VIEW
+    if (solarWrapper) solarWrapper.classList.add('hidden');
+    if (listContainer) listContainer.classList.remove('hidden');
+    if (this.solarAnimationId) {
+      cancelAnimationFrame(this.solarAnimationId);
+      this.solarAnimationId = null;
+    }
+
     if (filtered.length === 0) {
-      if (emptyState) emptyState.classList.add('hidden');
-      container.innerHTML = `
+      listContainer.innerHTML = `
         <div class="col-span-full py-12 text-center glass-panel rounded-3xl border border-white/10 p-8">
           <div class="w-12 h-12 rounded-2xl bg-white/5 text-slate-400 flex items-center justify-center mx-auto mb-3">
             <i data-lucide="search-x" class="w-6 h-6"></i>
           </div>
-          <h4 class="text-sm font-bold text-white mb-1">No subjects match your filter</h4>
-          <p class="text-xs text-slate-400 mb-4">Try clearing the search query or selecting a different semester.</p>
-          <button onclick="App.filterSubjectsBySemester('All'); const el = document.getElementById('subject-card-search-input'); if(el) el.value = ''; App.handleSubjectCardSearch('');" class="px-3.5 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white font-semibold text-xs border border-blue-500/30 transition">Reset Filters</button>
+          <h4 class="text-sm font-bold text-white mb-1">Your universe is waiting to expand.</h4>
+          <p class="text-xs text-slate-400 mb-4">No subjects match this semester or search query.</p>
+          <button onclick="App.openCreateSubjectModal(App.activeSemesterFilter)" class="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition">
+            + Create Subject
+          </button>
         </div>
       `;
       this.initLucide();
       return;
     }
-
-    if (emptyState) emptyState.classList.add('hidden');
 
     const gradients = [
       'from-blue-600 to-indigo-600',
@@ -414,7 +575,7 @@ export const App = {
       'from-rose-600 to-pink-700'
     ];
 
-    container.innerHTML = filtered.map((s, idx) => {
+    listContainer.innerHTML = filtered.map((s, idx) => {
       const grad = gradients[idx % gradients.length];
       const desc = s.description || 'MBA curriculum and study presentation slides.';
       const count = s.document_count !== undefined ? s.document_count : (s.documents ? s.documents.length : 0);
@@ -472,7 +633,7 @@ export const App = {
               onclick="App.openSubject('${s.id}')"
               class="px-4 py-2 rounded-xl bg-white/5 hover:bg-blue-600 text-slate-200 hover:text-white text-xs font-semibold transition border border-white/10 hover:border-transparent flex items-center space-x-1.5 shadow-sm"
             >
-              <span>Open Subject</span>
+              <span>ENTER SUBJECT</span>
               <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -483,6 +644,421 @@ export const App = {
     this.initLucide();
   },
 
+  startSolarSystemEngine(subjects) {
+    const canvas = document.getElementById('solar-system-canvas');
+    if (!canvas) return;
+
+    if (this.solarAnimationId) {
+      cancelAnimationFrame(this.solarAnimationId);
+      this.solarAnimationId = null;
+    }
+
+    // Check prefers-reduced-motion
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      this.isSolarAnimationPaused = true;
+    }
+
+    // Initialize stars background
+    if (this.solarStars.length === 0) {
+      for (let i = 0; i < 140; i++) {
+        this.solarStars.push({
+          x: Math.random(),
+          y: Math.random(),
+          size: Math.random() * 1.8 + 0.6,
+          brightness: Math.random() * 0.7 + 0.3,
+          twinkleSpeed: Math.random() * 0.03 + 0.01,
+          phase: Math.random() * Math.PI * 2
+        });
+      }
+    }
+
+    // Build planets with distinct archetypes and Keplerian orbits
+    const count = subjects.length;
+    const baseRadiusX = count <= 3 ? 120 : (count <= 5 ? 100 : 85);
+    const stepRadiusX = count <= 3 ? 65 : (count <= 5 ? 48 : 36);
+
+    this.solarPlanets = subjects.map((s, idx) => {
+      const archetype = this.planetArchetypes[idx % this.planetArchetypes.length];
+      const orbitRx = baseRadiusX + idx * stepRadiusX;
+      const orbitRy = orbitRx * 0.52; // isometric elliptical view
+      const angle = (idx * (2 * Math.PI / count)) + (Math.PI / 6);
+      const speed = (0.0035 + (0.002 / (idx + 1))) * (idx % 2 === 0 ? 1 : 1.15);
+
+      return {
+        id: s.id,
+        subject: s,
+        name: s.name,
+        semester: s.semester || 'Semester 1',
+        category: s.category || 'Management',
+        docCount: s.document_count !== undefined ? s.document_count : (s.documents ? s.documents.length : 0),
+        progress: s.avg_progress || 0,
+        radius: archetype.radius,
+        colors: archetype.colors,
+        glowColor: archetype.glowColor,
+        hasRings: archetype.hasRings,
+        ringColor: archetype.ringColor,
+        orbitRx,
+        orbitRy,
+        angle,
+        speed,
+        x: 0,
+        y: 0
+      };
+    });
+
+    // Attach event listeners only once
+    if (!this.solarCanvasInitialized) {
+      this.attachSolarEventListeners(canvas);
+      this.solarCanvasInitialized = true;
+    }
+
+    // Start 60fps render loop
+    const renderLoop = () => {
+      this.drawSolarSystemFrame(canvas);
+      this.solarAnimationId = requestAnimationFrame(renderLoop);
+    };
+    this.solarAnimationId = requestAnimationFrame(renderLoop);
+  },
+
+  attachSolarEventListeners(canvas) {
+    const handleMove = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : null);
+      const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : null);
+      if (clientX === null || clientY === null) return;
+
+      const mouseX = clientX - rect.left;
+      const mouseY = clientY - rect.top;
+
+      let found = null;
+      for (const p of this.solarPlanets) {
+        const dist = Math.hypot(mouseX - p.x, mouseY - p.y);
+        if (dist <= p.radius + 14) {
+          found = p;
+          break;
+        }
+      }
+
+      this.hoveredSolarPlanet = found;
+      canvas.style.cursor = found ? 'pointer' : 'default';
+
+      const tooltip = document.getElementById('solar-planet-tooltip');
+      if (tooltip) {
+        if (found) {
+          tooltip.innerHTML = `
+            <div class="flex items-center space-x-1.5 font-bold text-white">
+              <span class="w-2 h-2 rounded-full" style="background:${found.colors[0]}"></span>
+              <span class="truncate">${this.escapeHtml(found.name)}</span>
+            </div>
+            <div class="flex items-center justify-between text-[11px] text-slate-300 pt-1 border-t border-white/10">
+              <span class="text-slate-400">${this.escapeHtml(found.semester)}</span>
+              <span class="text-cyan-300 font-semibold">${found.docCount} Decks</span>
+            </div>
+            <div class="w-full bg-white/10 h-1.5 rounded-full overflow-hidden mt-1">
+              <div class="bg-gradient-to-r from-blue-500 to-emerald-400 h-full rounded-full" style="width: ${Math.max(5, found.progress)}%"></div>
+            </div>
+          `;
+          tooltip.style.left = `${Math.min(rect.width - 230, Math.max(10, found.x + 15))}px`;
+          tooltip.style.top = `${Math.min(rect.height - 100, Math.max(10, found.y - 40))}px`;
+          tooltip.classList.remove('hidden');
+        } else {
+          tooltip.classList.add('hidden');
+        }
+      }
+    };
+
+    const handleClick = (e) => {
+      const rect = canvas.getBoundingClientRect();
+      const clientX = e.clientX || (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientX : null);
+      const clientY = e.clientY || (e.changedTouches && e.changedTouches[0] ? e.changedTouches[0].clientY : null);
+      if (clientX === null || clientY === null) return;
+
+      const clickX = clientX - rect.left;
+      const clickY = clientY - rect.top;
+
+      let clickedPlanet = null;
+      for (const p of this.solarPlanets) {
+        const dist = Math.hypot(clickX - p.x, clickY - p.y);
+        if (dist <= p.radius + 16) {
+          clickedPlanet = p;
+          break;
+        }
+      }
+
+      if (clickedPlanet) {
+        this.selectSolarPlanet(clickedPlanet);
+      }
+    };
+
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseleave', () => {
+      this.hoveredSolarPlanet = null;
+      document.getElementById('solar-planet-tooltip')?.classList.add('hidden');
+    });
+    canvas.addEventListener('click', handleClick);
+    canvas.addEventListener('touchmove', handleMove, { passive: true });
+    canvas.addEventListener('touchend', handleClick);
+  },
+
+  selectSolarPlanet(planet) {
+    this.selectedSolarPlanet = planet;
+    const inspector = document.getElementById('solar-planet-inspector');
+    if (!inspector) return;
+
+    const s = planet.subject;
+    const desc = s.description || 'MBA curriculum with slide-by-slide concepts and AI tutor.';
+    const count = planet.docCount;
+    const prog = planet.progress || 0;
+
+    inspector.innerHTML = `
+      <div class="flex items-center justify-between border-b border-white/10 pb-2.5">
+        <div class="flex items-center space-x-2.5 min-w-0">
+          <div class="w-8 h-8 rounded-xl flex items-center justify-center font-bold text-white shadow-md flex-shrink-0" style="background: radial-gradient(circle, ${planet.colors[0]}, ${planet.colors[1]})">
+            🪐
+          </div>
+          <div class="min-w-0">
+            <h4 class="text-xs sm:text-sm font-bold text-white truncate">${this.escapeHtml(planet.name)}</h4>
+            <p class="text-[10px] text-slate-400">${this.escapeHtml(planet.semester)} • ${this.escapeHtml(planet.category)}</p>
+          </div>
+        </div>
+        <button onclick="App.closeSolarInspector()" class="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition flex-shrink-0">
+          <i data-lucide="x" class="w-4 h-4"></i>
+        </button>
+      </div>
+
+      <p class="text-slate-300 text-[11px] line-clamp-2 leading-relaxed">
+        ${this.escapeHtml(desc)}
+      </p>
+
+      <div class="grid grid-cols-2 gap-2 text-[10px]">
+        <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-0.5">
+          <span class="text-slate-400">Study Materials</span>
+          <p class="text-white font-bold text-xs">${count} ${count === 1 ? 'Presentation' : 'Presentations'}</p>
+        </div>
+        <div class="p-2.5 rounded-xl bg-white/[0.03] border border-white/5 space-y-0.5">
+          <span class="text-slate-400">Mastery Level</span>
+          <p class="text-emerald-400 font-bold text-xs">${prog}% Complete</p>
+        </div>
+      </div>
+
+      <div class="flex items-center space-x-2 pt-1">
+        <button 
+          onclick="App.openSubject('${planet.id}')"
+          class="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold text-xs shadow-lg shadow-blue-500/30 transition flex items-center justify-center space-x-1.5"
+        >
+          <span>ENTER SUBJECT</span>
+          <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+        </button>
+        <button 
+          onclick="App.openRenameSubjectModal('${planet.id}', '${this.escapeHtml(s.name)}', '${this.escapeHtml(s.description || '')}', '${this.escapeHtml(planet.semester)}', '${this.escapeHtml(planet.category)}', '${this.escapeHtml(s.goals || '')}')"
+          class="p-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white transition"
+          title="Edit Subject"
+        >
+          <i data-lucide="edit-3" class="w-4 h-4"></i>
+        </button>
+      </div>
+    `;
+
+    inspector.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  closeSolarInspector() {
+    this.selectedSolarPlanet = null;
+    const inspector = document.getElementById('solar-planet-inspector');
+    if (inspector) inspector.classList.add('hidden');
+  },
+
+  drawSolarSystemFrame(canvas) {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+
+    if (canvas.width !== rect.width * dpr || canvas.height !== rect.height * dpr) {
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+    }
+
+    const ctx = canvas.getContext('2d');
+    ctx.save();
+    ctx.scale(dpr, dpr);
+
+    const width = rect.width;
+    const height = rect.height;
+    const cx = width / 2;
+    const cy = height / 2;
+
+    ctx.clearRect(0, 0, width, height);
+
+    // 1. Draw subtle background space nebula gradient
+    const nebulaGrad = ctx.createRadialGradient(cx, cy, 30, cx, cy, width * 0.6);
+    nebulaGrad.addColorStop(0, 'rgba(15, 23, 42, 0.9)');
+    nebulaGrad.addColorStop(0.5, 'rgba(10, 15, 30, 0.95)');
+    nebulaGrad.addColorStop(1, '#050814');
+    ctx.fillStyle = nebulaGrad;
+    ctx.fillRect(0, 0, width, height);
+
+    // 2. Draw twinkling stars
+    const now = performance.now();
+    for (const star of this.solarStars) {
+      const sx = star.x * width;
+      const sy = star.y * height;
+      const alpha = star.brightness * (0.6 + 0.4 * Math.sin(now * star.twinkleSpeed + star.phase));
+      ctx.fillStyle = `rgba(255, 255, 255, ${alpha.toFixed(2)})`;
+      ctx.beginPath();
+      ctx.arc(sx, sy, star.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // 3. Update planetary angles & positions
+    if (!this.isSolarAnimationPaused) {
+      for (const p of this.solarPlanets) {
+        p.angle += p.speed;
+      }
+    }
+
+    for (const p of this.solarPlanets) {
+      p.x = cx + p.orbitRx * Math.cos(p.angle);
+      p.y = cy + p.orbitRy * Math.sin(p.angle);
+    }
+
+    // 4. Draw orbital paths (ellipses)
+    for (const p of this.solarPlanets) {
+      const isHighlighted = (this.hoveredSolarPlanet && this.hoveredSolarPlanet.id === p.id) || (this.selectedSolarPlanet && this.selectedSolarPlanet.id === p.id);
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, p.orbitRx, p.orbitRy, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = isHighlighted ? 'rgba(96, 165, 250, 0.45)' : 'rgba(255, 255, 255, 0.07)';
+      ctx.lineWidth = isHighlighted ? 1.5 : 1;
+      if (!isHighlighted) {
+        ctx.setLineDash([3, 4]);
+      } else {
+        ctx.setLineDash([]);
+      }
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Split planets into back-layer (behind Sun) and front-layer (in front of Sun)
+    const backPlanets = this.solarPlanets.filter(p => Math.sin(p.angle) < 0);
+    const frontPlanets = this.solarPlanets.filter(p => Math.sin(p.angle) >= 0);
+
+    // 5. Draw back-layer planets
+    for (const p of backPlanets) {
+      this.drawSinglePlanet(ctx, p);
+    }
+
+    // 6. Draw glowing Central Sun
+    this.drawCentralSun(ctx, cx, cy);
+
+    // 7. Draw front-layer planets
+    for (const p of frontPlanets) {
+      this.drawSinglePlanet(ctx, p);
+    }
+
+    ctx.restore();
+  },
+
+  drawCentralSun(ctx, cx, cy) {
+    const time = performance.now() * 0.0015;
+    const pulse = 1 + 0.04 * Math.sin(time * 2);
+
+    // Outer coronal flares
+    const flareGrad = ctx.createRadialGradient(cx, cy, 35, cx, cy, 80 * pulse);
+    flareGrad.addColorStop(0, 'rgba(245, 158, 11, 0.35)');
+    flareGrad.addColorStop(0.5, 'rgba(234, 88, 12, 0.15)');
+    flareGrad.addColorStop(1, 'rgba(234, 88, 12, 0)');
+    ctx.fillStyle = flareGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 80 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Inner bright glowing core
+    const coreGrad = ctx.createRadialGradient(cx - 10, cy - 10, 5, cx, cy, 50);
+    coreGrad.addColorStop(0, '#FEF08A');
+    coreGrad.addColorStop(0.3, '#F59E0B');
+    coreGrad.addColorStop(0.8, '#D97706');
+    coreGrad.addColorStop(1, '#9A3412');
+
+    ctx.save();
+    ctx.shadowColor = '#F59E0B';
+    ctx.shadowBlur = 30;
+    ctx.fillStyle = coreGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, 48 * pulse, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  },
+
+  drawSinglePlanet(ctx, p) {
+    const isHovered = this.hoveredSolarPlanet && this.hoveredSolarPlanet.id === p.id;
+    const isSelected = this.selectedSolarPlanet && this.selectedSolarPlanet.id === p.id;
+    const r = (isHovered || isSelected) ? p.radius * 1.18 : p.radius;
+
+    ctx.save();
+
+    // 1. Planetary glow aura
+    ctx.shadowColor = p.glowColor;
+    ctx.shadowBlur = (isHovered || isSelected) ? 22 : 12;
+
+    // 2. Planet sphere with 3D radial lighting
+    const grad = ctx.createRadialGradient(p.x - r * 0.35, p.y - r * 0.35, r * 0.1, p.x, p.y, r);
+    grad.addColorStop(0, p.colors[0]);
+    grad.addColorStop(0.6, p.colors[1]);
+    grad.addColorStop(1, p.colors[2]);
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 3. Optional Saturn / Uranus Planetary Rings
+    if (p.hasRings) {
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(-0.35); // ring tilt
+      ctx.beginPath();
+      ctx.ellipse(0, 0, r * 1.85, r * 0.55, 0, 0, Math.PI * 2);
+      ctx.strokeStyle = p.ringColor || 'rgba(250, 204, 21, 0.65)';
+      ctx.lineWidth = 3;
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 4. Focus halo if selected
+    if (isSelected) {
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, r + 6, 0, Math.PI * 2);
+      ctx.strokeStyle = 'rgba(96, 165, 250, 0.9)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+
+    // 5. Subject Label Tag
+    ctx.shadowBlur = 0;
+    const labelText = p.name.length > 18 ? p.name.substring(0, 16) + '..' : p.name;
+    ctx.font = '600 10px Inter, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+
+    const textMetrics = ctx.measureText(labelText);
+    const textWidth = textMetrics.width;
+    const tagY = p.y + r + 13;
+
+    // Pill background
+    ctx.fillStyle = isHovered || isSelected ? 'rgba(37, 99, 235, 0.85)' : 'rgba(15, 23, 42, 0.75)';
+    ctx.strokeStyle = isHovered || isSelected ? 'rgba(96, 165, 250, 0.6)' : 'rgba(255, 255, 255, 0.15)';
+    ctx.lineWidth = 1;
+
+    ctx.beginPath();
+    ctx.roundRect(p.x - textWidth / 2 - 6, tagY - 7, textWidth + 12, 14, 7);
+    ctx.fill();
+    ctx.stroke();
+
+    // Text
+    ctx.fillStyle = isHovered || isSelected ? '#FFFFFF' : '#E2E8F0';
+    ctx.fillText(labelText, p.x, tagY);
+
+    ctx.restore();
+  },
   async loadDashboard() {
     try {
       await this.loadSubjects();
@@ -3201,7 +3777,7 @@ export const App = {
     }
   },
 
-  openCreateSubjectModal() {
+  openCreateSubjectModal(preselectedSemester = null) {
     this.isCreatingSubject = false;
     const nameInput = document.getElementById('modal-subject-name-input');
     const descInput = document.getElementById('modal-subject-desc-input');
@@ -3215,7 +3791,15 @@ export const App = {
     if (nameInput) nameInput.value = '';
     if (descInput) descInput.value = '';
     if (goalsInput) goalsInput.value = '';
-    if (semSelect) semSelect.value = 'Semester 1';
+    if (semSelect) {
+      if (preselectedSemester && preselectedSemester.startsWith('Semester')) {
+        semSelect.value = preselectedSemester;
+      } else if (this.activeSemesterFilter && this.activeSemesterFilter.startsWith('Semester')) {
+        semSelect.value = this.activeSemesterFilter;
+      } else {
+        semSelect.value = 'Semester 1';
+      }
+    }
     if (catSelect) catSelect.value = 'Product Management';
     if (colorInput) colorInput.value = '#3B82F6';
 

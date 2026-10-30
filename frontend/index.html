@@ -192,49 +192,164 @@
       </div>
 
       <!-- My Subjects Section -->
-      <div class="space-y-4">
-        <div class="flex items-center justify-between">
+      <!-- ==================== MY SUBJECTS: INTERACTIVE SOLAR SYSTEM UNIVERSE ==================== -->
+      <div id="section-my-subjects" class="space-y-4">
+        <!-- Section Header Bar -->
+        <div class="flex items-center justify-between flex-wrap gap-3">
           <div>
             <h2 class="text-xl sm:text-2xl font-bold text-white tracking-tight flex items-center space-x-2">
               <span>My Subjects</span>
-              <span id="subject-count-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-white/10 text-slate-300 font-semibold border border-white/10">0 Subjects</span>
+              <span id="subject-count-badge" class="text-xs px-2.5 py-0.5 rounded-full bg-blue-500/15 text-blue-300 font-semibold border border-blue-500/20">7 Planets</span>
             </h2>
-            <p class="text-xs text-slate-400 mt-0.5">Explore study materials, view original presentations, and learn concepts with your AI tutor.</p>
+            <p class="text-xs text-slate-400 mt-0.5">Explore your interactive learning universe. Each subject orbits the central sun by semester.</p>
           </div>
 
-          <button 
-            onclick="App.openCreateSubjectModal()"
-            class="text-xs text-blue-400 hover:text-blue-300 font-semibold flex items-center space-x-1 transition"
-          >
-            <span>+ New Subject</span>
-          </button>
+          <div class="flex items-center space-x-2.5">
+            <!-- View Mode Toggle (Solar System vs List) -->
+            <div class="bg-white/5 border border-white/10 rounded-xl p-0.5 flex items-center text-xs">
+              <button 
+                id="btn-view-solar" 
+                onclick="App.setSubjectViewMode('solar')" 
+                class="px-2.5 py-1.5 rounded-lg font-semibold transition flex items-center space-x-1.5 text-white bg-blue-600 shadow-sm"
+                title="Interactive Solar System Universe"
+              >
+                <span>🪐</span>
+                <span class="hidden sm:inline">Universe</span>
+              </button>
+              <button 
+                id="btn-view-list" 
+                onclick="App.setSubjectViewMode('list')" 
+                class="px-2.5 py-1.5 rounded-lg font-medium transition flex items-center space-x-1.5 text-slate-400 hover:text-white"
+                title="Traditional List / Grid View"
+              >
+                <span>📋</span>
+                <span class="hidden sm:inline">Grid</span>
+              </button>
+            </div>
+
+            <!-- Orbit Animation Pause / Resume Button -->
+            <button 
+              id="btn-solar-pause-toggle" 
+              onclick="App.toggleSolarAnimation()" 
+              class="px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-xs font-semibold transition flex items-center space-x-1.5"
+              title="Pause or Resume Planetary Revolution"
+            >
+              <i id="solar-play-icon" data-lucide="pause" class="w-3.5 h-3.5"></i>
+              <span id="solar-play-text" class="hidden sm:inline">Pause</span>
+            </button>
+
+            <!-- + New Subject Button -->
+            <button 
+              onclick="App.openCreateSubjectModal()"
+              class="px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-md shadow-blue-500/20 transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="plus" class="w-3.5 h-3.5"></i>
+              <span>+ New Subject</span>
+            </button>
+          </div>
         </div>
 
-        <!-- Subject Search & Filter Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-3 bg-white/[0.02] p-2.5 rounded-2xl border border-white/10">
-          <div class="flex items-center space-x-1.5 overflow-x-auto py-0.5" id="subject-semester-filter-pills">
-            <button onclick="App.filterSubjectsBySemester('All')" data-semester-filter="All" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition">All</button>
-            <button onclick="App.filterSubjectsBySemester('Semester 1')" data-semester-filter="Semester 1" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 1</button>
-            <button onclick="App.filterSubjectsBySemester('Semester 2')" data-semester-filter="Semester 2" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 2</button>
-            <button onclick="App.filterSubjectsBySemester('Semester 3')" data-semester-filter="Semester 3" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 3</button>
-            <button onclick="App.filterSubjectsBySemester('Semester 4')" data-semester-filter="Semester 4" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 4</button>
+        <!-- Semester Selection Navigation Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-[#080D1D]/90 p-2 rounded-2xl border border-white/10 backdrop-blur-md">
+          <div class="flex items-center space-x-1.5 overflow-x-auto py-0.5 scrollbar-none w-full sm:w-auto" id="subject-semester-filter-pills">
+            <button onclick="App.filterSubjectsBySemester('All')" data-semester-filter="All" class="subject-filter-btn px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-blue-500/20 transition flex items-center space-x-1.5 flex-shrink-0">
+              <span>All Semesters</span>
+              <span id="sem-badge-all" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/20">7</span>
+            </button>
+            <button onclick="App.filterSubjectsBySemester('Semester 1')" data-semester-filter="Semester 1" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0">
+              <span>Semester 1</span>
+              <span id="sem-badge-1" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">3</span>
+            </button>
+            <button onclick="App.filterSubjectsBySemester('Semester 2')" data-semester-filter="Semester 2" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0">
+              <span>Semester 2</span>
+              <span id="sem-badge-2" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">3</span>
+            </button>
+            <button onclick="App.filterSubjectsBySemester('Semester 3')" data-semester-filter="Semester 3" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0">
+              <span>Semester 3</span>
+              <span id="sem-badge-3" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">1</span>
+            </button>
+            <button onclick="App.filterSubjectsBySemester('Semester 4')" data-semester-filter="Semester 4" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0">
+              <span>Semester 4</span>
+              <span id="sem-badge-4" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">0</span>
+            </button>
+            <button onclick="App.filterSubjectsBySemester('Semester 5')" data-semester-filter="Semester 5" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0">
+              <span>Semester 5</span>
+              <span id="sem-badge-5" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">0</span>
+            </button>
+            <button onclick="App.filterSubjectsBySemester('Semester 6')" data-semester-filter="Semester 6" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition flex items-center space-x-1 flex-shrink-0">
+              <span>Semester 6</span>
+              <span id="sem-badge-6" class="text-[10px] px-1.5 py-0.2 rounded-full bg-white/10">0</span>
+            </button>
           </div>
-          <div class="relative w-full sm:w-64">
+
+          <!-- Keyword Filter -->
+          <div class="relative w-full sm:w-56">
             <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
             <input 
               id="subject-card-search-input" 
               type="text" 
-              placeholder="Filter subjects..." 
+              placeholder="Search planets / subjects..." 
               oninput="App.handleSubjectCardSearch(this.value)"
               class="w-full pl-9 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 placeholder-slate-400"
             >
           </div>
         </div>
 
-        <!-- Subjects Grid -->
-        <div id="subjects-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+        <!-- 1. SOLAR SYSTEM INTERACTIVE VIEW CONTAINER -->
+        <div id="solar-system-wrapper" class="relative w-full h-[540px] sm:h-[620px] rounded-3xl overflow-hidden border border-white/10 bg-[#050814] shadow-2xl flex items-center justify-center select-none">
+          <!-- Canvas for Stars, Orbits, Planetary Spheres & Particle Dust -->
+          <canvas id="solar-system-canvas" class="absolute inset-0 w-full h-full cursor-grab active:cursor-grabbing"></canvas>
 
-        <!-- Empty Dashboard State -->
+          <!-- Central Sun Overlay Badge -->
+          <div id="central-sun-container" class="relative z-10 pointer-events-none flex flex-col items-center justify-center text-center">
+            <!-- Pulsing Corona Layers -->
+            <div class="w-36 h-36 sm:w-44 sm:h-44 rounded-full flex flex-col items-center justify-center p-3 text-white transition-transform duration-700">
+              <!-- Internal Glowing Data -->
+              <span class="text-[9px] sm:text-[10px] font-extrabold uppercase tracking-widest text-amber-200/90 drop-shadow">MY LEARNING UNIVERSE</span>
+              <h3 id="sun-stats-headline" class="text-xs sm:text-sm font-extrabold text-white mt-1 drop-shadow-md">7 SUBJECTS</h3>
+              <div class="grid grid-cols-2 gap-x-2 gap-y-0.5 mt-1 text-[9px] sm:text-[10px] text-amber-100 font-semibold">
+                <span id="sun-stat-docs">35 Decks</span>
+                <span id="sun-stat-concepts">11 Concepts</span>
+              </div>
+              <div class="mt-1.5 flex items-center space-x-1 text-[9px] font-bold text-amber-300 bg-black/40 px-2 py-0.5 rounded-full border border-amber-500/30">
+                <span id="sun-stat-prog">48% Mastery</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Hover Floating Info Tooltip -->
+          <div id="solar-planet-tooltip" class="absolute z-20 hidden pointer-events-none p-3.5 rounded-2xl bg-[#0E1626]/95 border border-blue-500/40 shadow-2xl backdrop-blur-md text-xs space-y-1.5 max-w-[220px] transition-all duration-150">
+            <!-- Dynamic Tooltip Content -->
+          </div>
+
+          <!-- Interactive Planet Inspection Card / Modal Overlay -->
+          <div id="solar-planet-inspector" class="absolute bottom-5 right-5 z-20 hidden max-w-sm w-full sm:w-80 p-5 rounded-2xl bg-[#0E1626]/95 border border-blue-500/40 shadow-2xl backdrop-blur-lg animate-fade-in text-xs space-y-3">
+            <!-- Dynamic Inspector Content with ENTER SUBJECT button -->
+          </div>
+
+          <!-- Empty Universe State (When filtered semester has 0 subjects) -->
+          <div id="solar-empty-universe" class="absolute inset-0 z-15 hidden flex flex-col items-center justify-center text-center p-6 bg-black/60 backdrop-blur-sm space-y-4">
+            <div class="w-16 h-16 rounded-2xl bg-gradient-to-tr from-blue-600/20 to-purple-600/20 text-blue-400 border border-blue-500/30 flex items-center justify-center text-2xl shadow-inner animate-pulse">
+              🪐
+            </div>
+            <div>
+              <h3 class="text-lg font-bold text-white tracking-tight">Your universe is waiting to expand.</h3>
+              <p class="text-xs text-slate-400 max-w-sm mx-auto mt-1">Create your first subject and start building your learning universe.</p>
+            </div>
+            <button 
+              onclick="App.openCreateSubjectModal(App.activeSemesterFilter)" 
+              class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-xs shadow-lg shadow-blue-500/25 transition flex items-center space-x-1.5"
+            >
+              <i data-lucide="plus" class="w-4 h-4"></i>
+              <span>+ Create Subject</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. ALTERNATIVE LIST / GRID VIEW CONTAINER -->
+        <div id="subjects-container" class="hidden grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
+
+        <!-- Traditional Empty Dashboard State -->
         <div id="dashboard-empty-state" class="hidden text-center py-16 px-6 rounded-3xl border border-dashed border-white/15 bg-white/[0.02]">
           <div class="w-20 h-20 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-5 empty-state-floating-icon shadow-inner">
             <i data-lucide="layers" class="w-10 h-10"></i>
@@ -1718,6 +1833,8 @@
               <option value="Semester 2">Semester 2 (Advanced Strategy)</option>
               <option value="Semester 3">Semester 3 (Specializations)</option>
               <option value="Semester 4">Semester 4 (Capstone & Cases)</option>
+              <option value="Semester 5">Semester 5 (Electives & Research)</option>
+              <option value="Semester 6">Semester 6 (Master Thesis & Defense)</option>
             </select>
           </div>
 
@@ -1822,6 +1939,8 @@
               <option value="Semester 2">Semester 2 (Advanced Strategy)</option>
               <option value="Semester 3">Semester 3 (Specializations)</option>
               <option value="Semester 4">Semester 4 (Capstone & Cases)</option>
+              <option value="Semester 5">Semester 5 (Electives & Research)</option>
+              <option value="Semester 6">Semester 6 (Master Thesis & Defense)</option>
             </select>
           </div>
 
