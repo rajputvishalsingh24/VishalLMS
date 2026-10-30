@@ -91,4 +91,28 @@ with urllib.request.urlopen(req) as resp:
 
 docs_in_subj = [d["id"] for d in subj_detail.get("documents", [])]
 print("5. Presentation present in subject details?", doc_id in docs_in_subj)
+
+# 6. Test PDF and Notes Upload
+pdf_bytes = b"%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Count 1/Kids[3 0 R]>>endobj\n3 0 obj<</Type/Page/MediaBox[0 0 612 792]/Parent 2 0 R/Resources<<>>>>endobj\nxref\n0 4\n0000000000 65535 f \n0000000009 00000 n \n0000000052 00000 n \n0000000102 00000 n \ntrailer<</Size 4/Root 1 0 R>>\nstartxref\n180\n%%EOF"
+boundary2 = "----WebKitFormBoundaryPDFUploadTest"
+body2 = io.BytesIO()
+body2.write(f"--{boundary2}\r\n".encode("utf-8"))
+body2.write(b'Content-Disposition: form-data; name="subject_id"\r\n\r\n')
+body2.write(f"{subject_id}\r\n".encode("utf-8"))
+body2.write(f"--{boundary2}\r\n".encode("utf-8"))
+body2.write(b'Content-Disposition: form-data; name="file"; filename="syllabus.pdf"\r\n')
+body2.write(b"Content-Type: application/pdf\r\n\r\n")
+body2.write(pdf_bytes)
+body2.write(b"\r\n")
+body2.write(f"--{boundary2}--\r\n".encode("utf-8"))
+
+req2 = urllib.request.Request(
+    f"{base_url}/api/documents/upload",
+    data=body2.getvalue(),
+    headers={"Content-Type": f"multipart/form-data; boundary={boundary2}", **auth_headers}
+)
+with urllib.request.urlopen(req2) as resp:
+    pdf_res = json.loads(resp.read().decode("utf-8"))
+print("6. PDF Upload Result:", pdf_res.get("success"), pdf_res.get("name"))
+
 print("SUCCESS: ALL VERIFICATIONS CONFIRMED ON LIVE PRODUCTION SITE!")
