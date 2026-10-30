@@ -956,6 +956,9 @@ export const App = {
 
   async setTeachingMode(mode) {
     this.state.teachingMode = mode;
+    this.currentTeachingMode = mode;
+
+    // Update Detailed Learning Concept Mode pills
     document.querySelectorAll('.teaching-mode-pill').forEach(pill => {
       pill.className = 'teaching-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold transition flex items-center space-x-1.5 text-slate-400 hover:text-white hover:bg-white/5';
     });
@@ -967,6 +970,26 @@ export const App = {
     if (modeBadge) {
       modeBadge.innerText = `${mode} Mode`;
     }
+
+    // Update AI Tutor page pills
+    document.querySelectorAll('.tutor-mode-pill').forEach(btn => {
+      if (btn.getAttribute('data-tutor-mode') === mode) {
+        btn.className = 'tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 shadow-sm transition';
+      } else {
+        btn.className = 'tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition';
+      }
+    });
+    const label = document.getElementById('current-tutor-mode-label');
+    if (label) {
+      const modeNames = { Beginner: '🌱 Beginner (ELI5)', MBA: '🏛️ MBA Professor', Exam: '📝 Exam Prep', Expert: '⚡ C-Suite Expert' };
+      label.innerText = modeNames[mode] || mode;
+    }
+
+    // Update Floating Chat badge if open
+    const fcMode = document.getElementById('fc-badge-mode');
+    if (fcMode) fcMode.innerText = `${mode} Mode`;
+
+    // Re-render concept package if active
     if (this.state.activeConceptName) {
       await this.fetchAndRenderConceptPackage(this.state.activeConceptName, null);
     }
@@ -1087,218 +1110,925 @@ export const App = {
     const container = document.getElementById('concept-sections-container') || document.getElementById('concept-steps-container');
     if (!container) return;
 
-    const sec = pkg.sections || {};
-    const secA = sec.section_a || {};
-    const secB = sec.section_b || {};
-    const secC = sec.section_c || {};
-    const secD = sec.section_d || {};
-    const secE = sec.section_e || {};
-    const secF = sec.section_f || {};
-    const secG = sec.section_g || {};
-    const secH = sec.section_h || {};
-    const secI = sec.section_i || {};
-    const secJ = sec.section_j || {};
-
-    let html = `
-      <!-- SECTION A: TOPIC INTRODUCTION -->
-      <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">A</span>
-          <span>Topic Introduction</span>
-        </div>
-        <div class="space-y-2 text-xs sm:text-sm text-slate-200">
-          <p class="leading-relaxed"><strong class="text-white">Definition:</strong> ${this.escapeHtml(secA.definition || '')}</p>
-          ${secA.core_idea ? `<p class="leading-relaxed"><strong class="text-cyan-300">Core Idea:</strong> ${this.escapeHtml(secA.core_idea)}</p>` : ''}
-          ${secA.importance ? `<p class="leading-relaxed text-slate-300"><strong class="text-amber-300">Strategic Importance:</strong> ${this.escapeHtml(secA.importance)}</p>` : ''}
-        </div>
-      </div>
-
-      <!-- SECTION B: DETAILED EXPLANATION -->
-      <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">B</span>
-          <span>Detailed Explanation & Mechanisms</span>
-        </div>
-        <div class="space-y-3 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
-          ${this.escapeHtml(secB.explanation || '')}
-        </div>
-        ${secB.components && secB.components.length ? `
-          <div class="mt-4 pt-4 border-t border-white/5 space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-indigo-300">Key Moving Parts & Components:</span>
-            <ul class="space-y-1.5 text-xs text-slate-300">
-              ${secB.components.map(c => `<li class="flex items-start space-x-2"><i data-lucide="check" class="w-3.5 h-3.5 text-indigo-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(c)}</span></li>`).join('')}
-            </ul>
+    // 1. RENDER ADAPTIVE RECOMMENDATION BANNER
+    const recBanner = document.getElementById('adaptive-recommendation-banner');
+    if (recBanner) {
+      const rec = pkg.adaptive_recommendation;
+      if (rec) {
+        recBanner.className = `p-4 sm:p-5 rounded-2xl border ${rec.badge_class || 'border-blue-500/30 bg-blue-500/10'} mb-6 space-y-2 animate-fade-in`;
+        recBanner.innerHTML = `
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2">
+              <span class="w-7 h-7 rounded-lg bg-white/10 flex items-center justify-center text-xs font-bold flex-shrink-0">
+                <i data-lucide="sparkles" class="w-4 h-4 text-amber-300"></i>
+              </span>
+              <span class="text-xs sm:text-sm font-bold text-white tracking-wide">${this.escapeHtml(rec.headline || 'Personalized Teaching Advice')}</span>
+            </div>
+            <span class="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full ${rec.badge_class || 'bg-blue-500/20 text-blue-300'}">${this.escapeHtml(rec.badge || 'Adaptive')}</span>
           </div>
-        ` : ''}
-      </div>
+          <p class="text-xs sm:text-sm text-slate-200 leading-relaxed">${this.escapeHtml(rec.message || '')}</p>
+        `;
+        recBanner.classList.remove('hidden');
+      } else {
+        recBanner.classList.add('hidden');
+      }
+    }
 
-      <!-- SECTION C: SIMPLE EXAMPLE & RELATABLE ANALOGY -->
-      <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3 bg-amber-500/[0.02]">
-        <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">C</span>
-          <span>Simple Example & Everyday Analogy</span>
-        </div>
-        <div class="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-100/90 leading-relaxed space-y-2">
-          <p>💡 ${this.escapeHtml(secC.analogy || '')}</p>
-          ${secC.intuition ? `<p class="text-xs text-amber-200/80 pt-2 border-t border-amber-500/20 font-medium"><strong>How this maps back:</strong> ${this.escapeHtml(secC.intuition)}</p>` : ''}
-        </div>
-      </div>
+    const mode = pkg.teaching_mode || this.state.teachingMode || 'MBA';
+    const md = pkg.mode_data || {};
+    let html = '';
 
-      <!-- SECTION D: REAL-WORLD BUSINESS EXAMPLE -->
-      <div class="glass-panel p-6 rounded-2xl border border-emerald-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-extrabold text-xs">D</span>
-          <span>Real-World Business Example</span>
-        </div>
-        <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed space-y-2">
-          <div class="flex items-center space-x-2 text-emerald-300 font-bold text-xs">
-            <i data-lucide="briefcase" class="w-4 h-4"></i>
-            <span>Case Study: ${this.escapeHtml(secD.company || 'Enterprise Benchmark')}</span>
+    // ==========================================
+    // 2. TEACHING MODE 1: BEGINNER (The Patient Teacher - 9 Parts)
+    // ==========================================
+    if (mode === 'Beginner') {
+      html += `
+        <!-- MODE HEADER -->
+        <div class="p-4 rounded-2xl bg-emerald-950/20 border border-emerald-500/30 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-300 font-bold flex items-center justify-center text-sm">🌱</span>
+            <div>
+              <h4 class="text-sm font-bold text-white">Beginner Mode: The Patient Teacher</h4>
+              <p class="text-[11px] text-emerald-300/80">Zero prior knowledge assumed • Intuitive real-life analogies • Step-by-step foundation</p>
+            </div>
           </div>
-          <p class="text-slate-300">${this.escapeHtml(secD.case_study || '')}</p>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">9-Part Learning Guide</span>
         </div>
-      </div>
 
-      <!-- SECTION E: HOW IT WORKS & PROCESS MECHANISM -->
-      <div class="glass-panel p-6 rounded-2xl border border-purple-500/20 space-y-4">
-        <div class="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-extrabold text-xs">E</span>
-          <span>How It Works & Process Mechanism</span>
+        <!-- PART 1: WHAT ARE WE LEARNING? -->
+        <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">1</span>
+            <span>What Are We Learning?</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.what_are_we_learning || '')}
+          </div>
         </div>
-        ${secE.steps && secE.steps.length ? `
-          <div class="space-y-2">
-            ${secE.steps.map((st, i) => `
-              <div class="flex items-start space-x-2.5 text-xs sm:text-sm text-slate-200">
-                <span class="w-5 h-5 rounded-full bg-purple-500/20 text-purple-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">${i+1}</span>
-                <span>${this.escapeHtml(st)}</span>
+
+        <!-- PART 2: WHY DOES IT MATTER? -->
+        <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">2</span>
+            <span>Why Does It Matter?</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.why_does_it_matter || '')}
+          </div>
+        </div>
+
+        <!-- PART 3: SIMPLE DEFINITION -->
+        <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">3</span>
+            <span>Simple Definition</span>
+          </div>
+          <div class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-xs sm:text-sm text-cyan-100 leading-relaxed">
+            ${this.renderMarkdown(md.simple_definition || '')}
+          </div>
+        </div>
+
+        <!-- PART 4: EVERYDAY ANALOGY -->
+        <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3 bg-amber-500/[0.02]">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">4</span>
+            <span>Everyday Analogy (Intuitive Mapping)</span>
+          </div>
+          <div class="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-100 leading-relaxed">
+            💡 ${this.renderMarkdown(md.everyday_analogy || '')}
+          </div>
+        </div>
+
+        <!-- PART 5: STEP-BY-STEP BREAKDOWN -->
+        <div class="glass-panel p-6 rounded-2xl border border-purple-500/20 space-y-4">
+          <div class="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-extrabold text-xs">5</span>
+            <span>Step-by-Step Breakdown</span>
+          </div>
+          <div class="space-y-2.5">
+            ${(md.step_by_step_breakdown || []).map((step, sIdx) => `
+              <div class="flex items-start space-x-3 text-xs sm:text-sm text-slate-200 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <span class="w-6 h-6 rounded-full bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">${sIdx + 1}</span>
+                <span class="leading-relaxed">${this.escapeHtml(step)}</span>
               </div>
             `).join('')}
           </div>
-        ` : ''}
-        ${secE.formula ? `
-          <div class="p-4 rounded-xl bg-purple-950/30 border border-purple-500/20 text-xs space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-purple-300">Strategic Formula / Metric:</span>
-            <p class="font-mono text-purple-200 bg-black/40 p-2.5 rounded-lg border border-purple-500/20">${this.escapeHtml(secE.formula)}</p>
-            ${secE.worked_calculation ? `<p class="text-slate-300 pt-1"><strong>Worked Calculation:</strong> ${this.escapeHtml(secE.worked_calculation)}</p>` : ''}
-          </div>
-        ` : ''}
-      </div>
+        </div>
 
-      <!-- SECTION F: WHEN TO USE IT -->
-      <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">F</span>
-          <span>When to Use It (Decision Criteria)</span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs sm:text-sm text-slate-200">
-          <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300">Strategic Decision Triggers:</span>
-            <ul class="space-y-1.5 text-slate-300">
-              ${(secF.decision_triggers || []).map(dt => `<li class="flex items-start space-x-2"><i data-lucide="arrow-right" class="w-3.5 h-3.5 text-cyan-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(dt)}</span></li>`).join('')}
-            </ul>
+        <!-- PART 6: SIMPLE EXAMPLE -->
+        <div class="glass-panel p-6 rounded-2xl border border-emerald-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-extrabold text-xs">6</span>
+            <span>Simple Real-Life Example</span>
           </div>
-          <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300">Problems Solved:</span>
-            <p class="text-slate-300 leading-relaxed">${this.escapeHtml(secF.problems_solved || '')}</p>
-            ${secF.boundary_conditions ? `<p class="text-[11px] text-slate-400 pt-2 border-t border-white/5"><strong>When NOT to use:</strong> ${this.escapeHtml(secF.boundary_conditions)}</p>` : ''}
+          <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.simple_example || '')}
           </div>
         </div>
-      </div>
 
-      <!-- SECTION G: ADVANTAGES AND LIMITATIONS -->
-      <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center font-extrabold text-xs">G</span>
-          <span>Advantages, Limitations & Common Pitfalls</span>
-        </div>
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Strategic Advantages:</span>
-            <ul class="space-y-1.5 text-slate-300">
-              ${(secG.advantages || []).map(a => `<li class="flex items-start space-x-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(a)}</span></li>`).join('')}
-            </ul>
+        <!-- PART 7: PRACTICAL DAILY APPLICATION -->
+        <div class="glass-panel p-6 rounded-2xl border border-teal-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-teal-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-extrabold text-xs">7</span>
+            <span>Practical Daily Application</span>
           </div>
-          <div class="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Core Limitations:</span>
-            <ul class="space-y-1.5 text-slate-300">
-              ${(secG.limitations || []).map(l => `<li class="flex items-start space-x-1.5"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(l)}</span></li>`).join('')}
-            </ul>
-          </div>
-          <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/20 space-y-2">
-            <span class="text-[11px] font-bold uppercase tracking-wider text-rose-300">Common Pitfalls:</span>
-            <ul class="space-y-1.5 text-slate-300">
-              ${(secG.common_pitfalls || []).map(p => `<li class="flex items-start space-x-1.5"><i data-lucide="x" class="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(p)}</span></li>`).join('')}
-            </ul>
+          <div class="p-4 rounded-xl bg-teal-950/20 border border-teal-500/20 text-xs sm:text-sm text-teal-100 leading-relaxed whitespace-pre-line">
+            🎯 ${this.renderMarkdown(md.practical_application || '')}
           </div>
         </div>
-      </div>
 
-      <!-- SECTION H: PRACTICAL APPLICATION FOR MBA & PRODUCT MANAGERS -->
-      <div class="glass-panel p-6 rounded-2xl border border-teal-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-teal-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-extrabold text-xs">H</span>
-          <span>Practical Application for MBA & Product Managers</span>
+        <!-- PART 8: COMMON MISUNDERSTANDING -->
+        <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 space-y-3 bg-rose-500/[0.01]">
+          <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center font-extrabold text-xs">8</span>
+            <span>Common Misunderstanding & Traps</span>
+          </div>
+          <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/20 text-xs sm:text-sm text-rose-200 leading-relaxed whitespace-pre-line">
+            ⚠️ ${this.renderMarkdown(md.common_misunderstanding || '')}
+          </div>
         </div>
-        <div class="space-y-2 text-xs sm:text-sm text-slate-200">
-          <p class="leading-relaxed"><strong class="text-white">Actionable Playbook:</strong> ${this.escapeHtml(secH.actionable_playbook || '')}</p>
-          ${secH.key_deliverables ? `<p class="leading-relaxed text-slate-300"><strong class="text-teal-300">Key Deliverables:</strong> ${this.escapeHtml(secH.key_deliverables)}</p>` : ''}
-          ${secH.cross_functional_alignment ? `<p class="leading-relaxed text-slate-300"><strong class="text-teal-300">Squad Alignment:</strong> ${this.escapeHtml(secH.cross_functional_alignment)}</p>` : ''}
-        </div>
-      </div>
 
-      <!-- SECTION I: HIGH-YIELD KEY TAKEAWAYS -->
-      <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
-        <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
-          <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">I</span>
-          <span>High-Yield Key Takeaways</span>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
-          ${(secI.takeaways || []).map(tk => `
-            <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-start space-x-2 text-slate-200">
-              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5"></i>
-              <span>${this.escapeHtml(tk)}</span>
+        <!-- PART 9: THREE QUESTIONS TO CHECK UNDERSTANDING -->
+        <div id="practice-check-section" class="glass-panel p-6 sm:p-8 rounded-2xl border border-amber-500/30 space-y-5 bg-amber-500/[0.01]">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+              <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">9</span>
+              <span>Three Questions to Check Understanding</span>
             </div>
-          `).join('')}
-        </div>
-      </div>
-
-      <!-- SECTION J: UNDERSTANDING CHECK (INTERACTIVE PRACTICE) -->
-      <div class="glass-panel p-6 sm:p-8 rounded-2xl border border-amber-500/30 space-y-5 bg-amber-500/[0.01]">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">J</span>
-            <span>Understanding Check (Interactive Practice)</span>
+            <span class="text-xs text-slate-400">${(md.check_questions || []).length} Quick Check Challenges</span>
           </div>
-          <span class="text-xs text-slate-400">${(secJ.questions || []).length} Practice Challenge Questions</span>
+
+          <div class="space-y-4">
+            ${(md.check_questions || []).map((q, qIdx) => `
+              <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-3" id="practice-card-${qIdx}">
+                <div class="flex items-center space-x-2 text-xs text-amber-300 font-semibold">
+                  <span>Question ${qIdx + 1}:</span>
+                  <span class="text-slate-400 font-normal">(${this.escapeHtml(q.type || 'Practice')})</span>
+                </div>
+                <p class="text-xs sm:text-sm font-semibold text-white leading-relaxed">${this.escapeHtml(q.question)}</p>
+                <div class="space-y-2">
+                  ${(q.options || []).map((opt, optIdx) => `
+                    <button 
+                      onclick="App.handlePracticeQuestionAnswer(${qIdx}, ${optIdx}, ${q.correct_index || 0}, '${this.escapeHtml(q.explanation || '')}')"
+                      class="practice-opt-btn-${qIdx} w-full text-left px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-sm text-slate-200 transition flex items-start space-x-2"
+                    >
+                      <span class="w-5 h-5 rounded-full bg-white/10 text-slate-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">${String.fromCharCode(65 + optIdx)}</span>
+                      <span>${this.escapeHtml(opt)}</span>
+                    </button>
+                  `).join('')}
+                </div>
+                <div id="practice-feedback-${qIdx}" class="hidden text-xs p-3.5 rounded-xl"></div>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 3. TEACHING MODE 2: MBA (The Business Professor - 11 Parts)
+    // ==========================================
+    else if (mode === 'MBA') {
+      const advLim = md.advantages_and_limitations || {};
+      const caseStudy = md.business_case_study || {};
+
+      html += `
+        <!-- MODE HEADER -->
+        <div class="p-4 rounded-2xl bg-blue-950/20 border border-blue-500/30 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="w-8 h-8 rounded-xl bg-blue-500/20 text-blue-300 font-bold flex items-center justify-center text-sm">🏛️</span>
+            <div>
+              <h4 class="text-sm font-bold text-white">MBA Mode: The Business Professor</h4>
+              <p class="text-[11px] text-blue-300/80">Executive frameworks • Strategic moats • Real-world corporate case studies</p>
+            </div>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-blue-500/10 text-blue-300 border border-blue-500/20">11-Part Masterclass</span>
         </div>
 
-        <div class="space-y-5">
-          ${(secJ.questions || []).map((q, qIdx) => `
-            <div class="p-4 rounded-xl bg-white/[0.03] border border-white/10 space-y-3" id="practice-card-${qIdx}">
-              <div class="flex items-center space-x-2 text-xs text-amber-300 font-semibold">
-                <span>Question ${qIdx + 1}:</span>
-                <span class="text-slate-400 font-normal">(${this.escapeHtml(q.type || 'Practice')})</span>
+        <!-- PART 1: DEFINITION -->
+        <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">1</span>
+            <span>Executive Definition</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.executive_definition || '')}
+          </div>
+        </div>
+
+        <!-- PART 2: BUSINESS CONTEXT -->
+        <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">2</span>
+            <span>Business Context & Macro Dynamics</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.business_context || '')}
+          </div>
+        </div>
+
+        <!-- PART 3: CONCEPTUAL EXPLANATION -->
+        <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">3</span>
+            <span>Conceptual Explanation & Foundations</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.conceptual_explanation || '')}
+          </div>
+        </div>
+
+        <!-- PART 4: HOW IT WORKS (OPERATIONAL MECHANICS) -->
+        <div class="glass-panel p-6 rounded-2xl border border-purple-500/20 space-y-4">
+          <div class="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-extrabold text-xs">4</span>
+            <span>Operational Mechanics (How It Works)</span>
+          </div>
+          <div class="space-y-2.5">
+            ${(md.operational_mechanics || []).map((step, sIdx) => `
+              <div class="flex items-start space-x-3 text-xs sm:text-sm text-slate-200 p-3 rounded-xl bg-white/[0.02] border border-white/5">
+                <span class="w-6 h-6 rounded-full bg-purple-500/20 text-purple-300 font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">${sIdx + 1}</span>
+                <span class="leading-relaxed">${this.escapeHtml(step)}</span>
               </div>
-              <p class="text-xs sm:text-sm font-semibold text-white leading-relaxed">${this.escapeHtml(q.question)}</p>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 5: RELEVANT MANAGEMENT FRAMEWORKS -->
+        <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">5</span>
+            <span>Relevant Management Frameworks</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${(md.management_frameworks || []).map(fw => `
+              <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-100 flex items-start space-x-2">
+                <i data-lucide="layers" class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5"></i>
+                <span>${this.escapeHtml(fw)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 6: REAL-WORLD BUSINESS EXAMPLE -->
+        <div class="glass-panel p-6 rounded-2xl border border-emerald-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-extrabold text-xs">6</span>
+            <span>Real-World Business Example</span>
+          </div>
+          <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed space-y-2">
+            <div class="flex items-center space-x-2 text-emerald-300 font-bold text-xs">
+              <i data-lucide="briefcase" class="w-4 h-4"></i>
+              <span>Company: ${this.escapeHtml(caseStudy.company || 'Enterprise Benchmark')}</span>
+            </div>
+            <p class="text-slate-300 leading-relaxed whitespace-pre-line">${this.renderMarkdown(caseStudy.case_study || '')}</p>
+          </div>
+        </div>
+
+        <!-- PART 7: MANAGERIAL & PRODUCT APPLICATION -->
+        <div class="glass-panel p-6 rounded-2xl border border-teal-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-teal-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-extrabold text-xs">7</span>
+            <span>Managerial & Product Application</span>
+          </div>
+          <div class="p-4 rounded-xl bg-teal-950/20 border border-teal-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.managerial_application || '')}
+          </div>
+        </div>
+
+        <!-- PART 8: STRATEGIC IMPLICATIONS -->
+        <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">8</span>
+            <span>Strategic Implications & Competitive Moats</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.strategic_implications || '')}
+          </div>
+        </div>
+
+        <!-- PART 9: ADVANTAGES AND LIMITATIONS -->
+        <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center font-extrabold text-xs">9</span>
+            <span>Advantages, Limitations & Common Pitfalls</span>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+            <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Strategic Advantages:</span>
+              <ul class="space-y-1.5 text-slate-300">
+                ${(advLim.advantages || []).map(a => `<li class="flex items-start space-x-1.5"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(a)}</span></li>`).join('')}
+              </ul>
+            </div>
+            <div class="p-4 rounded-xl bg-amber-950/20 border border-amber-500/20 space-y-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300">Core Limitations:</span>
+              <ul class="space-y-1.5 text-slate-300">
+                ${(advLim.limitations || []).map(l => `<li class="flex items-start space-x-1.5"><i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-amber-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(l)}</span></li>`).join('')}
+              </ul>
+            </div>
+            <div class="p-4 rounded-xl bg-rose-950/20 border border-rose-500/20 space-y-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-rose-300">Common Pitfalls:</span>
+              <ul class="space-y-1.5 text-slate-300">
+                ${(advLim.common_pitfalls || []).map(p => `<li class="flex items-start space-x-1.5"><i data-lucide="x" class="w-3.5 h-3.5 text-rose-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(p)}</span></li>`).join('')}
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- PART 10: KEY TAKEAWAYS -->
+        <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">10</span>
+            <span>Key Executive Takeaways</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs sm:text-sm">
+            ${(md.key_takeaways || []).map(tk => `
+              <div class="p-3.5 rounded-xl bg-white/[0.02] border border-white/5 flex items-start space-x-2 text-slate-200">
+                <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400 flex-shrink-0 mt-0.5"></i>
+                <span>${this.escapeHtml(tk)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 11: MBA-LEVEL DISCUSSION QUESTIONS -->
+        <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">11</span>
+            <span>MBA-Level Boardroom Discussion Questions</span>
+          </div>
+          <div class="space-y-2.5">
+            ${(md.discussion_questions || []).map((dq, dqIdx) => `
+              <div class="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 flex items-start space-x-2.5 text-xs sm:text-sm text-indigo-100">
+                <span class="font-bold text-indigo-300 flex-shrink-0">Q${dqIdx + 1}:</span>
+                <span class="leading-relaxed">${this.escapeHtml(dq)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 4. TEACHING MODE 3: EXAM (The MBA Examiner - Marking Schemes)
+    // ==========================================
+    else if (mode === 'Exam') {
+      const compTable = md.comparison_table || { headers: [], rows: [] };
+      const mnemonics = md.short_notes_and_mnemonics || {};
+
+      html += `
+        <!-- MODE HEADER -->
+        <div class="p-4 rounded-2xl bg-amber-950/20 border border-amber-500/30 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-300 font-bold flex items-center justify-center text-sm">📝</span>
+            <div>
+              <h4 class="text-sm font-bold text-white">Exam Mode: The MBA Examiner</h4>
+              <p class="text-[11px] text-amber-300/80">Structured marking schemes • 2, 5 & 10 Mark model answers • Comparison tables & mnemonics</p>
+            </div>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-amber-500/10 text-amber-300 border border-amber-500/20">University Marking Scheme</span>
+        </div>
+
+        <!-- 2-MARK ANSWER -->
+        <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+              <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">2M</span>
+              <span>2-Mark Model Answer (Concise Definition & Key Distinction)</span>
+            </div>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-cyan-500/20 text-cyan-300 border border-cyan-500/30">Target: 2 Marks</span>
+          </div>
+          <div class="p-4 rounded-xl bg-cyan-950/20 border border-cyan-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.two_mark_answer || '')}
+          </div>
+        </div>
+
+        <!-- 5-MARK ANSWER -->
+        <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+              <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">5M</span>
+              <span>5-Mark Model Answer (Intro, Theoretical Pillars & Example)</span>
+            </div>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Target: 5 Marks</span>
+          </div>
+          <div class="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.five_mark_answer || '')}
+          </div>
+        </div>
+
+        <!-- 10-MARK MASTER ANSWER -->
+        <div class="glass-panel p-6 rounded-2xl border border-purple-500/30 space-y-3 bg-purple-500/[0.01]">
+          <div class="flex items-center justify-between">
+            <div class="flex items-center space-x-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
+              <span class="w-6 h-6 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-extrabold text-xs">10M</span>
+              <span>10-Mark University Master Answer (Framework, Case & Evaluation)</span>
+            </div>
+            <span class="text-[11px] font-bold px-2 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">Target: 10 Marks</span>
+          </div>
+          <div class="p-5 rounded-xl bg-purple-950/20 border border-purple-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line space-y-3">
+            ${this.renderMarkdown(md.ten_mark_answer || '')}
+          </div>
+        </div>
+
+        <!-- STRUCTURED COMPARISON TABLE -->
+        ${compTable.headers && compTable.headers.length ? `
+          <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+            <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+              <i data-lucide="table" class="w-4 h-4"></i>
+              <span>High-Yield Comparison Table (Exam Evaluation)</span>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs text-slate-200 border-collapse">
+                <thead>
+                  <tr class="border-b border-white/10 bg-white/5">
+                    ${compTable.headers.map(h => `<th class="p-3 font-bold text-white">${this.escapeHtml(h)}</th>`).join('')}
+                  </tr>
+                </thead>
+                <tbody class="divide-y divide-white/5">
+                  ${(compTable.rows || []).map(r => `
+                    <tr class="hover:bg-white/[0.02]">
+                      ${r.map((cell, cIdx) => `<td class="p-3 ${cIdx === 0 ? 'font-semibold text-cyan-300' : ''}">${this.escapeHtml(cell)}</td>`).join('')}
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ` : ''}
+
+        <!-- FREQUENTLY CONFUSED CONCEPTS & TRAPS -->
+        <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+            <i data-lucide="alert-octagon" class="w-4 h-4 text-rose-400"></i>
+            <span>Frequently Confused Concepts & Examiner Traps</span>
+          </div>
+          <div class="space-y-2.5">
+            ${(md.frequently_confused_concepts || []).map(fc => `
+              <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-xs sm:text-sm text-rose-200 leading-relaxed whitespace-pre-line">
+                ${this.renderMarkdown(fc)}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- SHORT NOTES & MNEMONICS -->
+        <div class="glass-panel p-6 rounded-2xl border border-emerald-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+            <i data-lucide="zap" class="w-4 h-4 text-emerald-400"></i>
+            <span>Last-Minute Revision Mnemonics & Short Notes</span>
+          </div>
+          <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 space-y-2 text-xs sm:text-sm text-slate-200">
+            ${mnemonics.mnemonic ? `<p class="font-bold text-emerald-300 text-sm">💡 Mnemonic: ${this.escapeHtml(mnemonics.mnemonic)}</p>` : ''}
+            <ul class="space-y-1.5 text-slate-300 pt-1">
+              ${(mnemonics.bullet_notes || []).map(bn => `<li class="flex items-start space-x-2"><i data-lucide="check" class="w-3.5 h-3.5 text-emerald-400 flex-shrink-0 mt-0.5"></i><span>${this.escapeHtml(bn)}</span></li>`).join('')}
+            </ul>
+          </div>
+        </div>
+
+        <!-- PROBABLE EXAM QUESTIONS -->
+        <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <i data-lucide="help-circle" class="w-4 h-4 text-amber-400"></i>
+            <span>Top Probable University Examination Questions</span>
+          </div>
+          <div class="space-y-2.5">
+            ${(md.probable_exam_questions || []).map(q => `
+              <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-100 flex items-start space-x-2">
+                <i data-lucide="arrow-right" class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5"></i>
+                <span class="leading-relaxed">${this.escapeHtml(q)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 5. TEACHING MODE 4: EXPERT (The Industry Specialist - 10 Parts)
+    // ==========================================
+    else if (mode === 'Expert') {
+      html += `
+        <!-- MODE HEADER -->
+        <div class="p-4 rounded-2xl bg-purple-950/20 border border-purple-500/30 flex items-center justify-between">
+          <div class="flex items-center space-x-3">
+            <span class="w-8 h-8 rounded-xl bg-purple-500/20 text-purple-300 font-bold flex items-center justify-center text-sm">⚡</span>
+            <div>
+              <h4 class="text-sm font-bold text-white">Expert Mode: The Industry Specialist</h4>
+              <p class="text-[11px] text-purple-300/80">First-principles axioms • Systems architecture • Production trade-offs & edge cases</p>
+            </div>
+          </div>
+          <span class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-purple-500/10 text-purple-300 border border-purple-500/20">Staff-Level Architectural Depth</span>
+        </div>
+
+        <!-- PART 1: ADVANCED DEFINITION -->
+        <div class="glass-panel p-6 rounded-2xl border border-blue-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-blue-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-300 flex items-center justify-center font-extrabold text-xs">1</span>
+            <span>Advanced Architectural Definition</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.advanced_definition || '')}
+          </div>
+        </div>
+
+        <!-- PART 2: FIRST-PRINCIPLES FOUNDATION -->
+        <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">2</span>
+            <span>First-Principles Foundation (Axioms)</span>
+          </div>
+          <div class="space-y-2">
+            ${(md.first_principles || []).map(ax => `
+              <div class="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 text-xs sm:text-sm text-indigo-100 flex items-start space-x-2.5">
+                <i data-lucide="binary" class="w-4 h-4 text-indigo-400 flex-shrink-0 mt-0.5"></i>
+                <span class="leading-relaxed">${this.escapeHtml(ax)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 3: TECHNICAL MECHANISM -->
+        <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">3</span>
+            <span>Technical Mechanism & Data Flow</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.technical_mechanism || '')}
+          </div>
+        </div>
+
+        <!-- PART 4: SYSTEMS ARCHITECTURE DIAGRAM -->
+        ${md.architecture_diagram ? `
+          <div class="glass-panel p-6 rounded-2xl border border-cyan-500/20 space-y-3">
+            <div class="flex items-center space-x-2 text-cyan-400 font-bold text-xs uppercase tracking-wider">
+              <span class="w-6 h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center font-extrabold text-xs">4</span>
+              <span>Systems Architecture & Operating Diagram</span>
+            </div>
+            <pre class="font-mono text-xs text-cyan-300 bg-black/60 p-4 rounded-xl border border-cyan-500/30 overflow-x-auto leading-relaxed">${this.escapeHtml(md.architecture_diagram)}</pre>
+          </div>
+        ` : ''}
+
+        <!-- PART 5: ADVANCED INDUSTRY FRAMEWORKS -->
+        <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">5</span>
+            <span>Production-Grade Industry Frameworks</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            ${(md.advanced_frameworks || []).map(af => `
+              <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-100 flex items-start space-x-2">
+                <i data-lucide="cpu" class="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5"></i>
+                <span>${this.escapeHtml(af)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 6: PRODUCTION-GRADE INDUSTRY APPLICATION -->
+        <div class="glass-panel p-6 rounded-2xl border border-emerald-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-emerald-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-extrabold text-xs">6</span>
+            <span>Production-Grade Hyperscale Implementation</span>
+          </div>
+          <div class="p-4 rounded-xl bg-emerald-950/20 border border-emerald-500/20 text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.industry_application || '')}
+          </div>
+        </div>
+
+        <!-- PART 7: STRATEGIC & ARCHITECTURAL TRADE-OFFS -->
+        <div class="glass-panel p-6 rounded-2xl border border-rose-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center font-extrabold text-xs">7</span>
+            <span>Strategic & Architectural Trade-offs</span>
+          </div>
+          <div class="space-y-2">
+            ${(md.strategic_trade_offs || []).map(to => `
+              <div class="p-3.5 rounded-xl bg-rose-950/20 border border-rose-500/20 text-xs sm:text-sm text-rose-200 flex items-start space-x-2">
+                <i data-lucide="scale" class="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5"></i>
+                <span class="leading-relaxed">${this.escapeHtml(to)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 8: FAILURE MODES & RISK MITIGATION -->
+        <div class="glass-panel p-6 rounded-2xl border border-amber-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-300 flex items-center justify-center font-extrabold text-xs">8</span>
+            <span>Failure Modes, Edge Cases & Runbooks</span>
+          </div>
+          <div class="space-y-2">
+            ${(md.failure_modes_and_risks || []).map(fm => `
+              <div class="p-3.5 rounded-xl bg-amber-950/20 border border-amber-500/20 text-xs sm:text-sm text-amber-200 leading-relaxed whitespace-pre-line">
+                ⚠️ ${this.escapeHtml(fm)}
+              </div>
+            `).join('')}
+          </div>
+        </div>
+
+        <!-- PART 9: CRITICAL ANALYSIS -->
+        <div class="glass-panel p-6 rounded-2xl border border-teal-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-teal-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-teal-500/20 text-teal-300 flex items-center justify-center font-extrabold text-xs">9</span>
+            <span>Critical Nuance & Analysis</span>
+          </div>
+          <div class="text-xs sm:text-sm text-slate-200 leading-relaxed whitespace-pre-line">
+            ${this.renderMarkdown(md.critical_analysis || '')}
+          </div>
+        </div>
+
+        <!-- PART 10: STAFF-LEVEL DEFENSE QUESTIONS -->
+        <div class="glass-panel p-6 rounded-2xl border border-indigo-500/20 space-y-3">
+          <div class="flex items-center space-x-2 text-indigo-400 font-bold text-xs uppercase tracking-wider">
+            <span class="w-6 h-6 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center font-extrabold text-xs">10</span>
+            <span>Staff / Principal Level Defense Questions</span>
+          </div>
+          <div class="space-y-2.5">
+            ${(md.advanced_defense_questions || []).map((adq, aIdx) => `
+              <div class="p-3.5 rounded-xl bg-indigo-950/20 border border-indigo-500/20 flex items-start space-x-2.5 text-xs sm:text-sm text-indigo-100">
+                <span class="font-bold text-indigo-300 flex-shrink-0">Q${aIdx + 1}:</span>
+                <span class="leading-relaxed">${this.escapeHtml(adq)}</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 6. INTERACTIVE PRACTICAL BUSINESS CASE ENGINE WIDGET
+    // ==========================================
+    const bc = pkg.interactive_business_case;
+    if (bc) {
+      html += `
+        <div id="business-case-card" class="glass-panel-elevated p-6 sm:p-8 rounded-3xl border border-blue-500/30 space-y-5 bg-gradient-to-br from-blue-950/20 to-indigo-950/20">
+          <div class="flex items-center justify-between border-b border-white/10 pb-3">
+            <div class="flex items-center space-x-2.5">
+              <span class="w-8 h-8 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold">
+                <i data-lucide="briefcase" class="w-4 h-4"></i>
+              </span>
+              <div>
+                <h3 class="text-sm sm:text-base font-bold text-white">${this.escapeHtml(bc.title || 'Executive Decision Challenge')}</h3>
+                <p class="text-[11px] text-slate-400">Company: ${this.escapeHtml(bc.company || 'Enterprise Leader')}</p>
+              </div>
+            </div>
+            <span class="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">Interactive Simulation</span>
+          </div>
+
+          <div class="space-y-3 text-xs sm:text-sm text-slate-200">
+            <p class="leading-relaxed"><strong class="text-white">Situation:</strong> ${this.escapeHtml(bc.situation || '')}</p>
+            <div class="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-200 font-medium">
+              ⚡ <strong>Executive Dilemma:</strong> ${this.escapeHtml(bc.dilemma || '')}
+            </div>
+          </div>
+
+          <!-- Options -->
+          <div class="space-y-2.5 pt-2">
+            <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Choose Your Executive Action:</span>
+            ${(bc.options || []).map(opt => `
+              <button 
+                onclick="App.selectBusinessCaseOption('${opt.id}')"
+                data-opt-id="${opt.id}"
+                class="bc-opt-btn w-full text-left p-3.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition flex items-start space-x-3"
+              >
+                <span class="w-6 h-6 rounded-full bg-white/10 text-white font-bold text-xs flex items-center justify-center flex-shrink-0 mt-0.5">${opt.id}</span>
+                <div class="space-y-1">
+                  <span class="font-bold text-white text-xs sm:text-sm block">${this.escapeHtml(opt.title)}</span>
+                  <p class="text-xs text-slate-300 leading-relaxed">${this.escapeHtml(opt.description)}</p>
+                </div>
+              </button>
+            `).join('')}
+          </div>
+
+          <!-- Revealable Professor Solution -->
+          <div id="bc-professor-solution" class="hidden p-5 rounded-2xl bg-emerald-950/30 border border-emerald-500/30 space-y-3 animate-fade-in text-xs sm:text-sm">
+            <div class="flex items-center space-x-2 text-emerald-300 font-bold text-xs uppercase tracking-wider">
+              <i data-lucide="check-circle" class="w-4 h-4 text-emerald-400"></i>
+              <span>Professor Solution: Option ${this.escapeHtml(bc.recommended_option || 'B')} is Optimal</span>
+            </div>
+            <p class="text-slate-200 leading-relaxed">${this.escapeHtml(bc.professor_rationale || '')}</p>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 text-xs">
+              <div class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                <span class="font-bold text-amber-300">Managed Risks:</span>
+                <p class="text-slate-300">${this.escapeHtml(bc.risks || '')}</p>
+              </div>
+              <div class="p-3 rounded-xl bg-black/40 border border-white/5 space-y-1">
+                <span class="font-bold text-emerald-300">Expected Outcome:</span>
+                <p class="text-slate-300">${this.escapeHtml(bc.expected_outcome || '')}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ==========================================
+    // 7. SMART CONCEPT CONNECTIONS & PREREQUISITES
+    // ==========================================
+    const cc = pkg.concept_connections;
+    if (cc && ((cc.prerequisites && cc.prerequisites.length) || (cc.related_concepts && cc.related_concepts.length))) {
+      html += `
+        <div class="glass-panel p-6 rounded-2xl border border-white/10 space-y-4">
+          <div class="flex items-center space-x-2 text-slate-300 font-bold text-xs uppercase tracking-wider">
+            <i data-lucide="git-merge" class="w-4 h-4 text-blue-400"></i>
+            <span>Smart Concept Connections & Curriculum Roadmap</span>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+            <!-- Prerequisites -->
+            <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-amber-300 flex items-center space-x-1.5">
+                <i data-lucide="arrow-left-circle" class="w-3.5 h-3.5"></i>
+                <span>Prerequisite Concepts:</span>
+              </span>
               <div class="space-y-2">
-                ${(q.options || []).map((opt, optIdx) => `
-                  <button 
-                    onclick="App.handlePracticeQuestionAnswer(${qIdx}, ${optIdx}, ${q.correct_index || 0}, '${this.escapeHtml(q.explanation || '')}')"
-                    class="practice-opt-btn-${qIdx} w-full text-left px-4 py-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-xs sm:text-sm text-slate-200 transition flex items-start space-x-2"
-                  >
-                    <span class="w-5 h-5 rounded-full bg-white/10 text-slate-300 font-bold text-[11px] flex items-center justify-center flex-shrink-0 mt-0.5">${String.fromCharCode(65 + optIdx)}</span>
-                    <span>${this.escapeHtml(opt)}</span>
-                  </button>
+                ${(cc.prerequisites || []).map(pre => `
+                  <div class="p-2.5 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span class="font-semibold text-white block">${this.escapeHtml(pre.concept_name)}</span>
+                      <span class="text-[10px] text-slate-400">${this.escapeHtml(pre.reason)}</span>
+                    </div>
+                    <button 
+                      onclick="App.selectConceptByName('${this.escapeHtml(pre.concept_name)}')"
+                      class="px-2.5 py-1 rounded bg-blue-600/30 hover:bg-blue-600/50 text-blue-300 text-[10px] font-bold transition flex-shrink-0 ml-2"
+                    >
+                      Review
+                    </button>
+                  </div>
                 `).join('')}
               </div>
-              <div id="practice-feedback-${qIdx}" class="hidden text-xs p-3.5 rounded-xl"></div>
             </div>
-          `).join('')}
+
+            <!-- Related Concepts -->
+            <div class="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-2">
+              <span class="text-[11px] font-bold uppercase tracking-wider text-cyan-300 flex items-center space-x-1.5">
+                <i data-lucide="arrow-right-circle" class="w-3.5 h-3.5"></i>
+                <span>Connected Concepts:</span>
+              </span>
+              <div class="space-y-2">
+                ${(cc.related_concepts || []).map(rel => `
+                  <div class="p-2.5 rounded-lg bg-black/30 border border-white/5 flex items-center justify-between">
+                    <div>
+                      <span class="font-semibold text-white block">${this.escapeHtml(rel.concept_name)}</span>
+                      <span class="text-[10px] text-slate-400">${this.escapeHtml(rel.relationship)}</span>
+                    </div>
+                    <button 
+                      onclick="App.selectConceptByName('${this.escapeHtml(rel.concept_name)}')"
+                      class="px-2.5 py-1 rounded bg-cyan-600/30 hover:bg-cyan-600/50 text-cyan-300 text-[10px] font-bold transition flex-shrink-0 ml-2"
+                    >
+                      Explore
+                    </button>
+                  </div>
+                `).join('')}
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
-    `;
+      `;
+    }
 
     container.innerHTML = html;
+    this.initLucide();
+  },
+
+  selectBusinessCaseOption(optId) {
+    document.querySelectorAll('.bc-opt-btn').forEach(btn => {
+      const id = btn.getAttribute('data-opt-id');
+      if (id === optId) {
+        btn.className = 'bc-opt-btn w-full text-left p-3.5 rounded-xl border border-blue-500 bg-blue-500/20 text-white font-medium transition flex items-start space-x-3 shadow-md shadow-blue-500/10';
+      } else {
+        btn.className = 'bc-opt-btn w-full text-left p-3.5 rounded-xl border border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 transition flex items-start space-x-3';
+      }
+    });
+
+    const solEl = document.getElementById('bc-professor-solution');
+    if (solEl) {
+      solEl.classList.remove('hidden');
+    }
+    this.initLucide();
+  },
+
+  async toggleFloatingChat(open) {
+    const drawer = document.getElementById('floating-chatbot-drawer');
+    if (!drawer) return;
+
+    const shouldOpen = open !== undefined ? open : drawer.classList.contains('translate-x-full');
+
+    if (shouldOpen) {
+      drawer.classList.remove('translate-x-full');
+
+      const sub = document.getElementById('floating-chat-context-sub');
+      const conceptBadge = document.getElementById('fc-badge-concept');
+      const slideBadge = document.getElementById('fc-badge-slide');
+      const modeBadge = document.getElementById('fc-badge-mode');
+
+      if (this.state.currentDocName && sub) {
+        sub.innerText = `${this.state.currentDocName}`;
+      }
+      if (conceptBadge) conceptBadge.innerText = this.state.activeConceptName || 'Active Topic';
+      if (slideBadge) slideBadge.innerText = `Slide ${this.state.currentSlideNumber || 1}`;
+      if (modeBadge) modeBadge.innerText = `${this.state.teachingMode || 'MBA'} Mode`;
+
+      if (this.state.currentDocId) {
+        await this.loadPresentationChatHistory(this.state.currentDocId);
+      }
+      this.renderFloatingChatMessages();
+    } else {
+      drawer.classList.add('translate-x-full');
+    }
+  },
+
+  renderFloatingChatMessages() {
+    const container = document.getElementById('floating-chat-messages');
+    if (!container) return;
+
+    const msgs = this.state.chatMessages || [];
+    if (msgs.length === 0) {
+      container.innerHTML = `
+        <div class="text-center py-8 text-slate-400 space-y-2">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/10 text-blue-400 mx-auto flex items-center justify-center">
+            <i data-lucide="bot" class="w-5 h-5"></i>
+          </div>
+          <p class="text-xs text-slate-300 font-semibold">Hello Vishal! I am your AI Professor.</p>
+          <p class="text-[11px] text-slate-400 max-w-xs mx-auto">Ask any question about Slide ${this.state.currentSlideNumber || 1} or click the quick prompt chips above.</p>
+        </div>
+      `;
+      this.initLucide();
+      return;
+    }
+
+    container.innerHTML = msgs.map(m => {
+      const isUser = m.role === 'user';
+      return `
+        <div class="flex items-start space-x-2.5 ${isUser ? 'flex-row-reverse space-x-reverse' : ''}">
+          <div class="w-7 h-7 rounded-lg ${isUser ? 'bg-blue-600 text-white' : 'bg-indigo-600/30 text-indigo-300 border border-indigo-500/30'} flex items-center justify-center font-bold text-xs flex-shrink-0">
+            ${isUser ? 'VS' : '<i data-lucide="bot" class="w-3.5 h-3.5"></i>'}
+          </div>
+          <div class="max-w-[85%] rounded-2xl p-3 text-xs leading-relaxed ${isUser ? 'bg-blue-600 text-white shadow-sm' : 'glass-panel border border-white/10 text-slate-200'}">
+            ${isUser ? this.escapeHtml(m.content) : this.renderMarkdown(m.content)}
+            ${m.citation ? `<p class="mt-2 text-[10px] text-cyan-300/80 font-mono">${this.escapeHtml(m.citation)}</p>` : ''}
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    container.scrollTop = container.scrollHeight;
+    this.initLucide();
+  },
+
+  async handleFloatingChatSubmit(e) {
+    if (e) e.preventDefault();
+    const input = document.getElementById('floating-chat-input');
+    if (!input) return;
+    const query = input.value.trim();
+    if (!query) return;
+
+    input.value = '';
+    await this.sendFloatingChatQuery(query);
+  },
+
+  async sendFloatingChatPrompt(text) {
+    await this.sendFloatingChatQuery(text);
+  },
+
+  async sendFloatingChatQuery(query) {
+    if (!this.state.currentDocId) {
+      this.showToast('Please open a presentation to chat with the professor', 'warning');
+      return;
+    }
+
+    const thinking = document.getElementById('floating-chat-thinking');
+    if (thinking) thinking.classList.remove('hidden');
+
+    this.state.chatMessages = this.state.chatMessages || [];
+    this.state.chatMessages.push({ role: 'user', content: query });
+    this.renderFloatingChatMessages();
+
+    try {
+      const resp = await API.presentationTutorChat(
+        this.state.currentDocId,
+        query,
+        this.state.activeConceptName || 'Overview',
+        this.state.currentSlideNumber || 1,
+        this.state.teachingMode || 'MBA',
+        this.state.chatMessages
+      );
+
+      this.state.chatMessages.push({
+        role: 'tutor',
+        content: resp.reply,
+        citation: resp.citation
+      });
+
+      this.renderFloatingChatMessages();
+      this.renderChatMessages();
+    } catch (err) {
+      this.showToast(err.message || 'Chat error', 'error');
+    } finally {
+      if (thinking) thinking.classList.add('hidden');
+    }
   },
 
   async handlePracticeQuestionAnswer(qIdx, selectedOptIdx, correctIdx, explanation) {
@@ -3152,21 +3882,7 @@ export const App = {
     }
   },
 
-  setTeachingMode(mode) {
-    this.currentTeachingMode = mode;
-    document.querySelectorAll('.tutor-mode-pill').forEach(btn => {
-      if (btn.getAttribute('data-tutor-mode') === mode) {
-        btn.className = 'tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 shadow-sm transition';
-      } else {
-        btn.className = 'tutor-mode-pill px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 hover:text-white transition';
-      }
-    });
-    const label = document.getElementById('current-tutor-mode-label');
-    if (label) {
-      const modeNames = { Beginner: '🌱 Beginner (ELI5)', MBA: '🏛️ MBA Professor', Exam: '📝 Exam Prep', Expert: '⚡ C-Suite Expert' };
-      label.innerText = modeNames[mode] || mode;
-    }
-  },
+
 
   currentTutorAbortController: null,
   lastTutorQuery: '',
@@ -4318,18 +5034,7 @@ export const App = {
   ],
 
   handleMascotClick() {
-    const speech = document.getElementById('mascot-speech');
-    const textEl = document.getElementById('mascot-speech-text');
-    if (!speech || !textEl) return;
-
-    if (!speech.classList.contains('hidden')) {
-      speech.classList.add('hidden');
-    } else {
-      const tip = this.mascotTips[Math.floor(Math.random() * this.mascotTips.length)];
-      textEl.innerText = tip;
-      speech.classList.remove('hidden');
-      setTimeout(() => { speech.classList.add('hidden'); }, 7000);
-    }
+    this.toggleFloatingChat(true);
   },
   handleSearch(query) {
     const dropdown = document.getElementById('search-dropdown');

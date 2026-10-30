@@ -1412,11 +1412,20 @@ class TutorChatRequest(BaseModel):
     query: str
     concept_name: str
     slide_number: Optional[int] = 1
+    teaching_mode: Optional[str] = "MBA"
+    conversation_history: Optional[List[Dict[str, Any]]] = []
 
 @app.post("/api/presentations/{doc_id}/chat")
 def api_presentation_tutor_chat(doc_id: str, req: TutorChatRequest):
     try:
-        resp = process_tutor_conversation(doc_id, req.query, req.concept_name, req.slide_number or 1)
+        resp = process_tutor_conversation(
+            doc_id, 
+            req.query, 
+            req.concept_name, 
+            req.slide_number or 1,
+            teaching_mode=req.teaching_mode or "MBA",
+            conversation_history=req.conversation_history or []
+        )
         return resp
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

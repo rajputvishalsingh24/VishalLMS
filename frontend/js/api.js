@@ -407,11 +407,17 @@ export const API = {
     return res.json();
   },
 
-  async presentationTutorChat(docId, query, conceptName, slideNumber = 1) {
+  async presentationTutorChat(docId, query, conceptName, slideNumber = 1, teachingMode = 'MBA', conversationHistory = []) {
     const res = await fetch(`/api/presentations/${docId}/chat`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query, concept_name: conceptName, slide_number: slideNumber })
+      body: JSON.stringify({ 
+        query, 
+        concept_name: conceptName, 
+        slide_number: slideNumber,
+        teaching_mode: teachingMode,
+        conversation_history: conversationHistory
+      })
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

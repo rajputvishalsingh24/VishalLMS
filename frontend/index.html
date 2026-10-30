@@ -662,6 +662,9 @@
             </div>
           </div>
 
+          <!-- ADAPTIVE TEACHING RECOMMENDATION BANNER -->
+          <div id="adaptive-recommendation-banner" class="hidden mb-6"></div>
+
           <!-- 10 SECTIONS PEDAGOGICAL CONTAINER (A through J) -->
           <div id="concept-sections-container" class="space-y-6 text-sm sm:text-base leading-relaxed text-slate-200"></div>
 
@@ -1597,11 +1600,82 @@
     <div id="mascot-speech" class="mascot-speech-bubble hidden">
       <span id="mascot-speech-text">Welcome Vishal! Keep up your study streak.</span>
     </div>
-    <div class="mascot-avatar" onclick="App.handleMascotClick()" title="Ask Nova for a study tip">
+    <div class="mascot-avatar" onclick="App.handleMascotClick()" title="Ask AI Professor Nova">
       <div class="mascot-avatar-inner">
         <i data-lucide="bot" class="w-6 h-6 text-white"></i>
       </div>
     </div>
+  </div>
+
+  <!-- ==================== CONTEXTUAL FLOATING AI PROFESSOR CHATBOT DRAWER ==================== -->
+  <div id="floating-chatbot-drawer" class="fixed inset-y-0 right-0 z-50 w-full sm:w-[460px] bg-[#0E1626] border-l border-white/10 shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out">
+    <!-- Header -->
+    <div class="p-4 border-b border-white/10 flex items-center justify-between bg-black/30 backdrop-blur-md">
+      <div class="flex items-center space-x-3">
+        <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 flex items-center justify-center text-white shadow-md flex-shrink-0">
+          <i data-lucide="bot" class="w-5 h-5"></i>
+        </div>
+        <div>
+          <h3 class="text-sm font-bold text-white flex items-center space-x-2">
+            <span>AI Professor Nova</span>
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+          </h3>
+          <p id="floating-chat-context-sub" class="text-[11px] text-slate-400 truncate max-w-[260px]">Context: Active Slide Q&A</p>
+        </div>
+      </div>
+      <button onclick="App.toggleFloatingChat(false)" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+    </div>
+
+    <!-- Active Context Badges -->
+    <div id="floating-chat-badges" class="px-4 py-2 bg-white/[0.02] border-b border-white/5 flex flex-wrap gap-1.5 text-[10px]">
+      <span id="fc-badge-concept" class="px-2 py-0.5 rounded-md bg-blue-500/20 text-blue-300 font-semibold border border-blue-500/30">Concept</span>
+      <span id="fc-badge-slide" class="px-2 py-0.5 rounded-md bg-indigo-500/20 text-indigo-300 font-semibold border border-indigo-500/30">Slide 1</span>
+      <span id="fc-badge-mode" class="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/30">MBA Mode</span>
+    </div>
+
+    <!-- Quick Prompts Chips -->
+    <div class="px-4 py-2 border-b border-white/5 flex items-center gap-1.5 overflow-x-auto text-[11px]">
+      <button onclick="App.sendFloatingChatPrompt('Give me another practical business example for this')" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 whitespace-nowrap transition">
+        💡 Another Example
+      </button>
+      <button onclick="App.sendFloatingChatPrompt('Explain this in simpler terms with an everyday analogy')" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 whitespace-nowrap transition">
+        🌱 Simpler Analogy
+      </button>
+      <button onclick="App.sendFloatingChatPrompt('What is a high-yield exam question for this topic?')" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 whitespace-nowrap transition">
+        📝 Exam Question
+      </button>
+      <button onclick="App.sendFloatingChatPrompt('Explain this in conversational Hinglish')" class="px-2.5 py-1 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 whitespace-nowrap transition">
+        🇮🇳 Hinglish
+      </button>
+    </div>
+
+    <!-- Messages Container -->
+    <div id="floating-chat-messages" class="flex-1 p-4 overflow-y-auto space-y-3.5 text-xs sm:text-sm"></div>
+
+    <!-- Thinking indicator -->
+    <div id="floating-chat-thinking" class="hidden px-4 py-2 flex items-center space-x-2 text-xs text-blue-400 bg-blue-500/10 border-t border-blue-500/20">
+      <div class="thinking-wave">
+        <span class="thinking-dot"></span>
+        <span class="thinking-dot"></span>
+        <span class="thinking-dot"></span>
+      </div>
+      <span class="font-medium text-[11px]">Professor Nova is searching slides & external knowledge...</span>
+    </div>
+
+    <!-- Input Form -->
+    <form onsubmit="App.handleFloatingChatSubmit(event)" class="p-3 border-t border-white/10 bg-black/40 flex items-center gap-2">
+      <input 
+        id="floating-chat-input" 
+        type="text" 
+        placeholder="Ask Professor Nova about this slide..." 
+        class="flex-1 px-3.5 py-2.5 text-xs bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 placeholder-slate-400"
+      >
+      <button type="submit" class="p-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white shadow-md transition flex items-center justify-center flex-shrink-0">
+        <i data-lucide="send" class="w-4 h-4"></i>
+      </button>
+    </form>
   </div>
 
   <!-- ==================== MODALS ==================== -->
