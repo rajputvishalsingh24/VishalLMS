@@ -1301,8 +1301,6 @@ export const App = {
     }
     this.initLucide();
   },
-    this.initLucide();
-  },
 
   // --- TAB 4: ASK AI (DUAL KNOWLEDGE CHAT) ---
   async loadPresentationChatHistory(docId) {
@@ -2566,13 +2564,9 @@ export const App = {
   },
 
   // ==================== 5. PPT UPLOAD EXPERIENCE (7 STAGES) ====================
-  async openUploadPptModal(preselectedSubjectId = null) {
+  openUploadPptModal(preselectedSubjectId = null) {
     this.state.selectedUploadFile = null;
     this.state.uploadTargetSubjectId = preselectedSubjectId;
-
-    if (!this.state.subjects || this.state.subjects.length === 0) {
-      await this.loadSubjects();
-    }
 
     const fileInput = document.getElementById('modal-ppt-file-input');
     if (fileInput) fileInput.value = '';
@@ -2587,16 +2581,19 @@ export const App = {
       submitBtn.innerHTML = `<span>Upload & Analyze</span>`;
     }
 
-    const select = document.getElementById('modal-upload-subject-select');
-    if (select) {
-      if (this.state.subjects && this.state.subjects.length > 0) {
-        select.innerHTML = this.state.subjects.map(s => `
-          <option value="${s.id}" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
-        `).join('');
-      } else {
-        select.innerHTML = `<option value="">MBA Core Curriculum</option>`;
+    const updateSelect = () => {
+      const select = document.getElementById('modal-upload-subject-select');
+      if (select) {
+        if (this.state.subjects && this.state.subjects.length > 0) {
+          select.innerHTML = this.state.subjects.map(s => `
+            <option value="${s.id}" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
+          `).join('');
+        } else {
+          select.innerHTML = `<option value="">MBA Core Curriculum</option>`;
+        }
       }
-    }
+    };
+    updateSelect();
 
     const errorBox = document.getElementById('modal-upload-error-box');
     const errorText = document.getElementById('modal-upload-error');
@@ -2610,6 +2607,10 @@ export const App = {
 
     document.getElementById('modal-upload-ppt')?.classList.remove('hidden');
     this.initLucide();
+
+    if (!this.state.subjects || this.state.subjects.length === 0) {
+      this.loadSubjects().then(() => updateSelect());
+    }
   },
 
   openUploadPptForCurrentSubject() {
@@ -4058,7 +4059,13 @@ export const App = {
   }
 };
 
-// Auto-boot on DOM ready
-document.addEventListener('DOMContentLoaded', () => {
+window.App = App;
+
+// Auto-boot reliably whether DOM is already parsed or still loading
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => {
+    App.init();
+  });
+} else {
   App.init();
-});
+}
