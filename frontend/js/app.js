@@ -2726,33 +2726,52 @@ export const App = {
   // ==================== 5. PPT UPLOAD EXPERIENCE (7 STAGES) ====================
   openUploadPptModal(preselectedSubjectId = null) {
     this.state.selectedUploadFile = null;
-    this.state.uploadTargetSubjectId = preselectedSubjectId;
+    
+    // Auto-detect target subject if preselected or currently inside subject workspace
+    let targetSubjectId = preselectedSubjectId;
+    if (!targetSubjectId && this.state.currentSubject && this.state.currentSubject.id) {
+      targetSubjectId = this.state.currentSubject.id;
+    }
+    this.state.uploadTargetSubjectId = targetSubjectId;
 
     const fileInput = document.getElementById('modal-ppt-file-input');
     if (fileInput) fileInput.value = '';
-    const title = document.getElementById('dropzone-text-title');
-    const subtitle = document.getElementById('dropzone-text-subtitle');
-    if (title) title.innerText = 'Click to browse or drag and drop presentation';
-    if (subtitle) subtitle.innerText = 'Accepts PowerPoint (.ppt, .pptx), PDF (.pdf), Word (.docx) & Notes (.txt, .md)';
-    
-    const submitBtn = document.getElementById('modal-upload-submit-btn');
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.innerHTML = `<span>Upload & Process Presentation</span>`;
+
+    // Reset dropzone views
+    const emptyView = document.getElementById('dropzone-empty-view');
+    const selectedView = document.getElementById('dropzone-selected-view');
+    if (emptyView) emptyView.classList.remove('hidden');
+    if (selectedView) selectedView.classList.add('hidden');
+
+    const dropzone = document.getElementById('upload-dropzone');
+    if (dropzone) {
+      dropzone.classList.remove('border-blue-500', 'bg-blue-500/10');
     }
 
     const updateSelect = () => {
       const select = document.getElementById('modal-upload-subject-select');
+      const status = document.getElementById('modal-upload-subject-status');
       if (select) {
         if (this.state.subjects && this.state.subjects.length > 0) {
-          select.innerHTML = this.state.subjects.map(s => `
-            <option value="${s.id}" class="bg-[#131B2E] text-slate-100 py-1" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
-          `).join('');
+          if (status) status.innerText = `${this.state.subjects.length} subjects available`;
+          const activeTarget = this.state.uploadTargetSubjectId;
+          select.innerHTML = `
+            <option value="" disabled ${!activeTarget ? 'selected' : ''} class="bg-[#131B2E] text-slate-400">Choose a subject to link presentation...</option>
+            ${this.state.subjects.map(s => `
+              <option value="${s.id}" class="bg-[#131B2E] text-slate-100 py-1" ${s.id === activeTarget ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
+            `).join('')}
+          `;
+          if (activeTarget) {
+            select.value = activeTarget;
+          }
         } else {
+          if (status) status.innerText = 'No subjects';
           select.innerHTML = `<option value="" disabled selected class="bg-[#131B2E] text-slate-400">No subjects available — Create a subject first</option>`;
         }
       }
+      this.checkUploadButtonState();
     };
+
     updateSelect();
 
     const errorBox = document.getElementById('modal-upload-error-box');
@@ -2760,16 +2779,47 @@ export const App = {
     if (errorBox) errorBox.classList.add('hidden');
     if (errorText) errorText.innerText = '';
 
+    // Ensure form view is visible and other states hidden
     document.getElementById('upload-stage-form')?.classList.remove('hidden');
+    document.getElementById('upload-stage-form-footer')?.classList.remove('hidden');
     document.getElementById('upload-stage-processing')?.classList.add('hidden');
     document.getElementById('upload-stage-success')?.classList.add('hidden');
     document.getElementById('upload-modal-close-btn')?.classList.remove('hidden');
 
     document.getElementById('modal-upload-ppt')?.classList.remove('hidden');
+    this.checkUploadButtonState();
     this.initLucide();
 
     if (!this.state.subjects || this.state.subjects.length === 0) {
       this.loadSubjects().then(() => updateSelect());
+    }
+  },
+
+  handleUploadSubjectChange(subjectId) {
+    this.state.uploadTargetSubjectId = subjectId || null;
+    this.checkUploadButtonState();
+  },
+
+  checkUploadButtonState() {
+    const submitBtn = document.getElementById('modal-upload-submit-btn');
+    if (!submitBtn) return;
+
+    const select = document.getElementById('modal-upload-subject-select');
+    const selectedSubjectId = select ? select.value : this.state.uploadTargetSubjectId;
+    const hasSubject = Boolean(selectedSubjectId && selectedSubjectId.trim() !== '');
+    const hasFile = Boolean(this.state.selectedUploadFile);
+
+    const isReady = hasSubject && hasFile;
+    submitBtn.disabled = !isReady;
+
+    if (isReady) {
+      submitBtn.removeAttribute('title');
+    } else if (!hasSubject && !hasFile) {
+      submitBtn.setAttribute('title', 'Please choose a subject and select a presentation file');
+    } else if (!hasSubject) {
+      submitBtn.setAttribute('title', 'Please choose a subject to link presentation');
+    } else if (!hasFile) {
+      submitBtn.setAttribute('title', 'Please select a presentation file');
     }
   },
 
@@ -2819,45 +2869,84 @@ export const App = {
     const allowedExts = ['ppt', 'pptx', 'pdf', 'docx', 'doc', 'txt', 'md'];
     if (!allowedExts.includes(ext)) {
       if (errorBox && errorText) {
-        errorText.innerText = 'Please select a valid presentation (.ppt, .pptx), PDF (.pdf), Word document (.docx), or Notes file (.txt, .md).';
+        errorText.innerText = 'Please select a valid presentation (.ppt, .pptx) or PDF (.pdf).';
         errorBox.classList.remove('hidden');
       } else {
-        alert('Please select a valid presentation (.ppt, .pptx), PDF (.pdf), Word document (.docx), or Notes file (.txt, .md).');
+        alert('Please select a valid presentation (.ppt, .pptx) or PDF (.pdf).');
       }
       return;
     }
 
     if (file.size > 50 * 1024 * 1024) {
       if (errorBox && errorText) {
-        errorText.innerText = 'File size exceeds the 50 MB limit. Please select a smaller file.';
+        errorText.innerText = 'File size exceeds the 50 MB limit. Please select a smaller presentation.';
         errorBox.classList.remove('hidden');
       } else {
-        alert('File size exceeds the 50 MB limit. Please select a smaller file.');
+        alert('File size exceeds the 50 MB limit. Please select a smaller presentation.');
       }
       return;
     }
 
     this.state.selectedUploadFile = file;
-    const title = document.getElementById('dropzone-text-title');
-    const subtitle = document.getElementById('dropzone-text-subtitle');
-    if (title) title.innerText = file.name;
-    if (subtitle) subtitle.innerText = `${(file.size / (1024 * 1024)).toFixed(2)} MB • Ready to analyze`;
 
-    const submitBtn = document.getElementById('modal-upload-submit-btn');
-    if (submitBtn) submitBtn.disabled = false;
+    // Update dropzone view
+    const emptyView = document.getElementById('dropzone-empty-view');
+    const selectedView = document.getElementById('dropzone-selected-view');
+    const nameEl = document.getElementById('selected-file-name');
+    const sizeEl = document.getElementById('selected-file-size');
+
+    if (emptyView) emptyView.classList.add('hidden');
+    if (selectedView) selectedView.classList.remove('hidden');
+    if (nameEl) nameEl.innerText = file.name;
+    if (sizeEl) sizeEl.innerText = `${(file.size / (1024 * 1024)).toFixed(2)} MB`;
+
+    this.checkUploadButtonState();
+    this.initLucide();
+  },
+
+  clearSelectedUploadFile() {
+    this.state.selectedUploadFile = null;
+    const fileInput = document.getElementById('modal-ppt-file-input');
+    if (fileInput) fileInput.value = '';
+
+    const emptyView = document.getElementById('dropzone-empty-view');
+    const selectedView = document.getElementById('dropzone-selected-view');
+    if (emptyView) emptyView.classList.remove('hidden');
+    if (selectedView) selectedView.classList.add('hidden');
+
+    this.checkUploadButtonState();
   },
 
   async startUploadAndProcess() {
     const file = this.state.selectedUploadFile;
     if (!file) return;
 
-    const submitBtn = document.getElementById('modal-upload-submit-btn');
-    if (submitBtn) submitBtn.disabled = true;
-
     const select = document.getElementById('modal-upload-subject-select');
-    const subjectId = select ? select.value : (this.state.currentSubject?.id || null);
+    const subjectId = (select && select.value) ? select.value : this.state.uploadTargetSubjectId;
+    if (!subjectId) {
+      const errorBox = document.getElementById('modal-upload-error-box');
+      const errorText = document.getElementById('modal-upload-error');
+      if (errorBox && errorText) {
+        errorText.innerText = 'Please select a subject before uploading.';
+        errorBox.classList.remove('hidden');
+      }
+      return;
+    }
+
+    const submitBtn = document.getElementById('modal-upload-submit-btn');
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `
+        <svg class="animate-spin -ml-1 mr-2 h-4 w-4 text-white inline-block" fill="none" viewBox="0 0 24 24">
+          <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+          <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+        <span>Processing...</span>
+      `;
+    }
 
     document.getElementById('upload-stage-form')?.classList.add('hidden');
+    document.getElementById('upload-stage-form-footer')?.classList.add('hidden');
     document.getElementById('upload-stage-processing')?.classList.remove('hidden');
     document.getElementById('upload-modal-close-btn')?.classList.add('hidden');
 
@@ -2882,7 +2971,7 @@ export const App = {
       await activateStage(1, 400);
       const formData = new FormData();
       formData.append('file', file);
-      if (subjectId) formData.append('subject_id', subjectId);
+      formData.append('subject_id', subjectId);
 
       await activateStage(2, 500);
 
@@ -2933,8 +3022,16 @@ export const App = {
       console.error('Upload error:', err);
       document.getElementById('upload-stage-processing')?.classList.add('hidden');
       document.getElementById('upload-stage-form')?.classList.remove('hidden');
+      document.getElementById('upload-stage-form-footer')?.classList.remove('hidden');
       document.getElementById('upload-modal-close-btn')?.classList.remove('hidden');
-      if (submitBtn) submitBtn.disabled = false;
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = `
+          <i data-lucide="upload" class="w-4 h-4"></i>
+          <span>Upload &amp; Process Presentation</span>
+        `;
+        this.initLucide();
+      }
 
       const errorBox = document.getElementById('modal-upload-error-box');
       const errorText = document.getElementById('modal-upload-error');

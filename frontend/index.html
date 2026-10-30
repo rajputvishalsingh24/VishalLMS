@@ -1932,75 +1932,155 @@
 
   <!-- 4. UPLOAD PPT MODAL (WITH 7-STAGE ANIMATED PROCESSING FLOW) -->
   <div id="modal-upload-ppt" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl space-y-5 animate-fade-in custom-scrollbar">
-      <div class="flex items-center justify-between">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl max-w-lg w-full max-h-[92vh] flex flex-col shadow-2xl animate-fade-in overflow-hidden">
+      
+      <!-- Modal Header (Always Pinned at Top) -->
+      <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between flex-shrink-0 bg-[#0E1626]">
         <div class="flex items-center space-x-2.5">
-          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+          <div class="w-9 h-9 rounded-xl bg-cyan-500/20 text-cyan-400 flex items-center justify-center flex-shrink-0">
             <i data-lucide="upload" class="w-5 h-5"></i>
           </div>
-          <h3 class="text-lg font-bold text-white">Upload PowerPoint Presentation</h3>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-white">Upload PowerPoint Presentation</h3>
+            <p class="text-[11px] text-slate-400">Add slides to your MBA subject for AI-powered learning</p>
+          </div>
         </div>
-        <button id="upload-modal-close-btn" onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+        <button id="upload-modal-close-btn" onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-white/5 transition" title="Close">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <!-- State A: Form Input -->
-      <div id="upload-stage-form" class="space-y-4">
+      <!-- State A: Form Input Body (Scrollable if viewport is small, action buttons stay pinned) -->
+      <div id="upload-stage-form" class="p-6 space-y-4 overflow-y-auto flex-1 custom-scrollbar">
+        
+        <!-- 1. Subject Selection Dropdown -->
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Select Subject *</label>
-          <select 
-            id="modal-upload-subject-select"
-            class="w-full px-4 py-2.5 bg-[#131B2E] border border-white/15 rounded-xl focus:bg-[#18233c] focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
-          ></select>
+          <label for="modal-upload-subject-select" class="block text-xs font-semibold text-slate-200 mb-1.5 flex items-center justify-between">
+            <span>Select Subject <span class="text-rose-400">*</span></span>
+            <span id="modal-upload-subject-status" class="text-[11px] text-slate-400 font-normal">Loading subjects...</span>
+          </label>
+          <div class="relative">
+            <select 
+              id="modal-upload-subject-select"
+              onchange="App.handleUploadSubjectChange(this.value)"
+              class="w-full px-4 py-2.5 bg-[#131B2E] border border-white/20 rounded-xl focus:bg-[#18233c] focus:border-blue-500 focus:outline-none text-slate-100 text-sm appearance-none cursor-pointer pr-10 font-medium transition"
+              style="background-color: #131B2E; color: #FFFFFF; border: 1px solid rgba(255,255,255,0.2); min-height: 42px; display: block;"
+            >
+              <option value="" disabled selected class="bg-[#131B2E] text-slate-400">Choose a subject to link presentation...</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3.5 text-slate-400">
+              <i data-lucide="chevron-down" class="w-4 h-4"></i>
+            </div>
+          </div>
         </div>
 
+        <!-- 2. File Upload Area (Dropzone) -->
         <div 
           id="upload-dropzone" 
           onclick="document.getElementById('modal-ppt-file-input').click()"
           ondragover="App.handleDragOver(event)"
           ondragleave="App.handleDragLeave(event)"
           ondrop="App.handleFileDrop(event)"
-          class="border-2 border-dashed border-white/20 hover:border-blue-500/60 rounded-2xl p-8 text-center cursor-pointer transition bg-white/[0.02] hover:bg-white/[0.04] relative"
+          class="border-2 border-dashed border-white/20 hover:border-blue-500/60 rounded-2xl p-6 text-center cursor-pointer transition bg-white/[0.02] hover:bg-white/[0.04] relative"
         >
           <input 
             type="file" 
             id="modal-ppt-file-input" 
-            accept=".ppt,.pptx,.pdf,.docx,.doc,.txt,.md" 
+            accept=".ppt,.pptx,.pdf" 
             class="hidden"
             onclick="event.stopPropagation()"
             onchange="App.handleFileSelected(this.files && this.files[0])"
           >
-          <div class="w-14 h-14 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-3">
-            <i data-lucide="file-up" class="w-7 h-7"></i>
+
+          <!-- Dropzone Content: When NO file is selected -->
+          <div id="dropzone-empty-view" class="space-y-2">
+            <div class="w-12 h-12 rounded-2xl bg-blue-500/10 text-blue-400 flex items-center justify-center mx-auto mb-2">
+              <i data-lucide="file-up" class="w-6 h-6"></i>
+            </div>
+            <p id="dropzone-text-title" class="text-sm font-semibold text-white">Click to browse or drag and drop presentation</p>
+            <p id="dropzone-text-subtitle" class="text-xs text-slate-400">Accepts PowerPoint (.ppt, .pptx) &amp; PDF (.pdf) — Max 50 MB</p>
+            <button 
+              type="button" 
+              onclick="event.stopPropagation(); document.getElementById('modal-ppt-file-input').click();" 
+              class="mt-2 px-4 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 border border-blue-500/40 text-blue-200 hover:text-white font-semibold text-xs shadow transition inline-flex items-center"
+            >
+              <i data-lucide="folder-open" class="w-3.5 h-3.5 mr-1.5"></i>
+              <span>Browse Files</span>
+            </button>
           </div>
-          <p id="dropzone-text-title" class="text-sm font-semibold text-white">Click to browse or drag and drop files</p>
-          <p id="dropzone-text-subtitle" class="text-xs text-slate-400 mt-1">Accepts PowerPoint (.ppt, .pptx), PDF (.pdf), Word (.docx) & Notes (.txt, .md)</p>
-          <button 
-            type="button" 
-            onclick="event.stopPropagation(); document.getElementById('modal-ppt-file-input').click();" 
-            class="mt-3 px-4 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 border border-blue-500/40 text-blue-200 hover:text-white font-semibold text-xs shadow transition inline-flex items-center"
-          >
-            <i data-lucide="folder-open" class="w-3.5 h-3.5 mr-1.5"></i>
-            <span>Browse Files</span>
-          </button>
+
+          <!-- Dropzone Content: When a file IS selected -->
+          <div id="dropzone-selected-view" class="hidden space-y-3">
+            <div class="flex items-center justify-between p-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-left">
+              <div class="flex items-center space-x-3 overflow-hidden">
+                <div class="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center flex-shrink-0 shadow-md">
+                  <i data-lucide="presentation" class="w-5 h-5"></i>
+                </div>
+                <div class="overflow-hidden">
+                  <p id="selected-file-name" class="text-xs font-bold text-white truncate max-w-xs">presentation.pptx</p>
+                  <div class="flex items-center space-x-2 mt-0.5">
+                    <span id="selected-file-size" class="text-[11px] text-slate-400">0.00 MB</span>
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      ✓ Ready to upload
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center justify-center space-x-2 pt-1" onclick="event.stopPropagation()">
+              <button 
+                type="button" 
+                onclick="document.getElementById('modal-ppt-file-input').click()" 
+                class="px-3 py-1 rounded-lg bg-white/10 hover:bg-white/15 text-slate-200 text-xs font-medium transition flex items-center space-x-1"
+              >
+                <i data-lucide="refresh-cw" class="w-3 h-3 mr-1"></i>
+                <span>Change File</span>
+              </button>
+              <button 
+                type="button" 
+                onclick="App.clearSelectedUploadFile()" 
+                class="px-3 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/20 text-xs font-medium transition flex items-center space-x-1"
+              >
+                <i data-lucide="trash-2" class="w-3 h-3 mr-1"></i>
+                <span>Remove</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
+        <!-- Error Alert Box -->
         <div id="modal-upload-error-box" class="hidden p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-start space-x-2">
           <i data-lucide="alert-circle" class="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5"></i>
           <span id="modal-upload-error"></span>
         </div>
 
-        <div class="flex items-center justify-end space-x-3 pt-2">
-          <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
-          <button id="modal-upload-submit-btn" disabled onclick="App.startUploadAndProcess()" class="px-5 py-2.5 rounded-xl bg-blue-600 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-1.5">
-            <span>Upload & Process Presentation</span>
-          </button>
-        </div>
+      </div>
+
+      <!-- Action Buttons Footer (ALWAYS pinned at bottom of modal) -->
+      <div id="upload-stage-form-footer" class="px-6 py-4 border-t border-white/10 bg-[#0B1322] flex items-center justify-between flex-shrink-0">
+        <button 
+          type="button" 
+          onclick="App.closeModals()" 
+          class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 border border-white/10 transition"
+        >
+          Cancel
+        </button>
+        <button 
+          type="button" 
+          id="modal-upload-submit-btn" 
+          disabled 
+          onclick="App.startUploadAndProcess()" 
+          class="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:from-blue-600 disabled:hover:to-indigo-600 text-white font-bold text-xs shadow-lg shadow-blue-500/20 transition flex items-center space-x-2"
+          style="display: inline-flex !important;"
+        >
+          <i data-lucide="upload" class="w-4 h-4"></i>
+          <span>Upload &amp; Process Presentation</span>
+        </button>
       </div>
 
       <!-- State B: 7-Stage Animated Processing Flow -->
-      <div id="upload-stage-processing" class="hidden space-y-4">
+      <div id="upload-stage-processing" class="hidden p-6 space-y-4 overflow-y-auto flex-1">
         <div class="text-center py-2">
           <h4 class="text-base font-bold text-white">Processing Presentation</h4>
           <p class="text-xs text-slate-400 mt-0.5" id="upload-processing-filename">lecture_notes.pptx</p>
@@ -2039,7 +2119,7 @@
       </div>
 
       <!-- State C: Success Card -->
-      <div id="upload-stage-success" class="hidden text-center py-6 space-y-4">
+      <div id="upload-stage-success" class="hidden p-6 text-center py-6 space-y-4">
         <div class="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center mx-auto">
           <i data-lucide="check" class="w-8 h-8"></i>
         </div>
