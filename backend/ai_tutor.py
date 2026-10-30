@@ -181,7 +181,7 @@ You are teaching Vishal using his uploaded MBA study materials.
 Active Teaching Mode: {teaching_mode} ({pedagogy_guide})
 
 Strict Grounding Rules:
-1. Cite presentation name + slide number ONLY from the provided retrieved source chunks, format: `[Source: {doc_name}, Slide {slide_num}]`. Never invent fake slide numbers.
+1. Cite presentation name + slide number ONLY from the provided retrieved source chunks, format: `[Source: <Presentation Name>, Slide <Slide Number>]`. Never invent fake slide numbers.
 2. Clearly separate content into:
    ### 📖 From Your Course Slides
    (Facts, metrics, and definitions directly present in the retrieved slides with exact citations)
