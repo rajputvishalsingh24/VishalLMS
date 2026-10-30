@@ -63,6 +63,7 @@ export const App = {
 
   async init() {
     console.log('Initializing VISHAL SINGH LMS...');
+    window.App = this;
     this.initTheme();
     this.initLucide();
     this.initStudyTimerListeners();
@@ -79,8 +80,33 @@ export const App = {
       console.warn('Auth check notice:', e);
     }
 
-    await this.loadDashboard();
-    window.App = this;
+    // Support browser back/forward history navigation
+    window.addEventListener('popstate', (e) => {
+      if (e.state && e.state.pageId) {
+        this.navigate(e.state.pageId, e.state.options || {}, false);
+      } else {
+        this.navigate('dashboard', {}, false);
+      }
+    });
+
+    // Check initial URL hash
+    const rawHash = window.location.hash.replace(/^#/, '');
+    if (rawHash) {
+      const parts = rawHash.split('/');
+      const page = parts[0];
+      const id = parts[1];
+      if (page === 'subject' && id) {
+        await this.navigate('subject', { subjectId: id }, false);
+      } else if (page === 'presentation-learn' && id) {
+        await this.navigate('presentation-learn', { docId: id }, false);
+      } else if (['tutor', 'practice', 'revision', 'mba-tools', 'progress'].includes(page)) {
+        await this.navigate(page, {}, false);
+      } else {
+        await this.loadDashboard();
+      }
+    } else {
+      await this.loadDashboard();
+    }
   },
 
   initLucide() {
@@ -228,13 +254,18 @@ export const App = {
   },
 
   // ==================== ROUTING & NAVIGATION ====================
-  async navigate(pageId, options = {}) {
+  async navigate(pageId, options = {}, pushHistory = true) {
     // If leaving presentation-learn, stop/flush study timer
     if (this.state.currentPage === 'presentation-learn' && pageId !== 'presentation-learn') {
       this.stopStudyTimer();
     }
 
     this.state.currentPage = pageId;
+
+    if (pushHistory) {
+      const hash = `#${pageId}${options.subjectId ? '/' + options.subjectId : ''}${options.docId ? '/' + options.docId : ''}`;
+      window.history.pushState({ pageId, options }, '', hash);
+    }
 
     // Update nav pills in header
     document.querySelectorAll('.nav-pill').forEach(el => {
@@ -289,6 +320,148 @@ export const App = {
   },
 
   // ==================== 1. MAIN DASHBOARD ====================
+  activeSemesterFilter: 'All',
+  subjectSearchQuery: '',
+
+  filterSubjectsBySemester(semester) {
+    this.activeSemesterFilter = semester;
+    document.querySelectorAll('.subject-filter-btn').forEach(btn => {
+      const sem = btn.getAttribute('data-semester-filter');
+      if (sem === semester) {
+        btn.className = 'subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition';
+      } else {
+        btn.className = 'subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition';
+      }
+    });
+    this.renderSubjectCards();
+  },
+
+  handleSubjectCardSearch(query) {
+    this.subjectSearchQuery = (query || '').toLowerCase().trim();
+    this.renderSubjectCards();
+  },
+
+  renderSubjectCards() {
+    const container = document.getElementById('subjects-container');
+    const emptyState = document.getElementById('dashboard-empty-state');
+    if (!container) return;
+
+    if (!this.state.subjects || this.state.subjects.length === 0) {
+      container.innerHTML = '';
+      if (emptyState) emptyState.classList.remove('hidden');
+      return;
+    }
+
+    let filtered = this.state.subjects;
+    if (this.activeSemesterFilter && this.activeSemesterFilter !== 'All') {
+      filtered = filtered.filter(s => (s.semester || 'Semester 1') === this.activeSemesterFilter);
+    }
+    if (this.subjectSearchQuery) {
+      const q = this.subjectSearchQuery;
+      filtered = filtered.filter(s =>
+        (s.name && s.name.toLowerCase().includes(q)) ||
+        (s.description && s.description.toLowerCase().includes(q)) ||
+        (s.category && s.category.toLowerCase().includes(q)) ||
+        (s.goals && s.goals.toLowerCase().includes(q))
+      );
+    }
+
+    if (filtered.length === 0) {
+      if (emptyState) emptyState.classList.add('hidden');
+      container.innerHTML = `
+        <div class="col-span-full py-12 text-center glass-panel rounded-3xl border border-white/10 p-8">
+          <div class="w-12 h-12 rounded-2xl bg-white/5 text-slate-400 flex items-center justify-center mx-auto mb-3">
+            <i data-lucide="search-x" class="w-6 h-6"></i>
+          </div>
+          <h4 class="text-sm font-bold text-white mb-1">No subjects match your filter</h4>
+          <p class="text-xs text-slate-400 mb-4">Try clearing the search query or selecting a different semester.</p>
+          <button onclick="App.filterSubjectsBySemester('All'); const el = document.getElementById('subject-card-search-input'); if(el) el.value = ''; App.handleSubjectCardSearch('');" class="px-3.5 py-1.5 rounded-xl bg-blue-600/30 hover:bg-blue-600 text-blue-200 hover:text-white font-semibold text-xs border border-blue-500/30 transition">Reset Filters</button>
+        </div>
+      `;
+      this.initLucide();
+      return;
+    }
+
+    if (emptyState) emptyState.classList.add('hidden');
+
+    const gradients = [
+      'from-blue-600 to-indigo-600',
+      'from-cyan-600 to-blue-700',
+      'from-violet-600 to-purple-800',
+      'from-emerald-600 to-teal-700',
+      'from-amber-600 to-orange-700',
+      'from-rose-600 to-pink-700'
+    ];
+
+    container.innerHTML = filtered.map((s, idx) => {
+      const grad = gradients[idx % gradients.length];
+      const desc = s.description || 'MBA curriculum and study presentation slides.';
+      const count = s.document_count !== undefined ? s.document_count : (s.documents ? s.documents.length : 0);
+      const category = s.category || 'Management';
+      const semester = s.semester || 'Semester 1';
+      const goals = s.goals ? `<p class="text-[11px] text-amber-300/80 mt-2 line-clamp-1 flex items-center space-x-1"><i data-lucide="target" class="w-3 h-3 text-amber-400 flex-shrink-0"></i><span class="truncate">${this.escapeHtml(s.goals)}</span></p>` : '';
+
+      return `
+        <div class="subject-card glass-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between group">
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${grad} text-white flex items-center justify-center font-bold text-lg shadow-md group-hover:scale-105 transition-transform">
+                <i data-lucide="book-open" class="w-6 h-6"></i>
+              </div>
+
+              <div class="flex items-center space-x-1">
+                <button 
+                  onclick="App.openRenameSubjectModal('${s.id}', '${this.escapeHtml(s.name)}', '${this.escapeHtml(s.description || '')}', '${this.escapeHtml(semester)}', '${this.escapeHtml(category)}', '${this.escapeHtml(s.goals || '')}')" 
+                  class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition"
+                  title="Edit Subject"
+                >
+                  <i data-lucide="edit-3" class="w-4 h-4"></i>
+                </button>
+                <button 
+                  onclick="App.confirmDeleteSubject('${s.id}', '${this.escapeHtml(s.name)}')" 
+                  class="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
+                  title="Delete Subject"
+                >
+                  <i data-lucide="trash-2" class="w-4 h-4"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="flex items-center space-x-2 mb-2 flex-wrap gap-y-1">
+              <span class="text-[10px] font-bold px-2 py-0.5 rounded-md bg-blue-500/15 text-blue-300 border border-blue-500/20">${this.escapeHtml(category)}</span>
+              <span class="text-[10px] font-medium px-2 py-0.5 rounded-md bg-white/5 text-slate-400 border border-white/10">${this.escapeHtml(semester)}</span>
+            </div>
+
+            <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">
+              ${this.escapeHtml(s.name)}
+            </h3>
+            <p class="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
+              ${this.escapeHtml(desc)}
+            </p>
+            ${goals}
+          </div>
+
+          <div class="flex items-center justify-between pt-5 mt-4 border-t border-white/10">
+            <span class="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
+              <i data-lucide="presentation" class="w-3.5 h-3.5 text-cyan-400"></i>
+              <span>${count} ${count === 1 ? 'Presentation' : 'Presentations'}</span>
+            </span>
+
+            <button 
+              onclick="App.openSubject('${s.id}')"
+              class="px-4 py-2 rounded-xl bg-white/5 hover:bg-blue-600 text-slate-200 hover:text-white text-xs font-semibold transition border border-white/10 hover:border-transparent flex items-center space-x-1.5 shadow-sm"
+            >
+              <span>Open Subject</span>
+              <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    this.initLucide();
+  },
+
   async loadDashboard() {
     try {
       await this.loadSubjects();
@@ -296,86 +469,7 @@ export const App = {
       const countBadge = document.getElementById('subject-count-badge');
       if (countBadge) countBadge.innerText = `${this.state.subjects.length} Subjects`;
 
-      const container = document.getElementById('subjects-container');
-      const emptyState = document.getElementById('dashboard-empty-state');
-
-      if (!this.state.subjects || this.state.subjects.length === 0) {
-        if (container) container.innerHTML = '';
-        if (emptyState) emptyState.classList.remove('hidden');
-        return;
-      }
-
-      if (emptyState) emptyState.classList.add('hidden');
-
-      const gradients = [
-        'from-blue-600 to-indigo-600',
-        'from-cyan-600 to-blue-700',
-        'from-violet-600 to-purple-800',
-        'from-emerald-600 to-teal-700',
-        'from-amber-600 to-orange-700',
-        'from-rose-600 to-pink-700'
-      ];
-
-      if (container) {
-        container.innerHTML = this.state.subjects.map((s, idx) => {
-          const grad = gradients[idx % gradients.length];
-          const desc = s.description || 'MBA curriculum and study presentation slides.';
-          const count = s.document_count !== undefined ? s.document_count : (s.documents ? s.documents.length : 0);
-
-          return `
-            <div class="subject-card glass-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between group">
-              <div>
-                <div class="flex items-center justify-between mb-4">
-                  <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr ${grad} text-white flex items-center justify-center font-bold text-lg shadow-md group-hover:scale-105 transition-transform">
-                    <i data-lucide="book-open" class="w-6 h-6"></i>
-                  </div>
-
-                  <div class="flex items-center space-x-1">
-                    <button 
-                      onclick="App.openRenameSubjectModal('${s.id}', '${this.escapeHtml(s.name)}', '${this.escapeHtml(s.description || '')}')" 
-                      class="p-2 text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition"
-                      title="Rename Subject"
-                    >
-                      <i data-lucide="edit-3" class="w-4 h-4"></i>
-                    </button>
-                    <button 
-                      onclick="App.confirmDeleteSubject('${s.id}', '${this.escapeHtml(s.name)}')" 
-                      class="p-2 text-slate-400 hover:text-rose-400 rounded-lg hover:bg-white/5 transition"
-                      title="Delete Subject"
-                    >
-                      <i data-lucide="trash-2" class="w-4 h-4"></i>
-                    </button>
-                  </div>
-                </div>
-
-                <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition-colors">
-                  ${this.escapeHtml(s.name)}
-                </h3>
-                <p class="text-xs text-slate-400 mt-1 line-clamp-2 leading-relaxed">
-                  ${this.escapeHtml(desc)}
-                </p>
-              </div>
-
-              <div class="flex items-center justify-between pt-5 mt-4 border-t border-white/10">
-                <span class="text-xs font-semibold text-slate-300 flex items-center space-x-1.5">
-                  <i data-lucide="presentation" class="w-3.5 h-3.5 text-cyan-400"></i>
-                  <span>${count} ${count === 1 ? 'Presentation' : 'Presentations'}</span>
-                </span>
-
-                <button 
-                  onclick="App.openSubject('${s.id}')"
-                  class="px-4 py-2 rounded-xl bg-white/5 hover:bg-blue-600 text-slate-200 hover:text-white text-xs font-semibold transition border border-white/10 hover:border-transparent flex items-center space-x-1.5 shadow-sm"
-                >
-                  <span>Open Subject</span>
-                  <i data-lucide="arrow-right" class="w-3.5 h-3.5"></i>
-                </button>
-              </div>
-            </div>
-          `;
-        }).join('');
-      }
-
-      this.initLucide();
+      this.renderSubjectCards();
     } catch (e) {
       console.error('Error loading dashboard:', e);
     }
@@ -416,15 +510,66 @@ export const App = {
         container.innerHTML = docs.map(doc => {
           const slideCount = doc.slide_count || 1;
           const uploadDate = doc.created_at ? new Date(doc.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'Recently added';
+          const pStatus = (doc.processing_status || doc.status || 'completed').toLowerCase();
+
+          let statusBadge = '';
+          let actionButton = '';
+
+          if (pStatus === 'failed') {
+            statusBadge = `
+              <span class="inline-flex items-center space-x-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-rose-500/15 text-rose-400 border border-rose-500/20">
+                <i data-lucide="alert-circle" class="w-3 h-3 text-rose-400"></i>
+                <span>Processing Notice</span>
+              </span>
+            `;
+            actionButton = `
+              <button 
+                onclick="App.retryProcessing('${doc.id}', this)"
+                class="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs transition shadow-md flex items-center justify-center space-x-1.5"
+              >
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Retry Processing</span>
+              </button>
+            `;
+          } else if (pStatus === 'processing' || pStatus === 'uploading') {
+            statusBadge = `
+              <span class="inline-flex items-center space-x-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping"></span>
+                <span>Extracting Slides...</span>
+              </span>
+            `;
+            actionButton = `
+              <button 
+                onclick="App.retryProcessing('${doc.id}', this)"
+                class="w-full py-2.5 rounded-xl bg-amber-600/30 hover:bg-amber-600 text-amber-200 hover:text-white font-semibold text-xs transition border border-amber-500/40 flex items-center justify-center space-x-1.5"
+              >
+                <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+                <span>Re-process Slides</span>
+              </button>
+            `;
+          } else {
+            statusBadge = `
+              <span class="inline-flex items-center space-x-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span>Ready to Learn</span>
+              </span>
+            `;
+            actionButton = `
+              <button 
+                onclick="App.openPresentationLearning('${doc.id}')"
+                class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition shadow-md shadow-blue-600/20 flex items-center justify-center space-x-1.5"
+              >
+                <i data-lucide="play-circle" class="w-4 h-4"></i>
+                <span>Open & Learn</span>
+              </button>
+            `;
+          }
 
           return `
             <div class="ppt-card glass-panel p-6 rounded-3xl border border-white/10 flex flex-col justify-between group">
               <div>
                 <div class="flex items-center justify-between mb-3">
-                  <span class="inline-flex items-center space-x-1 text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/20">
-                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                    <span>Ready to Learn</span>
-                  </span>
+                  ${statusBadge}
 
                   <div class="flex items-center space-x-1">
                     <button 
@@ -465,13 +610,7 @@ export const App = {
               </div>
 
               <div class="pt-5 mt-4 border-t border-white/10">
-                <button 
-                  onclick="App.openPresentationLearning('${doc.id}')"
-                  class="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition shadow-md shadow-blue-600/20 flex items-center justify-center space-x-1.5"
-                >
-                  <i data-lucide="play-circle" class="w-4 h-4"></i>
-                  <span>Open & Learn</span>
-                </button>
+                ${actionButton}
               </div>
             </div>
           `;
@@ -481,6 +620,26 @@ export const App = {
       this.initLucide();
     } catch (e) {
       console.error('Error loading subject detail:', e);
+    }
+  },
+
+  async retryProcessing(docId, btnEl = null) {
+    if (btnEl) {
+      btnEl.disabled = true;
+      btnEl.innerHTML = `<span class="inline-block animate-spin mr-1">⏳</span><span>Processing...</span>`;
+    }
+    try {
+      await API.retryDocumentProcessing(docId);
+      if (this.state.currentSubject?.id) {
+        await this.loadSubject(this.state.currentSubject.id);
+      } else {
+        await this.loadDashboard();
+      }
+    } catch (e) {
+      alert(e.message || 'Processing retry failed. Please try again.');
+      if (this.state.currentSubject?.id) {
+        await this.loadSubject(this.state.currentSubject.id);
+      }
     }
   },
 
@@ -2138,14 +2297,40 @@ export const App = {
   },
 
   // ==================== 4. SUBJECT CRUD MODALS ====================
+  selectCreateSubjectColor(color, btnEl) {
+    const input = document.getElementById('modal-subject-color-input');
+    if (input) input.value = color;
+    const container = document.getElementById('create-subject-color-swatches');
+    if (container) {
+      container.querySelectorAll('button').forEach(b => {
+        b.classList.remove('ring-2', 'ring-white', 'scale-110');
+        b.classList.add('ring-0');
+      });
+    }
+    if (btnEl) {
+      btnEl.classList.remove('ring-0');
+      btnEl.classList.add('ring-2', 'ring-white', 'scale-110');
+    }
+  },
+
   openCreateSubjectModal() {
     this.isCreatingSubject = false;
     const nameInput = document.getElementById('modal-subject-name-input');
     const descInput = document.getElementById('modal-subject-desc-input');
+    const goalsInput = document.getElementById('modal-subject-goals-input');
+    const semSelect = document.getElementById('modal-subject-semester-select');
+    const catSelect = document.getElementById('modal-subject-category-select');
+    const colorInput = document.getElementById('modal-subject-color-input');
     const err = document.getElementById('modal-subject-error');
     const btn = document.getElementById('modal-create-subject-btn');
+
     if (nameInput) nameInput.value = '';
     if (descInput) descInput.value = '';
+    if (goalsInput) goalsInput.value = '';
+    if (semSelect) semSelect.value = 'Semester 1';
+    if (catSelect) catSelect.value = 'Product Management';
+    if (colorInput) colorInput.value = '#3B82F6';
+
     if (err) {
       err.innerText = '';
       err.classList.add('hidden');
@@ -2154,6 +2339,12 @@ export const App = {
       btn.disabled = false;
       btn.innerHTML = `<span>Create Subject</span>`;
     }
+
+    const firstSwatch = document.querySelector('#create-subject-color-swatches button');
+    if (firstSwatch) {
+      this.selectCreateSubjectColor('#3B82F6', firstSwatch);
+    }
+
     document.getElementById('modal-create-subject')?.classList.remove('hidden');
     nameInput?.focus();
   },
@@ -2163,13 +2354,19 @@ export const App = {
 
     const nameInput = document.getElementById('modal-subject-name-input');
     const descInput = document.getElementById('modal-subject-desc-input');
+    const goalsInput = document.getElementById('modal-subject-goals-input');
     const semSelect = document.getElementById('modal-subject-semester-select');
+    const catSelect = document.getElementById('modal-subject-category-select');
+    const colorInput = document.getElementById('modal-subject-color-input');
     const err = document.getElementById('modal-subject-error');
     const btn = document.getElementById('modal-create-subject-btn');
 
     const name = nameInput ? nameInput.value.trim() : '';
     const desc = descInput ? descInput.value.trim() : '';
+    const goals = goalsInput ? goalsInput.value.trim() : '';
     const semester = semSelect ? semSelect.value : 'Semester 1';
+    const category = catSelect ? catSelect.value : 'Product Management';
+    const color = colorInput ? colorInput.value : '#3B82F6';
 
     if (!name) {
       if (err) {
@@ -2188,12 +2385,13 @@ export const App = {
     }
 
     try {
-      await API.createSubject({ name, description: desc, semester });
+      await API.createSubject({ name, description: desc, semester, category, goals, color });
       await this.loadSubjects();
       await this.loadDashboard();
       this.closeModals();
       if (nameInput) nameInput.value = '';
       if (descInput) descInput.value = '';
+      if (goalsInput) goalsInput.value = '';
     } catch (e) {
       if (err) {
         err.innerText = e.message || 'Subject could not be created. Please try again.';
@@ -2208,25 +2406,53 @@ export const App = {
     }
   },
 
-  openRenameSubjectModal(id, currentName, currentDesc) {
-    document.getElementById('modal-rename-subject-id').value = id;
-    const nameEl = document.getElementById('modal-rename-subject-input');
-    const descEl = document.getElementById('modal-rename-subject-desc-input');
-    if (nameEl) nameEl.value = currentName;
-    if (descEl) descEl.value = currentDesc;
+  openRenameSubjectModal(id, currentName, currentDesc = '', currentSem = 'Semester 1', currentCat = 'Product Management', currentGoals = '') {
+    const idInput = document.getElementById('modal-rename-subject-id');
+    const nameInput = document.getElementById('modal-rename-subject-input');
+    const descInput = document.getElementById('modal-rename-subject-desc-input');
+    const semSelect = document.getElementById('modal-rename-subject-semester-select');
+    const catSelect = document.getElementById('modal-rename-subject-category-select');
+    const goalsInput = document.getElementById('modal-rename-subject-goals-input');
+    const err = document.getElementById('modal-rename-subject-error');
+
+    if (idInput) idInput.value = id;
+    if (nameInput) nameInput.value = currentName || '';
+    if (descInput) descInput.value = currentDesc || '';
+    if (semSelect) semSelect.value = currentSem || 'Semester 1';
+    if (catSelect) catSelect.value = currentCat || 'Product Management';
+    if (goalsInput) goalsInput.value = currentGoals || '';
+    if (err) err.classList.add('hidden');
+
     document.getElementById('modal-rename-subject')?.classList.remove('hidden');
-    nameEl?.focus();
+    nameInput?.focus();
   },
 
   async submitRenameSubject() {
-    const id = document.getElementById('modal-rename-subject-id').value;
-    const name = document.getElementById('modal-rename-subject-input').value.trim();
-    const desc = document.getElementById('modal-rename-subject-desc-input').value.trim();
+    const id = document.getElementById('modal-rename-subject-id')?.value;
+    const name = document.getElementById('modal-rename-subject-input')?.value.trim();
+    const desc = document.getElementById('modal-rename-subject-desc-input')?.value.trim();
+    const semester = document.getElementById('modal-rename-subject-semester-select')?.value || 'Semester 1';
+    const category = document.getElementById('modal-rename-subject-category-select')?.value || 'Product Management';
+    const goals = document.getElementById('modal-rename-subject-goals-input')?.value.trim() || '';
+    const err = document.getElementById('modal-rename-subject-error');
+    const btn = document.getElementById('modal-rename-subject-btn');
 
-    if (!name) return;
+    if (!name) {
+      if (err) {
+        err.innerText = 'Subject name cannot be empty.';
+        err.classList.remove('hidden');
+      }
+      return;
+    }
+
+    if (btn) {
+      btn.disabled = true;
+      btn.innerText = 'Saving...';
+    }
 
     try {
-      await API.updateSubject(id, { name, description: desc });
+      await API.updateSubject(id, { name, description: desc, semester, category, goals });
+      await this.loadSubjects();
       this.closeModals();
       if (this.state.currentPage === 'subject' && this.state.currentSubject?.id === id) {
         await this.loadSubject(id);
@@ -2234,14 +2460,33 @@ export const App = {
         await this.loadDashboard();
       }
     } catch (e) {
-      alert(e.message || 'Failed to rename subject');
+      if (err) {
+        err.innerText = e.message || 'Failed to update subject.';
+        err.classList.remove('hidden');
+      } else {
+        alert(e.message || 'Failed to update subject');
+      }
+    } finally {
+      if (btn) {
+        btn.disabled = false;
+        btn.innerText = 'Save Changes';
+      }
     }
   },
 
   async confirmDeleteSubject(id, name) {
-    if (!confirm(`Are you sure you want to delete '${name}' and all its uploaded presentations?`)) return;
+    const msg = `Are you sure you want to delete subject "${name}"?\n\n` +
+      `WARNING: This will permanently delete:\n` +
+      `• The subject record\n` +
+      `• All associated PPT/PDF presentations\n` +
+      `• All extracted slides and AI learning summaries\n` +
+      `• All generated quizzes and doubt tickets\n\n` +
+      `This action cannot be undone.`;
+    if (!confirm(msg)) return;
+
     try {
       await API.deleteSubject(id);
+      await this.loadSubjects();
       await this.loadDashboard();
       if (this.state.currentPage === 'subject') {
         this.navigate('dashboard');
@@ -2249,6 +2494,35 @@ export const App = {
     } catch (e) {
       alert(e.message || 'Failed to delete subject');
     }
+  },
+
+  openProfileModal() {
+    const subjects = this.state.subjects || [];
+    const countSubjects = subjects.length;
+    let countPresentations = 0;
+    subjects.forEach(s => {
+      countPresentations += (s.document_count !== undefined ? s.document_count : (s.documents ? s.documents.length : 0));
+    });
+
+    const subEl = document.getElementById('profile-stats-subjects');
+    const presEl = document.getElementById('profile-stats-presentations');
+    if (subEl) subEl.innerText = countSubjects;
+    if (presEl) presEl.innerText = countPresentations;
+
+    document.getElementById('modal-profile')?.classList.remove('hidden');
+    this.initLucide();
+  },
+
+  async handleLogout() {
+    if (!confirm('Are you sure you want to log out of VISHAL SINGH LMS?')) return;
+    try {
+      await API.logout();
+    } catch (e) {
+      console.warn('Logout notice:', e);
+    }
+    localStorage.removeItem('vishal_lms_token');
+    sessionStorage.clear();
+    window.location.reload();
   },
 
   openRenamePresentationModal(docId, currentName) {

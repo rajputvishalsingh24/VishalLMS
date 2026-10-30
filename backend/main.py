@@ -4,8 +4,11 @@ import json
 import uuid
 import tempfile
 import traceback
+import logging
 from typing import Optional, List, Dict, Any
 from datetime import datetime
+
+logger = logging.getLogger("vishal_lms")
 
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Query, Request
 from fastapi.staticfiles import StaticFiles
@@ -267,7 +270,9 @@ def get_subjects(request: Request):
 class SubjectCreate(BaseModel):
     name: str
     semester: str = "Semester 1"
+    category: str = "Product Management"
     description: str = ""
+    goals: str = ""
     color: str = "#3B82F6"
 
 @app.get("/api/subjects/{id}")
@@ -300,10 +305,10 @@ def create_subject(subj: SubjectCreate, request: Request):
     
     conn.execute(
         """
-        INSERT INTO subjects (id, user_id, name, semester, description, color, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO subjects (id, user_id, name, semester, category, description, goals, color, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (s_id, user_id, name, subj.semester, subj.description.strip(), subj.color, now_str, now_str)
+        (s_id, user_id, name, subj.semester, subj.category, subj.description.strip(), subj.goals.strip(), subj.color, now_str, now_str)
     )
     conn.commit()
     conn.close()
@@ -314,7 +319,9 @@ def create_subject(subj: SubjectCreate, request: Request):
         "user_id": user_id,
         "name": name,
         "semester": subj.semester,
+        "category": subj.category,
         "description": subj.description.strip(),
+        "goals": subj.goals.strip(),
         "color": subj.color,
         "created_at": now_str,
         "updated_at": now_str,
@@ -323,37 +330,67 @@ def create_subject(subj: SubjectCreate, request: Request):
 
 class SubjectUpdate(BaseModel):
     name: Optional[str] = None
+    semester: Optional[str] = None
+    category: Optional[str] = None
     description: Optional[str] = None
+    goals: Optional[str] = None
+    color: Optional[str] = None
 
 @app.put("/api/subjects/{id}")
 def update_subject(id: str, subj: SubjectUpdate, request: Request):
     conn = get_connection()
     now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
-    if subj.name:
-        name = subj.name.strip()
-        if not name:
-            conn.close()
-            raise HTTPException(status_code=400, detail="Subject name cannot be empty")
-        conn.execute("UPDATE subjects SET name = ?, description = COALESCE(?, description), updated_at = ? WHERE id = ?", (name, subj.description, now_str, id))
-    elif subj.description is not None:
-        conn.execute("UPDATE subjects SET description = ?, updated_at = ? WHERE id = ?", (subj.description.strip(), now_str, id))
     
-    updated = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
+    current = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
+    if not current:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Subject not found")
+
+    curr = dict(current)
+    new_name = subj.name.strip() if subj.name is not None else curr.get("name", "")
+    if not new_name:
+        conn.close()
+        raise HTTPException(status_code=400, detail="Subject name cannot be empty")
+    
+    new_desc = subj.description.strip() if subj.description is not None else curr.get("description", "")
+    new_sem = subj.semester if subj.semester is not None else curr.get("semester", "Semester 1")
+    new_cat = subj.category if subj.category is not None else curr.get("category", "Product Management")
+    new_goals = subj.goals if subj.goals is not None else curr.get("goals", "")
+    new_color = subj.color if subj.color is not None else curr.get("color", "#3B82F6")
+
+    conn.execute(
+        """
+        UPDATE subjects
+        SET name = ?, description = ?, semester = ?, category = ?, goals = ?, color = ?, updated_at = ?
+        WHERE id = ?
+        """,
+        (new_name, new_desc, new_sem, new_cat, new_goals, new_color, now_str, id)
+    )
     conn.commit()
+    updated = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
     conn.close()
-    return {"success": True, "id": id, "name": updated["name"] if updated else "", "description": updated["description"] if updated else ""}
+    return {"success": True, "id": id, **dict(updated)}
 
 @app.delete("/api/subjects/{id}")
 def delete_subject(id: str, request: Request):
     conn = get_connection()
-    # Cascade delete documents and chunks
-    conn.execute("DELETE FROM document_chunks WHERE document_id IN (SELECT id FROM documents WHERE subject_id = ?)", (id,))
-    conn.execute("DELETE FROM documents WHERE subject_id = ?", (id,))
-    conn.execute("DELETE FROM topics WHERE subject_id = ?", (id,))
-    conn.execute("DELETE FROM subjects WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
-    return {"success": True, "message": "Subject deleted successfully"}
+    # Comprehensive cascade delete of all subject-related materials
+    for table in ["document_chunks", "slide_assets", "presentation_summaries", "presentation_flashcards", "smart_flashcards", "doubt_notebook", "study_sessions"]:
+        try:
+            conn.execute(f"DELETE FROM {table} WHERE document_id IN (SELECT id FROM documents WHERE subject_id = ?)", (id,))
+        except Exception:
+            pass
+    try:
+        conn.execute("DELETE FROM documents WHERE subject_id = ?", (id,))
+        conn.execute("DELETE FROM topics WHERE subject_id = ?", (id,))
+        conn.execute("DELETE FROM subjects WHERE id = ?", (id,))
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Notice during cascade delete subject: {e}")
+        conn.commit()
+    finally:
+        conn.close()
+    return {"success": True, "message": "Subject and all associated materials deleted successfully"}
 
 class TopicStatusUpdate(BaseModel):
     status: str
@@ -619,15 +656,71 @@ async def upload_document(
 def delete_document(id: str):
     conn = get_connection()
     doc = conn.execute("SELECT file_path FROM documents WHERE id = ?", (id,)).fetchone()
-    if doc and os.path.exists(doc["file_path"]):
+    if doc and doc["file_path"] and os.path.exists(doc["file_path"]):
         try:
             os.remove(doc["file_path"])
         except Exception:
             pass
-    conn.execute("DELETE FROM documents WHERE id = ?", (id,))
-    conn.commit()
-    conn.close()
+    for table in ["document_chunks", "slide_assets", "presentation_summaries", "presentation_flashcards", "smart_flashcards", "doubt_notebook", "study_sessions"]:
+        try:
+            conn.execute(f"DELETE FROM {table} WHERE document_id = ?", (id,))
+        except Exception:
+            pass
+    try:
+        conn.execute("DELETE FROM documents WHERE id = ?", (id,))
+        conn.commit()
+    except Exception as e:
+        logger.warning(f"Notice during delete_document: {e}")
+        conn.commit()
+    finally:
+        conn.close()
     return {"success": True}
+
+@app.post("/api/documents/{id}/retry")
+def retry_document_processing(id: str, request: Request):
+    conn = get_connection()
+    doc = conn.execute("SELECT * FROM documents WHERE id = ?", (id,)).fetchone()
+    if not doc:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    file_path = doc["file_path"]
+    file_type = doc["file_type"].lower()
+    
+    try:
+        from .extractor import extract_document
+        chunks = extract_document(file_path, file_type) if os.path.exists(file_path) else []
+        slide_count = max(1, len(chunks))
+        
+        if chunks:
+            conn.execute("DELETE FROM document_chunks WHERE document_id = ?", (id,))
+            for idx, chunk in enumerate(chunks, start=1):
+                chunk_id = str(uuid.uuid4())
+                takeaways_json = json.dumps(chunk.get("takeaways", []))
+                conn.execute("""
+                INSERT INTO document_chunks (id, document_id, chunk_index, slide_number, page_number, title, content, takeaways)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """, (
+                    chunk_id, id, idx, chunk.get("slide_number", idx),
+                    chunk.get("page_number", idx), chunk.get("title", f"Slide {idx}"),
+                    chunk.get("content", ""), takeaways_json
+                ))
+        
+        now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
+        conn.execute("UPDATE documents SET slide_count = ?, page_count = ?, processing_status = 'completed', status = 'ready', updated_at = ? WHERE id = ?", (slide_count, slide_count, now_str, id))
+        conn.commit()
+    except Exception as e:
+        print(f"Retry extraction error: {e}")
+    finally:
+        conn.close()
+
+    try:
+        from .summarizer import analyze_presentation
+        analyze_presentation(id)
+    except Exception as e:
+        print(f"Notice auto-analyzing on retry: {e}")
+
+    return {"success": True, "message": "Presentation re-processed successfully"}
 
 class DocumentUpdate(BaseModel):
     name: str

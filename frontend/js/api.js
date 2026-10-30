@@ -160,6 +160,18 @@ export const API = {
     return res.json();
   },
 
+  async retryDocumentProcessing(id) {
+    const res = await fetch(`/api/documents/${id}/retry`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || 'Failed to re-process document');
+    }
+    return res.json();
+  },
+
   // AI Tutor
   async tutorChat(query, mode = 'ask_materials', subjectId = null, documentId = null, detailLevel = 'normal') {
     const res = await fetch('/api/tutor/chat', {

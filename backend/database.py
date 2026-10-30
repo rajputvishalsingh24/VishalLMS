@@ -658,7 +658,7 @@ def _run_safe_migrations(conn):
             except Exception:
                 pass
 
-        # Safe migrations for subjects: user_id, updated_at
+        # Safe migrations for subjects: user_id, updated_at, category, goals
         s_cols = [r[1] for r in c.execute("PRAGMA table_info(subjects)").fetchall()]
         if "user_id" not in s_cols:
             try:
@@ -669,6 +669,16 @@ def _run_safe_migrations(conn):
             try:
                 c.execute("ALTER TABLE subjects ADD COLUMN updated_at TEXT")
                 c.execute("UPDATE subjects SET updated_at = created_at WHERE updated_at IS NULL")
+            except Exception:
+                pass
+        if "category" not in s_cols:
+            try:
+                c.execute("ALTER TABLE subjects ADD COLUMN category TEXT DEFAULT 'Core Management'")
+            except Exception:
+                pass
+        if "goals" not in s_cols:
+            try:
+                c.execute("ALTER TABLE subjects ADD COLUMN goals TEXT DEFAULT ''")
             except Exception:
                 pass
 

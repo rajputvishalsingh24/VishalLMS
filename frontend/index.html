@@ -119,16 +119,21 @@
           <i id="theme-toggle-icon" data-lucide="sun" class="w-4 h-4 text-amber-400"></i>
         </button>
 
-        <!-- User Profile Avatar -->
-        <div class="flex items-center space-x-2 pl-2 border-l border-white/10">
-          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-md border border-white/20">
+        <!-- User Profile Avatar & Account Settings -->
+        <button 
+          id="header-profile-btn"
+          onclick="App.openProfileModal()" 
+          class="flex items-center space-x-2 pl-2 border-l border-white/10 hover:opacity-90 transition group text-left cursor-pointer"
+          title="Account Profile & Settings"
+        >
+          <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-md border border-white/20 group-hover:scale-105 transition-transform">
             VS
           </div>
-          <div class="hidden xl:block text-left">
+          <div class="hidden xl:block">
             <p id="header-user-name" class="text-xs font-semibold text-slate-200 leading-tight">Vishal Singh</p>
-            <p class="text-[10px] text-slate-400">MBA Scholar</p>
+            <p class="text-[10px] text-slate-400">Profile & Settings</p>
           </div>
-        </div>
+        </button>
       </div>
 
     </div>
@@ -204,6 +209,27 @@
           </button>
         </div>
 
+        <!-- Subject Search & Filter Bar -->
+        <div class="flex flex-wrap items-center justify-between gap-3 bg-white/[0.02] p-2.5 rounded-2xl border border-white/10">
+          <div class="flex items-center space-x-1.5 overflow-x-auto py-0.5" id="subject-semester-filter-pills">
+            <button onclick="App.filterSubjectsBySemester('All')" data-semester-filter="All" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-semibold bg-blue-600 text-white shadow-sm transition">All</button>
+            <button onclick="App.filterSubjectsBySemester('Semester 1')" data-semester-filter="Semester 1" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 1</button>
+            <button onclick="App.filterSubjectsBySemester('Semester 2')" data-semester-filter="Semester 2" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 2</button>
+            <button onclick="App.filterSubjectsBySemester('Semester 3')" data-semester-filter="Semester 3" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 3</button>
+            <button onclick="App.filterSubjectsBySemester('Semester 4')" data-semester-filter="Semester 4" class="subject-filter-btn px-3 py-1.5 rounded-xl text-xs font-medium text-slate-400 hover:text-white hover:bg-white/5 transition">Semester 4</button>
+          </div>
+          <div class="relative w-full sm:w-64">
+            <i data-lucide="search" class="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
+            <input 
+              id="subject-card-search-input" 
+              type="text" 
+              placeholder="Filter subjects..." 
+              oninput="App.handleSubjectCardSearch(this.value)"
+              class="w-full pl-9 pr-3 py-1.5 text-xs bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 placeholder-slate-400"
+            >
+          </div>
+        </div>
+
         <!-- Subjects Grid -->
         <div id="subjects-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5"></div>
 
@@ -212,8 +238,8 @@
           <div class="w-20 h-20 rounded-3xl bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center mx-auto mb-5 empty-state-floating-icon shadow-inner">
             <i data-lucide="layers" class="w-10 h-10"></i>
           </div>
-          <h3 class="text-lg font-bold text-white mb-2">No subjects yet</h3>
-          <p class="text-sm text-slate-400 max-w-md mx-auto mb-6">Create your first subject to start uploading class presentations, viewing slides, and preparing with AI quizzes.</p>
+          <h3 class="text-lg font-bold text-white mb-2">No subjects added yet.</h3>
+          <p class="text-sm text-slate-400 max-w-md mx-auto mb-6">Create your first subject and upload your study materials to begin learning.</p>
           <button 
             onclick="App.openCreateSubjectModal()" 
             class="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm shadow-lg shadow-blue-500/25 transition inline-flex items-center space-x-2"
@@ -1536,7 +1562,7 @@
 
   <!-- 1. CREATE SUBJECT MODAL -->
   <div id="modal-create-subject" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
         <div class="flex items-center space-x-2.5">
           <div class="w-9 h-9 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center">
@@ -1555,33 +1581,75 @@
           <input 
             id="modal-subject-name-input" 
             type="text" 
-            placeholder="e.g. Product Management, Business Analytics" 
+            placeholder="e.g. Product Management, Business Analytics, Corporate Finance" 
             class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
           >
           <p id="modal-subject-error" class="hidden text-rose-400 text-xs mt-1.5"></p>
         </div>
 
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Semester</label>
+            <select 
+              id="modal-subject-semester-select" 
+              class="w-full px-3.5 py-2.5 bg-[#131B2E] border border-white/10 rounded-xl focus:border-blue-500 focus:outline-none text-slate-100 text-xs sm:text-sm"
+            >
+              <option value="Semester 1">Semester 1 (Core & Foundation)</option>
+              <option value="Semester 2">Semester 2 (Advanced Strategy)</option>
+              <option value="Semester 3">Semester 3 (Specializations)</option>
+              <option value="Semester 4">Semester 4 (Capstone & Cases)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Category / Track</label>
+            <select 
+              id="modal-subject-category-select" 
+              class="w-full px-3.5 py-2.5 bg-[#131B2E] border border-white/10 rounded-xl focus:border-blue-500 focus:outline-none text-slate-100 text-xs sm:text-sm"
+            >
+              <option value="Product Management">Product Management</option>
+              <option value="Marketing & Growth">Marketing & Growth</option>
+              <option value="Finance & Valuation">Finance & Valuation</option>
+              <option value="Business Analytics & AI">Business Analytics & AI</option>
+              <option value="Operations & Supply Chain">Operations & Supply Chain</option>
+              <option value="Business Strategy">Business Strategy</option>
+              <option value="General Management">General Management</option>
+            </select>
+          </div>
+        </div>
+
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Semester</label>
-          <select 
-            id="modal-subject-semester-select" 
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Learning Goals (Optional)</label>
+          <input 
+            id="modal-subject-goals-input" 
+            type="text" 
+            placeholder="e.g. Master product discovery, unit economics, case frameworks" 
             class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
           >
-            <option value="Semester 1">Semester 1 (Foundation & Core)</option>
-            <option value="Semester 2">Semester 2 (Advanced Strategy)</option>
-            <option value="Semester 3">Semester 3 (Specializations)</option>
-            <option value="Semester 4">Semester 4 (Capstone & Cases)</option>
-          </select>
         </div>
 
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1.5">Description (Optional)</label>
           <textarea 
             id="modal-subject-desc-input" 
-            rows="3" 
-            placeholder="Brief description of the course curriculum or semester focus..." 
+            rows="2" 
+            placeholder="Brief overview of curriculum topics and presentation focus..." 
             class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm resize-none"
           ></textarea>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Color Accent</label>
+          <input type="hidden" id="modal-subject-color-input" value="#3B82F6">
+          <div class="flex items-center space-x-2 pt-1" id="create-subject-color-swatches">
+            <button type="button" onclick="App.selectCreateSubjectColor('#3B82F6', this)" class="w-7 h-7 rounded-full bg-[#3B82F6] ring-2 ring-white scale-110 transition"></button>
+            <button type="button" onclick="App.selectCreateSubjectColor('#06B6D4', this)" class="w-7 h-7 rounded-full bg-[#06B6D4] ring-0 transition"></button>
+            <button type="button" onclick="App.selectCreateSubjectColor('#6366F1', this)" class="w-7 h-7 rounded-full bg-[#6366F1] ring-0 transition"></button>
+            <button type="button" onclick="App.selectCreateSubjectColor('#8B5CF6', this)" class="w-7 h-7 rounded-full bg-[#8B5CF6] ring-0 transition"></button>
+            <button type="button" onclick="App.selectCreateSubjectColor('#10B981', this)" class="w-7 h-7 rounded-full bg-[#10B981] ring-0 transition"></button>
+            <button type="button" onclick="App.selectCreateSubjectColor('#F59E0B', this)" class="w-7 h-7 rounded-full bg-[#F59E0B] ring-0 transition"></button>
+            <button type="button" onclick="App.selectCreateSubjectColor('#F43F5E', this)" class="w-7 h-7 rounded-full bg-[#F43F5E] ring-0 transition"></button>
+          </div>
         </div>
       </div>
 
@@ -1596,11 +1664,16 @@
     </div>
   </div>
 
-  <!-- 2. RENAME SUBJECT MODAL -->
+  <!-- 2. EDIT / RENAME SUBJECT MODAL -->
   <div id="modal-rename-subject" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
-    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl space-y-5 animate-fade-in max-h-[90vh] overflow-y-auto">
       <div class="flex items-center justify-between">
-        <h3 class="text-lg font-bold text-white">Rename Subject</h3>
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-indigo-600/20 text-indigo-400 flex items-center justify-center">
+            <i data-lucide="edit-3" class="w-5 h-5"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">Edit Subject Details</h3>
+        </div>
         <button onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
@@ -1609,13 +1682,56 @@
       <input type="hidden" id="modal-rename-subject-id">
       <div class="space-y-4">
         <div>
-          <label class="block text-xs font-semibold text-slate-300 mb-1.5">New Subject Name *</label>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Subject Name *</label>
           <input 
             id="modal-rename-subject-input" 
             type="text" 
             class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
           >
+          <p id="modal-rename-subject-error" class="hidden text-rose-400 text-xs mt-1.5"></p>
         </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Semester</label>
+            <select 
+              id="modal-rename-subject-semester-select" 
+              class="w-full px-3.5 py-2.5 bg-[#131B2E] border border-white/10 rounded-xl focus:border-blue-500 focus:outline-none text-slate-100 text-xs sm:text-sm"
+            >
+              <option value="Semester 1">Semester 1 (Core & Foundation)</option>
+              <option value="Semester 2">Semester 2 (Advanced Strategy)</option>
+              <option value="Semester 3">Semester 3 (Specializations)</option>
+              <option value="Semester 4">Semester 4 (Capstone & Cases)</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-300 mb-1.5">Category / Track</label>
+            <select 
+              id="modal-rename-subject-category-select" 
+              class="w-full px-3.5 py-2.5 bg-[#131B2E] border border-white/10 rounded-xl focus:border-blue-500 focus:outline-none text-slate-100 text-xs sm:text-sm"
+            >
+              <option value="Product Management">Product Management</option>
+              <option value="Marketing & Growth">Marketing & Growth</option>
+              <option value="Finance & Valuation">Finance & Valuation</option>
+              <option value="Business Analytics & AI">Business Analytics & AI</option>
+              <option value="Operations & Supply Chain">Operations & Supply Chain</option>
+              <option value="Business Strategy">Business Strategy</option>
+              <option value="General Management">General Management</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Learning Goals</label>
+          <input 
+            id="modal-rename-subject-goals-input" 
+            type="text" 
+            placeholder="Key learning outcomes or case goals" 
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+          >
+        </div>
+
         <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1.5">Description</label>
           <textarea 
@@ -1628,7 +1744,87 @@
 
       <div class="flex items-center justify-end space-x-3 pt-2">
         <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white transition">Cancel</button>
-        <button onclick="App.submitRenameSubject()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition">Save Changes</button>
+        <button id="modal-rename-subject-btn" onclick="App.submitRenameSubject()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition">Save Changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PROFILE & ACCOUNT SETTINGS MODAL -->
+  <div id="modal-profile" class="fixed inset-0 z-50 bg-black/70 backdrop-blur-md hidden flex items-center justify-center p-4">
+    <div class="bg-[#0E1626] border border-white/15 rounded-3xl p-6 sm:p-8 max-w-md w-full shadow-2xl space-y-5 animate-fade-in">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center space-x-2.5">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-xs shadow-md">
+            VS
+          </div>
+          <div>
+            <h3 class="text-base font-bold text-white leading-tight">Account & Profile</h3>
+            <p class="text-[11px] text-slate-400">Personal AI Learning Platform</p>
+          </div>
+        </div>
+        <button onclick="App.closeModals()" class="text-slate-400 hover:text-white p-1">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- User Card -->
+      <div class="p-4 rounded-2xl bg-white/[0.03] border border-white/10 flex items-center space-x-3.5">
+        <div class="w-12 h-12 rounded-2xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center font-bold text-base shadow-lg border border-white/20 flex-shrink-0">
+          VS
+        </div>
+        <div class="overflow-hidden">
+          <h4 id="profile-modal-name" class="text-sm font-bold text-white truncate">Vishal Singh</h4>
+          <p id="profile-modal-role" class="text-xs text-blue-400 font-medium">MBA Scholar • Product Management</p>
+          <p id="profile-modal-username" class="text-[11px] text-slate-400 truncate">@vishal</p>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="grid grid-cols-2 gap-3">
+        <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/10 text-center">
+          <p id="profile-stats-subjects" class="text-xl font-extrabold text-white">0</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Enrolled Subjects</p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-white/[0.02] border border-white/10 text-center">
+          <p id="profile-stats-presentations" class="text-xl font-extrabold text-cyan-400">0</p>
+          <p class="text-[11px] text-slate-400 mt-0.5">Uploaded PPTs</p>
+        </div>
+      </div>
+
+      <!-- Account Details -->
+      <div class="space-y-2 text-xs">
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+          <span class="text-slate-400">Platform</span>
+          <span class="font-semibold text-slate-200">VISHAL SINGH LMS 2.0</span>
+        </div>
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+          <span class="text-slate-400">AI Engine</span>
+          <span class="font-semibold text-emerald-400 flex items-center space-x-1">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+            <span>Gemini Pro & Flash Active</span>
+          </span>
+        </div>
+        <div class="flex items-center justify-between p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+          <span class="text-slate-400">Teaching Mode</span>
+          <span class="font-semibold text-indigo-300">MBA Student Mode</span>
+        </div>
+      </div>
+
+      <!-- Logout & Close Buttons -->
+      <div class="flex items-center space-x-3 pt-2">
+        <button 
+          onclick="App.handleLogout()" 
+          class="flex-1 py-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-semibold transition flex items-center justify-center space-x-1.5"
+        >
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          <span>Log Out</span>
+        </button>
+        <button 
+          onclick="App.closeModals()" 
+          class="flex-1 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-slate-200 hover:text-white border border-white/10 text-xs font-semibold transition"
+        >
+          Close
+        </button>
       </div>
     </div>
   </div>
