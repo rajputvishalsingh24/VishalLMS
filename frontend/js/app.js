@@ -277,11 +277,21 @@ export const App = {
     this.initLucide();
   },
 
+  async loadSubjects() {
+    try {
+      const subjects = await API.getSubjects();
+      this.state.subjects = Array.isArray(subjects) ? subjects : [];
+      return this.state.subjects;
+    } catch (e) {
+      console.error('Failed to load subjects:', e);
+      return [];
+    }
+  },
+
   // ==================== 1. MAIN DASHBOARD ====================
   async loadDashboard() {
     try {
-      const subjects = await API.getSubjects();
-      this.state.subjects = subjects || [];
+      await this.loadSubjects();
 
       const countBadge = document.getElementById('subject-count-badge');
       if (countBadge) countBadge.innerText = `${this.state.subjects.length} Subjects`;
@@ -2129,43 +2139,71 @@ export const App = {
 
   // ==================== 4. SUBJECT CRUD MODALS ====================
   openCreateSubjectModal() {
+    this.isCreatingSubject = false;
     const nameInput = document.getElementById('modal-subject-name-input');
     const descInput = document.getElementById('modal-subject-desc-input');
     const err = document.getElementById('modal-subject-error');
+    const btn = document.getElementById('modal-create-subject-btn');
     if (nameInput) nameInput.value = '';
     if (descInput) descInput.value = '';
     if (err) {
       err.innerText = '';
       err.classList.add('hidden');
     }
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = `<span>Create Subject</span>`;
+    }
     document.getElementById('modal-create-subject')?.classList.remove('hidden');
     nameInput?.focus();
   },
 
   async submitCreateSubject() {
+    if (this.isCreatingSubject) return;
+
     const nameInput = document.getElementById('modal-subject-name-input');
     const descInput = document.getElementById('modal-subject-desc-input');
+    const semSelect = document.getElementById('modal-subject-semester-select');
     const err = document.getElementById('modal-subject-error');
+    const btn = document.getElementById('modal-create-subject-btn');
 
     const name = nameInput ? nameInput.value.trim() : '';
     const desc = descInput ? descInput.value.trim() : '';
+    const semester = semSelect ? semSelect.value : 'Semester 1';
 
     if (!name) {
       if (err) {
         err.innerText = 'Please enter a subject name.';
         err.classList.remove('hidden');
       }
+      nameInput?.focus();
       return;
     }
 
+    this.isCreatingSubject = true;
+    if (err) err.classList.add('hidden');
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = `<span class="inline-block animate-spin mr-1.5">⏳</span><span>Creating...</span>`;
+    }
+
     try {
-      await API.createSubject({ name, description: desc, semester: 'MBA Core' });
-      this.closeModals();
+      await API.createSubject({ name, description: desc, semester });
+      await this.loadSubjects();
       await this.loadDashboard();
+      this.closeModals();
+      if (nameInput) nameInput.value = '';
+      if (descInput) descInput.value = '';
     } catch (e) {
       if (err) {
-        err.innerText = e.message || 'Subject already exists or could not be created.';
+        err.innerText = e.message || 'Subject could not be created. Please try again.';
         err.classList.remove('hidden');
+      }
+    } finally {
+      this.isCreatingSubject = false;
+      if (btn) {
+        btn.disabled = false;
+        btn.innerHTML = `<span>Create Subject</span>`;
       }
     }
   },
@@ -2254,26 +2292,42 @@ export const App = {
   },
 
   // ==================== 5. PPT UPLOAD EXPERIENCE (7 STAGES) ====================
-  openUploadPptModal(preselectedSubjectId = null) {
+  async openUploadPptModal(preselectedSubjectId = null) {
     this.state.selectedUploadFile = null;
     this.state.uploadTargetSubjectId = preselectedSubjectId;
+
+    if (!this.state.subjects || this.state.subjects.length === 0) {
+      await this.loadSubjects();
+    }
 
     const fileInput = document.getElementById('modal-ppt-file-input');
     if (fileInput) fileInput.value = '';
     const title = document.getElementById('dropzone-text-title');
     const subtitle = document.getElementById('dropzone-text-subtitle');
     if (title) title.innerText = 'Click to browse or drag and drop presentation';
-    if (subtitle) subtitle.innerText = 'Accepts Microsoft PowerPoint (.ppt, .pptx)';
+    if (subtitle) subtitle.innerText = 'Accepts Microsoft PowerPoint (.ppt, .pptx) & PDF (.pdf)';
     
     const submitBtn = document.getElementById('modal-upload-submit-btn');
-    if (submitBtn) submitBtn.disabled = true;
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.innerHTML = `<span>Upload & Analyze</span>`;
+    }
 
     const select = document.getElementById('modal-upload-subject-select');
-    if (select && this.state.subjects) {
-      select.innerHTML = this.state.subjects.map(s => `
-        <option value="${s.id}" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
-      `).join('');
+    if (select) {
+      if (this.state.subjects && this.state.subjects.length > 0) {
+        select.innerHTML = this.state.subjects.map(s => `
+          <option value="${s.id}" ${s.id === preselectedSubjectId ? 'selected' : ''}>${this.escapeHtml(s.name)}</option>
+        `).join('');
+      } else {
+        select.innerHTML = `<option value="">MBA Core Curriculum</option>`;
+      }
     }
+
+    const errorBox = document.getElementById('modal-upload-error-box');
+    const errorText = document.getElementById('modal-upload-error');
+    if (errorBox) errorBox.classList.add('hidden');
+    if (errorText) errorText.innerText = '';
 
     document.getElementById('upload-stage-form')?.classList.remove('hidden');
     document.getElementById('upload-stage-processing')?.classList.add('hidden');
@@ -2281,6 +2335,7 @@ export const App = {
     document.getElementById('upload-modal-close-btn')?.classList.remove('hidden');
 
     document.getElementById('modal-upload-ppt')?.classList.remove('hidden');
+    this.initLucide();
   },
 
   openUploadPptForCurrentSubject() {

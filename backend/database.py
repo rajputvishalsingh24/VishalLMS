@@ -61,13 +61,16 @@ def _run_init_script(conn):
 
     CREATE TABLE IF NOT EXISTS subjects (
         id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
         name TEXT NOT NULL,
         semester TEXT NOT NULL DEFAULT 'Semester 1',
         description TEXT DEFAULT '',
         code TEXT DEFAULT '',
         color TEXT DEFAULT '#3B82F6',
         icon TEXT DEFAULT 'Folder',
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     CREATE TABLE IF NOT EXISTS topics (
@@ -84,6 +87,7 @@ def _run_init_script(conn):
 
     CREATE TABLE IF NOT EXISTS documents (
         id TEXT PRIMARY KEY,
+        user_id TEXT DEFAULT 'user_vishal',
         subject_id TEXT,
         topic_id TEXT,
         name TEXT NOT NULL,
@@ -97,8 +101,11 @@ def _run_init_script(conn):
         slide_count INTEGER DEFAULT 0,
         page_count INTEGER DEFAULT 0,
         is_processed BOOLEAN DEFAULT 0,
-        processing_status TEXT DEFAULT 'pending',
+        status TEXT DEFAULT 'ready',
+        processing_status TEXT DEFAULT 'completed',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (subject_id) REFERENCES subjects(id) ON DELETE SET NULL,
         FOREIGN KEY (topic_id) REFERENCES topics(id) ON DELETE SET NULL
     );
@@ -648,6 +655,44 @@ def _run_safe_migrations(conn):
         if "is_mastered" not in pf_cols:
             try:
                 c.execute("ALTER TABLE presentation_flashcards ADD COLUMN is_mastered BOOLEAN DEFAULT 0")
+            except Exception:
+                pass
+
+        # Safe migrations for subjects: user_id, updated_at
+        s_cols = [r[1] for r in c.execute("PRAGMA table_info(subjects)").fetchall()]
+        if "user_id" not in s_cols:
+            try:
+                c.execute("ALTER TABLE subjects ADD COLUMN user_id TEXT DEFAULT 'user_vishal'")
+            except Exception:
+                pass
+        if "updated_at" not in s_cols:
+            try:
+                c.execute("ALTER TABLE subjects ADD COLUMN updated_at TEXT")
+                c.execute("UPDATE subjects SET updated_at = created_at WHERE updated_at IS NULL")
+            except Exception:
+                pass
+
+        # Safe migrations for documents: user_id, processing_status, status, updated_at
+        d_cols = [r[1] for r in c.execute("PRAGMA table_info(documents)").fetchall()]
+        if "user_id" not in d_cols:
+            try:
+                c.execute("ALTER TABLE documents ADD COLUMN user_id TEXT DEFAULT 'user_vishal'")
+            except Exception:
+                pass
+        if "processing_status" not in d_cols:
+            try:
+                c.execute("ALTER TABLE documents ADD COLUMN processing_status TEXT DEFAULT 'completed'")
+            except Exception:
+                pass
+        if "status" not in d_cols:
+            try:
+                c.execute("ALTER TABLE documents ADD COLUMN status TEXT DEFAULT 'ready'")
+            except Exception:
+                pass
+        if "updated_at" not in d_cols:
+            try:
+                c.execute("ALTER TABLE documents ADD COLUMN updated_at TEXT")
+                c.execute("UPDATE documents SET updated_at = created_at WHERE updated_at IS NULL")
             except Exception:
                 pass
     except Exception:

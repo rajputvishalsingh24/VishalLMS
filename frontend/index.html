@@ -1562,6 +1562,19 @@
         </div>
 
         <div>
+          <label class="block text-xs font-semibold text-slate-300 mb-1.5">Semester</label>
+          <select 
+            id="modal-subject-semester-select" 
+            class="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-xl focus:bg-white/10 focus:border-blue-500 focus:outline-none text-slate-100 text-sm"
+          >
+            <option value="Semester 1">Semester 1 (Foundation & Core)</option>
+            <option value="Semester 2">Semester 2 (Advanced Strategy)</option>
+            <option value="Semester 3">Semester 3 (Specializations)</option>
+            <option value="Semester 4">Semester 4 (Capstone & Cases)</option>
+          </select>
+        </div>
+
+        <div>
           <label class="block text-xs font-semibold text-slate-300 mb-1.5">Description (Optional)</label>
           <textarea 
             id="modal-subject-desc-input" 
@@ -1576,7 +1589,7 @@
         <button onclick="App.closeModals()" class="px-4 py-2 rounded-xl text-xs font-semibold text-slate-300 hover:text-white hover:bg-white/5 transition">
           Cancel
         </button>
-        <button onclick="App.submitCreateSubject()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-1.5">
+        <button id="modal-create-subject-btn" onclick="App.submitCreateSubject()" class="px-5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs shadow-md transition flex items-center space-x-1.5">
           <span>Create Subject</span>
         </button>
       </div>

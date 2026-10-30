@@ -3,6 +3,16 @@ const API_BASE = window.location.origin.includes('localhost') || window.location
   ? '' 
   : '';
 
+function getAuthHeaders(extra = {}) {
+  const token = localStorage.getItem('vishal_lms_token');
+  const headers = { ...extra };
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+    headers['X-Auth-Token'] = token;
+  }
+  return headers;
+}
+
 export const API = {
   // Auth
   async login(username, password) {
@@ -19,32 +29,39 @@ export const API = {
   },
 
   async logout(token) {
-    const res = await fetch(`/api/auth/logout?token=${token || ''}`, { method: 'POST' });
+    const activeToken = token || localStorage.getItem('vishal_lms_token') || '';
+    const res = await fetch(`/api/auth/logout?token=${activeToken}`, {
+      method: 'POST',
+      headers: getAuthHeaders()
+    });
     return res.json();
   },
 
   async getCurrentUser(token) {
-    const res = await fetch(`/api/auth/me?token=${token || ''}`);
+    const activeToken = token || localStorage.getItem('vishal_lms_token') || '';
+    const res = await fetch(`/api/auth/me?token=${activeToken}`, {
+      headers: getAuthHeaders()
+    });
     if (!res.ok) return { authenticated: false };
     return res.json();
   },
 
   // Stats
   async getStats() {
-    const res = await fetch('/api/stats');
+    const res = await fetch('/api/stats', { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch stats');
     return res.json();
   },
 
   // Subjects
   async getSubjects() {
-    const res = await fetch('/api/subjects');
+    const res = await fetch('/api/subjects', { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch subjects');
     return res.json();
   },
 
   async getSubjectDetail(id) {
-    const res = await fetch(`/api/subjects/${id}`);
+    const res = await fetch(`/api/subjects/${id}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch subject details');
     return res.json();
   },
@@ -52,7 +69,7 @@ export const API = {
   async createSubject(data) {
     const res = await fetch('/api/subjects', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -65,7 +82,7 @@ export const API = {
   async updateSubject(id, data) {
     const res = await fetch(`/api/subjects/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -76,7 +93,10 @@ export const API = {
   },
 
   async deleteSubject(id) {
-    const res = await fetch(`/api/subjects/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/subjects/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to delete subject');
     return res.json();
   },
@@ -84,7 +104,7 @@ export const API = {
   async updateTopicStatus(id, status, progress) {
     const res = await fetch(`/api/topics/${id}/status`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ status, progress })
     });
     if (!res.ok) throw new Error('Failed to update topic status');
@@ -94,13 +114,13 @@ export const API = {
   // Documents
   async getDocuments(params = {}) {
     const q = new URLSearchParams(params).toString();
-    const res = await fetch(`/api/documents?${q}`);
+    const res = await fetch(`/api/documents?${q}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch documents');
     return res.json();
   },
 
   async getDocument(id) {
-    const res = await fetch(`/api/documents/${id}`);
+    const res = await fetch(`/api/documents/${id}`, { headers: getAuthHeaders() });
     if (!res.ok) throw new Error('Failed to fetch document details');
     return res.json();
   },
@@ -108,6 +128,7 @@ export const API = {
   async uploadDocument(formData) {
     const res = await fetch('/api/documents/upload', {
       method: 'POST',
+      headers: getAuthHeaders(),
       body: formData
     });
     if (!res.ok) {
@@ -120,7 +141,7 @@ export const API = {
   async updateDocument(id, data) {
     const res = await fetch(`/api/documents/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(data)
     });
     if (!res.ok) {
@@ -131,7 +152,10 @@ export const API = {
   },
 
   async deleteDocument(id) {
-    const res = await fetch(`/api/documents/${id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/documents/${id}`, {
+      method: 'DELETE',
+      headers: getAuthHeaders()
+    });
     if (!res.ok) throw new Error('Failed to delete document');
     return res.json();
   },

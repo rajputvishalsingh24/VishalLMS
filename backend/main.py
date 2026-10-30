@@ -125,26 +125,58 @@ def logout(token: Optional[str] = Query(None)):
         conn.close()
     return {"success": True, "message": "Logged out successfully"}
 
-@app.get("/api/auth/me")
-def get_current_user(token: Optional[str] = Query(None)):
-    conn = get_connection()
-    if token:
-        session = conn.execute("""
-        SELECT u.id, u.username, u.full_name, u.program 
-        FROM user_sessions s
-        JOIN users u ON s.user_id = u.id
-        WHERE s.token = ?
-        """, (token,)).fetchone()
-        if session:
-            conn.close()
-            return {"authenticated": True, "user": dict(session)}
+def get_auth_user(request: Request, conn=None) -> Dict[str, Any]:
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+    try:
+        token = None
+        # Check Authorization header (Bearer <token>)
+        auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+        if auth_header:
+            if auth_header.startswith("Bearer "):
+                token = auth_header.split(" ", 1)[1].strip()
+            else:
+                token = auth_header.strip()
+        
+        # Check X-Auth-Token header
+        if not token:
+            token = request.headers.get("X-Auth-Token") or request.headers.get("x-auth-token")
+            
+        # Check query params
+        if not token:
+            token = request.query_params.get("token")
+            
+        if token:
+            session = conn.execute("""
+            SELECT u.id, u.username, u.full_name, u.program 
+            FROM user_sessions s
+            JOIN users u ON s.user_id = u.id
+            WHERE s.token = ?
+            """, (token,)).fetchone()
+            if session:
+                return dict(session)
 
-    # Default to main user if session is valid or single-user desktop environment
-    user = conn.execute("SELECT id, username, full_name, program FROM users LIMIT 1").fetchone()
-    conn.close()
-    if user:
-        return {"authenticated": True, "user": dict(user)}
-    return {"authenticated": False}
+        # Default fallback to primary user or first user
+        user = conn.execute("SELECT id, username, full_name, program FROM users WHERE id = 'user_vishal' LIMIT 1").fetchone()
+        if not user:
+            user = conn.execute("SELECT id, username, full_name, program FROM users LIMIT 1").fetchone()
+        if user:
+            return dict(user)
+        return {"id": "user_vishal", "username": "vishal", "full_name": "Vishal Singh", "program": "Master of Business Administration (MBA)"}
+    finally:
+        if should_close:
+            conn.close()
+
+@app.get("/api/auth/me")
+def get_current_user(request: Request, token: Optional[str] = Query(None)):
+    conn = get_connection()
+    try:
+        user = get_auth_user(request, conn)
+        return {"authenticated": True, "user": user}
+    finally:
+        conn.close()
 
 # ----------------- STATS & DASHBOARD ----------------- #
 @app.get("/api/stats")
@@ -201,8 +233,10 @@ def get_dashboard_stats():
 
 # ----------------- SUBJECTS & TOPICS ----------------- #
 @app.get("/api/subjects")
-def get_subjects():
+def get_subjects(request: Request):
     conn = get_connection()
+    user = get_auth_user(request, conn)
+    user_id = user.get("id", "user_vishal")
     c = conn.cursor()
     
     subjects = c.execute("""
@@ -213,9 +247,10 @@ def get_subjects():
     FROM subjects s
     LEFT JOIN topics t ON s.id = t.subject_id
     LEFT JOIN documents d ON s.id = d.subject_id
+    WHERE s.user_id = ? OR s.user_id = 'user_vishal' OR s.user_id IS NULL OR ? = 'user_vishal'
     GROUP BY s.id
-    ORDER BY s.semester ASC, s.name ASC
-    """).fetchall()
+    ORDER BY s.semester ASC, s.created_at DESC, s.name ASC
+    """, (user_id, user_id)).fetchall()
 
     result = []
     for s in subjects:
@@ -236,50 +271,72 @@ class SubjectCreate(BaseModel):
     color: str = "#3B82F6"
 
 @app.get("/api/subjects/{id}")
-def get_subject_detail(id: str):
+def get_subject_detail(id: str, request: Request):
     conn = get_connection()
     subj = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
     if not subj:
         conn.close()
         raise HTTPException(status_code=404, detail="Subject not found")
     docs = conn.execute("SELECT * FROM documents WHERE subject_id = ? ORDER BY created_at DESC", (id,)).fetchall()
+    topics = conn.execute("SELECT * FROM topics WHERE subject_id = ? ORDER BY order_index ASC", (id,)).fetchall()
     conn.close()
     res = dict(subj)
     res["documents"] = [dict(d) for d in docs]
+    res["topics"] = [dict(t) for t in topics]
     return res
 
 @app.post("/api/subjects")
-def create_subject(subj: SubjectCreate):
+def create_subject(subj: SubjectCreate, request: Request):
     name = subj.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="Subject name cannot be empty")
+    
     conn = get_connection()
-    existing = conn.execute("SELECT id FROM subjects WHERE LOWER(name) = LOWER(?)", (name,)).fetchone()
-    if existing:
-        conn.close()
-        raise HTTPException(status_code=400, detail=f"A subject named '{name}' already exists.")
+    user = get_auth_user(request, conn)
+    user_id = user.get("id", "user_vishal")
+    
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     s_id = f"sub_{uuid.uuid4().hex[:8]}"
-    conn.execute("INSERT INTO subjects (id, name, semester, description, color) VALUES (?, ?, ?, ?, ?)",
-                 (s_id, name, subj.semester, subj.description.strip(), subj.color))
+    
+    conn.execute(
+        """
+        INSERT INTO subjects (id, user_id, name, semester, description, color, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (s_id, user_id, name, subj.semester, subj.description.strip(), subj.color, now_str, now_str)
+    )
     conn.commit()
     conn.close()
-    return {"id": s_id, "name": name, "description": subj.description.strip()}
+    
+    return {
+        "success": True,
+        "id": s_id,
+        "user_id": user_id,
+        "name": name,
+        "semester": subj.semester,
+        "description": subj.description.strip(),
+        "color": subj.color,
+        "created_at": now_str,
+        "updated_at": now_str,
+        "message": f"Subject '{name}' created successfully."
+    }
 
 class SubjectUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
 
 @app.put("/api/subjects/{id}")
-def update_subject(id: str, subj: SubjectUpdate):
+def update_subject(id: str, subj: SubjectUpdate, request: Request):
     conn = get_connection()
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
     if subj.name:
         name = subj.name.strip()
         if not name:
             conn.close()
             raise HTTPException(status_code=400, detail="Subject name cannot be empty")
-        conn.execute("UPDATE subjects SET name = ?, description = COALESCE(?, description) WHERE id = ?", (name, subj.description, id))
+        conn.execute("UPDATE subjects SET name = ?, description = COALESCE(?, description), updated_at = ? WHERE id = ?", (name, subj.description, now_str, id))
     elif subj.description is not None:
-        conn.execute("UPDATE subjects SET description = ? WHERE id = ?", (subj.description.strip(), id))
+        conn.execute("UPDATE subjects SET description = ?, updated_at = ? WHERE id = ?", (subj.description.strip(), now_str, id))
     
     updated = conn.execute("SELECT * FROM subjects WHERE id = ?", (id,)).fetchone()
     conn.commit()
@@ -287,14 +344,16 @@ def update_subject(id: str, subj: SubjectUpdate):
     return {"success": True, "id": id, "name": updated["name"] if updated else "", "description": updated["description"] if updated else ""}
 
 @app.delete("/api/subjects/{id}")
-def delete_subject(id: str):
+def delete_subject(id: str, request: Request):
     conn = get_connection()
     # Cascade delete documents and chunks
+    conn.execute("DELETE FROM document_chunks WHERE document_id IN (SELECT id FROM documents WHERE subject_id = ?)", (id,))
     conn.execute("DELETE FROM documents WHERE subject_id = ?", (id,))
+    conn.execute("DELETE FROM topics WHERE subject_id = ?", (id,))
     conn.execute("DELETE FROM subjects WHERE id = ?", (id,))
     conn.commit()
     conn.close()
-    return {"success": True}
+    return {"success": True, "message": "Subject deleted successfully"}
 
 class TopicStatusUpdate(BaseModel):
     status: str
@@ -311,6 +370,7 @@ def update_topic_status(id: str, data: TopicStatusUpdate):
 # ----------------- DOCUMENTS & UPLOADS ----------------- #
 @app.get("/api/documents")
 def get_documents(
+    request: Request,
     subject_id: Optional[str] = None,
     file_type: Optional[str] = None,
     semester: Optional[str] = None,
@@ -318,14 +378,16 @@ def get_documents(
     sort_by: str = "newest"
 ):
     conn = get_connection()
+    user = get_auth_user(request, conn)
+    user_id = user.get("id", "user_vishal")
     query = """
     SELECT d.*, s.name as subject_name, s.color as subject_color, t.name as topic_name
     FROM documents d
     LEFT JOIN subjects s ON d.subject_id = s.id
     LEFT JOIN topics t ON d.topic_id = t.id
-    WHERE 1=1
+    WHERE (d.user_id = ? OR d.user_id = 'user_vishal' OR d.user_id IS NULL OR ? = 'user_vishal')
     """
-    params = []
+    params = [user_id, user_id]
 
     if subject_id and subject_id != "all":
         query += " AND d.subject_id = ?"
@@ -398,6 +460,7 @@ def get_document_details(id: str):
 
 @app.post("/api/documents/upload")
 async def upload_document(
+    request: Request,
     file: UploadFile = File(...),
     subject_id: Optional[str] = Form(None),
     topic_id: Optional[str] = Form(None),
@@ -447,6 +510,8 @@ async def upload_document(
 
     # Resolve and validate target subject to guarantee valid foreign key
     conn = get_connection()
+    user = get_auth_user(request, conn)
+    user_id = user.get("id", "user_vishal")
     c = conn.cursor()
 
     target_subject_id = None
@@ -456,14 +521,14 @@ async def upload_document(
             target_subject_id = s_row["id"]
 
     if not target_subject_id:
-        first_sub = c.execute("SELECT id FROM subjects ORDER BY created_at ASC LIMIT 1").fetchone()
+        first_sub = c.execute("SELECT id FROM subjects WHERE user_id = ? OR user_id = 'user_vishal' ORDER BY created_at ASC LIMIT 1", (user_id,)).fetchone()
         if first_sub:
             target_subject_id = first_sub["id"]
         else:
             default_sub_id = f"sub_{uuid.uuid4().hex[:8]}"
             c.execute(
-                "INSERT INTO subjects (id, name, description) VALUES (?, 'MBA Core Curriculum', 'Default subject for uploaded class presentations and study materials')",
-                (default_sub_id,)
+                "INSERT INTO subjects (id, user_id, name, description) VALUES (?, ?, 'MBA Core Curriculum', 'Default subject for uploaded class presentations and study materials')",
+                (default_sub_id, user_id)
             )
             conn.commit()
             target_subject_id = default_sub_id
@@ -488,16 +553,18 @@ async def upload_document(
         }]
 
     slide_count = max(1, len(extracted_chunks))
+    now_str = datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S")
 
     c.execute("""
     INSERT INTO documents (
-        id, subject_id, topic_id, name, original_filename, file_type, file_size,
-        file_path, semester, faculty, description, tags, slide_count, page_count, progress
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
+        id, user_id, subject_id, topic_id, name, original_filename, file_type, file_size,
+        file_path, semester, faculty, description, tags, slide_count, page_count, progress,
+        status, processing_status, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 'ready', 'completed', ?, ?)
     """, (
-        doc_id, target_subject_id, clean_topic_id, safe_filename, safe_filename,
+        doc_id, user_id, target_subject_id, clean_topic_id, safe_filename, safe_filename,
         real_ext.upper(), file_size, file_path, semester, faculty, description, tags,
-        slide_count, slide_count
+        slide_count, slide_count, now_str, now_str
     ))
 
     for idx, chunk in enumerate(extracted_chunks, start=1):
@@ -534,8 +601,11 @@ async def upload_document(
         "id": doc_id,
         "name": safe_filename,
         "subject_id": target_subject_id,
+        "user_id": user_id,
         "slide_count": slide_count,
         "file_size": file_size,
+        "status": "ready",
+        "processing_status": "completed",
         "message": f"Successfully uploaded and processed {slide_count} slides!"
     }
 

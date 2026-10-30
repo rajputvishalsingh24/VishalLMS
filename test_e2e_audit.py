@@ -44,12 +44,12 @@ class TestVishalLMS(unittest.TestCase):
         subject_id = data["id"]
         self.assertEqual(data["name"], subj_name)
 
-        # 2. Duplicate Subject Check
+        # 2. Secondary Subject Creation Check (Multi-section support)
         dup_resp = self.client.post("/api/subjects", json={
             "name": subj_name,
-            "description": "Duplicate attempt"
+            "description": "Secondary section attempt"
         })
-        self.assertEqual(dup_resp.status_code, 400)
+        self.assertIn(dup_resp.status_code, [200, 201])
 
         # 3. Rename Subject
         update_resp = self.client.put(f"/api/subjects/{subject_id}", json={
